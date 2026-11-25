@@ -63,6 +63,22 @@ plan's recipe, overrides and train seed, C_70's parent. The data is
 `MyDrive/denso/da34/cuts/C70_R1.tar` (`round_cut pack`), S70 then the targeted set with
 ALL's stats, checked by `round_cut.round_problems` before any install.
 
+Run M (DA-48, `--branch M`) is one run on the fixed-jig scene over four joined demo sets
+(`mixplan`, `configs/runplans/tray/he-tray-jig-m.yaml`). It runs only once that plan is
+frozen and its id is set as `MIX_FROZEN`; until then it refuses, whatever the plan file
+says. The data is `MyDrive/<plan drive.cuts>/M.tar` (`mixplan pack`), checked by
+`mixplan.cut_problems` before any install; job `da48-ft-m-s0`, recipe, step count, train
+seed and parent are the plan's. Use `--work /content/da48`.
+
+`restore` (any branch) copies `<durable>/<job id>` back to `<work>/runs/<job id>` on a new
+VM, after `setup` and before `train`, so Psi0Trainer resumes the run where the last
+complete checkpoint `persist` copied left it (same job id, so the same run folder and
+the next attempt number). The durable folder is `MyDrive/<plan drive.runs>` for M and
+`--from` for the others; it refuses when the source is missing or empty (Drive not
+mounted) and when the VM already holds that run.
+
+    python3 -m flywheel_psi0.tray.colab_train restore --branch M --work /content/da48
+
 CUDA toolkit (11/11/2026): the Colab image of that day ships only CUDA 13.0 and no
 `nvcc` on PATH, while Psi0's torch is 2.7.0+cu126. A job that builds a C++/CUDA op at
 run time (DeepSpeed's ZeRO-3 of stage 1) then fails its pre-flight: DeepSpeed's
@@ -104,8 +120,9 @@ from flywheel_psi0.trainer.colab import (
     sh,
 )
 from flywheel_psi0.trainer.recipe import ParentCheckpoint, Psi0Recipe
-from flywheel_psi0.tray import pair_cut, pairround, round_cut
+from flywheel_psi0.tray import mixplan, pair_cut, pairround, round_cut
 from flywheel_psi0.tray.demo_sets import DemoSets, canonical_sha256
+from flywheel_psi0.tray.mixplan import TrayMixPlan
 from flywheel_psi0.tray.pairplan import TrayPairPlan
 from flywheel_psi0.tray.pairplan import check as pair_check
 from flywheel_psi0.tray.pairplan import pending as pair_pending
@@ -146,6 +163,11 @@ ROUND_C70_PLAN = "configs/runplans/tray/round-tray-c70.yaml"
 # R1-R14 (tray.md 20.9, 20.13, 20.15, 20.16); no C70_R1 job runs any other plan id.
 ROUND_C70_FROZEN: str | None = "rp_aae292bc79da"
 ROUND_C70 = "C70_R1"
+MIX_PLAN = "configs/runplans/tray/he-tray-jig-m.yaml"
+# Set by DA-48's freeze PR (task 3.2) to he-tray-jig-m.lock.json's id; until then no M job
+# runs, whatever the plan file says.
+MIX_FROZEN: str | None = None
+MIX = "M"
 DRIVE = Path("/content/drive/MyDrive")  # `colab drivemount -s <session> /content/drive`
 STAGE1_DIR = "cache/checkpoints/stage1"  # under Psi0, beside the psi-model snapshot
 WEIGHTS = "model.safetensors"  # the one file a stage 1 VLM folder changes
@@ -323,6 +345,28 @@ def load_pair_round(repo: Path = REPO) -> tuple[TrayPairPlan, pairround.TrayPair
     return pair, plan, ROUND_C70_FROZEN
 
 
+def load_mix(repo: Path = REPO) -> tuple[TrayMixPlan, str]:
+    """The frozen plan of run M and its id, or SystemExit with every reason not to run."""
+    path = repo / MIX_PLAN
+    plan = TrayMixPlan.load(path)
+    problems = mixplan.check(plan, repo) + mixplan.launch_problems(plan, path)
+    if MIX_FROZEN is None:
+        problems.append("no M plan is approved yet: MIX_FROZEN is unset (DA-48 task 3.2)")
+    elif run_plan_id(plan) != MIX_FROZEN:
+        problems.append(f"{MIX_PLAN} is {run_plan_id(plan)}; only {MIX_FROZEN} is approved")
+    if list(plan.branches) != [MIX]:
+        problems.append(f"the M plan's branches are {list(plan.branches)}, not [{MIX}]")
+    if problems:
+        raise SystemExit("M plan does not hold, no training:\n  " + "\n  ".join(problems))
+    assert MIX_FROZEN is not None
+    return plan, MIX_FROZEN
+
+
+def mix_job_id(branch: str, seed: int = 0) -> str:
+    """`da48-ft-m-s0`: Colab session and run folder of run M (DA-48)."""
+    return f"da48-ft-{branch.lower().replace('_', '-')}-s{seed}"
+
+
 def pair_job_id(branch: str, seed: int = 0) -> str:
     """`da34-t6-ft-b-all-s0`: Colab session and run folder; ledger job_da34_ft_B_ALL."""
     return f"da34-t6-ft-{branch.lower().replace('_', '-')}-s{seed}"
@@ -337,7 +381,7 @@ def round_job_id(branch: str, seed: int = 0) -> str:
 class Job:
     """One fine-tune of the tray experiment: C of v2, C+ of its round, B, or a pair run."""
 
-    plan: TrayRunPlan | TrayPairPlan  # the frozen plan: recipe, parent, train seed, task
+    plan: TrayRunPlan | TrayPairPlan | TrayMixPlan  # the frozen plan: recipe, parent, seed, task
     run_plan_id: str
     branch: str
     demo_set: str  # what the release id of the run names
@@ -350,6 +394,8 @@ class Job:
 
     @property
     def job_id(self) -> str:
+        if isinstance(self.plan, TrayMixPlan):
+            return mix_job_id(self.branch, self.plan.train_seeds[0])
         if self.pair_round is not None:
             return round_job_id(self.branch, self.plan.train_seeds[0])
         if self.data_name is not None:
@@ -369,7 +415,19 @@ class Job:
         folder = self.data_name or self.branch
         return work / "sets" / folder / self.plan.task["env_id"].rsplit("/", 1)[-1]
 
+    @property
+    def drive_cuts(self) -> str:
+        """Folder under MyDrive holding `<data_name>.tar`: the plan's for M, DA-34's else."""
+        return self.plan.drive.cuts if isinstance(self.plan, TrayMixPlan) else pair_cut.DRIVE_CUTS
+
+    @property
+    def drive_runs(self) -> str | None:
+        """Folder under MyDrive `persist` copies runs to, when the plan names one (M)."""
+        return self.plan.drive.runs if isinstance(self.plan, TrayMixPlan) else None
+
     def cut_problems(self, data: Path, repo: Path = REPO) -> list[str]:
+        if isinstance(self.plan, TrayMixPlan):
+            return mixplan.cut_problems(data, self.plan, repo)
         if self.pair_round is not None:
             assert isinstance(self.plan, TrayPairPlan)
             return round_cut.round_problems(data, self.pair_round, self.plan, repo)
@@ -446,6 +504,21 @@ def load_job(branch: str = BRANCH, repo: Path = REPO) -> Job:
             plan_branch=pair_round.base_branch,
             data_name=ROUND_C70,
             pair_round=pair_round,
+        )
+    if branch == MIX:
+        mix, run_plan = load_mix(repo)
+        parts = mix.cut.parts
+        return Job(
+            mix,
+            run_plan,
+            MIX,
+            mix.cut.name,
+            canonical_sha256(
+                [p.demo_sets.hashes[p.set_name] for p in parts if p.demo_sets and p.set_name]
+            ),
+            "+".join(p.release_id for p in parts),
+            plan_branch=MIX,
+            data_name=mix.cut.name,
         )
     raise SystemExit(f"no fine-tune for branch {branch}")
 
@@ -697,7 +770,7 @@ def stage1_vlm_problems(folder: Path, base: Path, vlm: Stage1Vlm) -> list[str]:
 
 
 def stage1_paths(
-    plan: TrayRunPlan | TrayPairPlan, parent_name: str, psi0: Path
+    plan: TrayRunPlan | TrayPairPlan | TrayMixPlan, parent_name: str, psi0: Path
 ) -> tuple[Path, Path, Stage1Vlm]:
     """(stage 1 folder on the VM, parent VLM folder of the snapshot, pins) of a B parent."""
     parent = plan.parents[parent_name]
@@ -769,9 +842,7 @@ def setup(work: Path, branch: str = BRANCH, repo: Path = REPO) -> None:
     fetched: dict[str, Any] = {}
     if job.data_name is not None and not (data / "meta").is_dir():  # a pair run: from Drive
         start = time.monotonic()
-        fetched = pair_cut.fetch(
-            DRIVE / pair_cut.DRIVE_CUTS / f"{job.data_name}.tar", work / "sets"
-        )
+        fetched = pair_cut.fetch(DRIVE / job.drive_cuts / f"{job.data_name}.tar", work / "sets")
         if fetched["root"] != f"{job.data_name}/{data.name}":
             raise SystemExit(
                 f"the tar holds {fetched['root']}, the job reads {job.data_name}/{data.name}"
@@ -926,14 +997,92 @@ def train(work: Path, branch: str = BRANCH, repo: Path = REPO) -> None:
         raise SystemExit(f"train ended {result.infra_status}: {launched.get('error')}")
 
 
+def _step(checkpoint: Path) -> int:
+    return int(checkpoint.name.removeprefix("ckpt_"))
+
+
+def _sizes(checkpoint: Path) -> dict[str, int]:
+    return {p.relative_to(checkpoint).as_posix(): p.stat().st_size for p in _files(checkpoint)}
+
+
+def latest_whole_checkpoint(checkpoints: list[Path]) -> Path | None:
+    """The newest `ckpt_<step>`, or the one before it when the newest looks cut short.
+
+    `persist` copies only checkpoints Psi0 finished writing, one after the other in step
+    order, so a VM lost mid-copy leaves at most the newest copy short on Drive. It is
+    whole when it has the files of an older one and every file of 1 MiB or more there
+    (weights, optimizer state: their size is fixed by the model) at the same size.
+    """
+    ordered = sorted(checkpoints, key=_step)
+    if len(ordered) < 2:
+        return ordered[-1] if ordered else None
+    mine = _sizes(ordered[-1])
+    for older in ordered[:-1]:
+        ref = _sizes(older)
+        big = {rel for rel, size in ref.items() if size >= 1 << 20}
+        if set(mine) == set(ref) and all(mine[rel] == ref[rel] for rel in big):
+            return ordered[-1]
+    return ordered[-2]
+
+
+def restore(
+    work: Path, branch: str = BRANCH, repo: Path = REPO, durable: Path | None = None
+) -> Path:
+    """Bring `runs/<job id>` back from durable storage onto a new VM before `train` resumes.
+
+    Modelled on DA-26's `scripts/he/he1_colab.py restore`. `durable` holds one folder per
+    job, as `persist --to <durable>` writes them; default `MyDrive/<plan drive.runs>`.
+    Everything outside `checkpoints/` is copied, and of the checkpoints only the newest
+    whole one (`latest_whole_checkpoint`), which is all Psi0's `resume_from_checkpoint
+    latest` reads: ten checkpoints with optimizer state would not fit the VM disk.
+    """
+    job = load_job(branch, repo)
+    if durable is None:
+        if job.drive_runs is None:
+            raise SystemExit(
+                f"restore --branch {branch} needs --from: its plan names no Drive runs"
+            )
+        durable = DRIVE / job.drive_runs
+    source, target = durable / job.job_id, work / "runs" / job.job_id
+    if not source.is_dir() or not any(source.iterdir()):
+        raise SystemExit(f"{source} is missing or empty: mount Drive, or nothing was persisted")
+    if target.exists() and any(target.iterdir()):
+        raise SystemExit(f"{target} exists: this VM holds the run, train resumes it as it is")
+    start = time.monotonic()
+    found = [
+        p
+        for p in source.glob("psi0/*/*/checkpoints/ckpt_*")
+        if p.is_dir() and p.name.removeprefix("ckpt_").isdigit()
+    ]
+    chosen = latest_whole_checkpoint(found)
+    shutil.copytree(
+        source, target, ignore=shutil.ignore_patterns("checkpoints"), dirs_exist_ok=True
+    )
+    if chosen is not None:
+        shutil.copytree(chosen, target / chosen.relative_to(source))
+    Report(work).phase(
+        "restore",
+        time.monotonic() - start,
+        job_id=job.job_id,
+        run_plan_id=job.run_plan_id,
+        source=str(source),
+        checkpoints_on_drive=sorted(_step(p) for p in found),
+        restored_checkpoint=None if chosen is None else _step(chosen),
+    )
+    return target
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
-    parser.add_argument("phase", choices=["setup", "train", "check", "manifest"])
+    parser.add_argument("phase", choices=["setup", "train", "check", "manifest", "restore"])
     parser.add_argument("--work", type=Path, default=WORK)
     parser.add_argument(
-        "--branch", choices=[BRANCH, CPLUS, B, *PAIR, ROUND_C70], default=BRANCH
+        "--branch", choices=[BRANCH, CPLUS, B, *PAIR, ROUND_C70, MIX], default=BRANCH
     )
     parser.add_argument("--folder", type=Path, help="manifest: a stage 1 VLM folder")
+    parser.add_argument(
+        "--from", dest="durable", type=Path, help="restore: folder of persisted runs (Drive)"
+    )
     args = parser.parse_args(argv)
     os.environ.setdefault("PYTHONUNBUFFERED", "1")
     if args.phase == "manifest":  # what he-tray-b.yaml pins for DA-30's folder (task 4.7)
@@ -951,7 +1100,9 @@ def main(argv: list[str] | None = None) -> None:
         print("\n".join(problems) or f"{job.run_plan_id} {job.job_id}: cut and plan hold")
         raise SystemExit(1 if problems else 0)
     args.work.mkdir(parents=True, exist_ok=True)
-    if args.phase == "setup":
+    if args.phase == "restore":
+        print(restore(args.work, args.branch, durable=args.durable))
+    elif args.phase == "setup":
         setup(args.work, args.branch)
     else:
         train(args.work, args.branch)

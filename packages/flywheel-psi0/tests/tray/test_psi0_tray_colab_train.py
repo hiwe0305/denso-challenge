@@ -807,3 +807,168 @@ def test_c70_r1_runs_only_the_approved_frozen_round_as_c70s_job(
     (repo / ROUND_C70).write_text(text)
     with pytest.raises(SystemExit, match="changed since it was frozen"):
         colab_train.load_job("C70_R1", repo)
+
+
+# --- run M of DA-48 (he-tray-jig-m.yaml, mixplan) -----------------------------------
+
+
+def _frozen_m(tmp_path: Path) -> tuple[Path, str, Path]:
+    """(repo, run_plan_id, drive): a frozen M plan on four fake parts, M.tar on drive."""
+    from flywheel_psi0.tray import pair_cut
+    from test_psi0_tray_mixplan import JIG_ENV_NAME, _frozen, _setup
+
+    repo, cut, raw = _setup(tmp_path)
+    path = _frozen(repo, raw)
+    assert path == repo / colab_train.MIX_PLAN
+    frozen = json.loads(path.with_name("he-tray-jig-m.lock.json").read_text())["run_plan_id"]
+    drive = tmp_path / "drive"
+    (drive / "denso/da48/cuts").mkdir(parents=True)
+    assert cut.name == JIG_ENV_NAME
+    pair_cut.pack(cut, "M", drive / "denso/da48/cuts/M.tar")
+    return repo, frozen, drive
+
+
+def test_m_does_not_run_from_the_draft_plan() -> None:
+    from flywheel_psi0.tray import mixplan
+
+    assert colab_train.MIX_FROZEN is None  # set by the freeze PR (task 3.2)
+    plan = mixplan.TrayMixPlan.load(REPO / colab_train.MIX_PLAN)
+    assert mixplan.check(plan, REPO) == []  # the draft holds as a draft
+    todo = mixplan.pending(plan)
+    assert len(todo) == 14 and any("stats_sha256" in p for p in todo)
+    assert plan.steps() == 100000 and plan.checkpoints.reads == [60000, 80000]
+    with pytest.raises(SystemExit) as refused:
+        colab_train.load_job("M")
+    for reason in ("MIX_FROZEN is unset", "DRAFT", "PENDING", "not frozen"):
+        assert reason in str(refused.value)
+
+
+def test_m_runs_only_the_approved_frozen_plan_with_its_own_drive_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from test_psi0_tray_mixplan import JIG_ENV_NAME
+
+    repo, frozen, drive = _frozen_m(tmp_path)
+    with pytest.raises(SystemExit, match="MIX_FROZEN is unset"):
+        colab_train.load_job("M", repo)
+    monkeypatch.setattr(colab_train, "MIX_FROZEN", "rp_000000000000")
+    with pytest.raises(SystemExit, match="only rp_000000000000 is approved"):
+        colab_train.load_job("M", repo)
+    monkeypatch.setattr(colab_train, "MIX_FROZEN", frozen)
+    job = colab_train.load_job("M", repo)
+    assert (job.job_id, job.run_plan_id, job.data_name) == ("da48-ft-m-s0", frozen, "M")
+    assert job.parent_name == "psi0-baseline-egodex-he"
+    assert (job.drive_cuts, job.drive_runs) == ("denso/da48/cuts", "denso/da48/runs")
+    assert job.release_id == "tray_s1_full1+tray_s1_full2+tray_s1place_cut1+tray_s1place_cut2"
+    work = tmp_path / "work"
+    assert job.data(work) == work / "sets" / "M" / JIG_ENV_NAME
+
+    class Installed(Exception):
+        pass
+
+    def install_env(work: Path) -> float:
+        raise Installed
+
+    monkeypatch.setattr(colab_train, "install_env", install_env)
+    monkeypatch.setattr(colab_train, "DRIVE", drive)
+    with pytest.raises(Installed):  # M.tar from denso/da48/cuts, checked, then the install
+        colab_train.setup(work, "M", repo)
+    assert colab_train.load_job("M", repo).cut_problems(job.data(work), repo) == []
+    # a cut that does not hold is refused before the install
+    stats = job.data(work) / "meta" / "stats_psi0.json"
+    stats.write_text("{}")
+    with pytest.raises(SystemExit, match="cut does not hold"):
+        colab_train.setup(work, "M", repo)
+    # no M.tar under the plan's folder: refused, whatever lies under DA-34's
+    (tmp_path / "drive2" / "denso/da34/cuts").mkdir(parents=True)
+    shutil.copy(drive / "denso/da48/cuts/M.tar", tmp_path / "drive2/denso/da34/cuts/M.tar")
+    monkeypatch.setattr(colab_train, "DRIVE", tmp_path / "drive2")
+    with pytest.raises(SystemExit, match="upload it to Drive first"):
+        colab_train.setup(tmp_path / "work2", "M", repo)
+
+
+def test_m_train_uses_the_plans_steps_parent_and_seed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import flywheel_psi0.trainer as trainer_package
+    from flywheel_psi0.tray import pair_cut
+
+    repo, frozen, drive = _frozen_m(tmp_path)
+    monkeypatch.setattr(colab_train, "MIX_FROZEN", frozen)
+    monkeypatch.setattr(trainer_package, "Psi0Trainer", _FakeTrainer)
+    work = tmp_path / "work"
+    pair_cut.fetch(drive / "denso/da48/cuts/M.tar", work / "sets")
+    colab_train.train(work, "M", repo)
+    seen = _FakeTrainer.seen
+    spec = seen["spec"]
+    assert (spec.job_id, spec.seed) == ("da48-ft-m-s0", 0)
+    assert spec.parent.checkpoint_id == "psi0-baseline-egodex-he"
+    assert seen["overrides"] == {"train.validation_steps": 2000, "train.max_training_steps": 100000}
+    assert seen["run_plan_id"] == frozen and seen["nproc_per_node"] == 1
+    assert seen["release_id"].startswith("tray_s1_full1+tray_s1_full2+")
+    assert "#M:" in seen["release_id"]
+
+
+def _ckpt(root: Path, step: int, weights: int = 2 << 20, extra: bool = True) -> None:
+    folder = root / "psi0" / "exp" / "run.da48-ft-m-s0" / "checkpoints" / f"ckpt_{step}"
+    folder.mkdir(parents=True)
+    (folder / "model.safetensors").write_bytes(bytes(weights))
+    if extra:
+        (folder / "trainer_state.json").write_text(json.dumps({"step": step}))
+
+
+def test_restore_brings_the_run_back_with_its_latest_whole_checkpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, frozen, drive = _frozen_m(tmp_path)
+    monkeypatch.setattr(colab_train, "MIX_FROZEN", frozen)
+    monkeypatch.setattr(colab_train, "DRIVE", drive)
+    work = tmp_path / "work"
+    with pytest.raises(SystemExit, match="missing or empty"):  # Drive not mounted
+        colab_train.restore(work, "M", repo)
+    persisted = drive / "denso/da48/runs/da48-ft-m-s0"
+    persisted.mkdir(parents=True)
+    (persisted / "metrics.jsonl").write_text('{"attempt": 0, "step": 50000}\n')
+    (persisted / "result.json").write_text(json.dumps({"checkpoint_step": 50000}))
+    for step in (30000, 40000):
+        _ckpt(persisted, step)
+    _ckpt(persisted, 50000, weights=1 << 20)  # cut short when the VM was lost mid-copy
+    target = colab_train.restore(work, "M", repo)
+    assert target == work / "runs" / "da48-ft-m-s0"
+    assert (target / "metrics.jsonl").read_text() == (persisted / "metrics.jsonl").read_text()
+    restored = sorted(p.name for p in target.glob("psi0/*/*/checkpoints/ckpt_*"))
+    assert restored == ["ckpt_40000"]  # the newest whole one only
+    phase = json.loads((work / "report.json").read_text())["phases"]["restore"]
+    assert phase["restored_checkpoint"] == 40000
+    assert phase["checkpoints_on_drive"] == [30000, 40000, 50000]
+    with pytest.raises(SystemExit, match="this VM holds the run"):
+        colab_train.restore(work, "M", repo)
+    # on another VM, once the newest copy is whole, it is the one taken
+    _ckpt(persisted, 60000)
+    target = colab_train.restore(tmp_path / "vm2", "M", repo)
+    assert [p.name for p in target.glob("psi0/*/*/checkpoints/ckpt_*")] == ["ckpt_60000"]
+    # the CLI hands --work, --branch and --from to restore
+    seen: dict[str, Any] = {}
+
+    def fake_restore(work: Path, branch: str, durable: Path | None = None) -> Path:
+        seen.update(work=work, branch=branch, durable=durable)
+        return work
+
+    monkeypatch.setattr(colab_train, "restore", fake_restore)
+    colab_train.main(["restore", "--branch", "M", "--work", str(tmp_path / "w")])
+    assert seen == {"work": tmp_path / "w", "branch": "M", "durable": None}
+    colab_train.main(["restore", "--branch", "C_70", "--work", "w", "--from", "/d/runs"])
+    assert (seen["branch"], seen["durable"]) == ("C_70", Path("/d/runs"))
+
+
+def test_restore_of_a_da34_branch_needs_a_source_and_the_old_branches_keep_da34(
+    tmp_path: Path,
+) -> None:
+    from flywheel_psi0.tray import pair_cut
+
+    with pytest.raises(SystemExit, match="needs --from"):
+        colab_train.restore(tmp_path, "C_70")
+    jobs = [colab_train.load_job(b) for b in (*colab_train.PAIR, colab_train.ROUND_C70)]
+    assert {j.drive_cuts for j in jobs} == {pair_cut.DRIVE_CUTS} == {"denso/da34/cuts"}
+    assert {j.drive_runs for j in jobs} == {None}
+    assert colab_train.load_job("C70_R1").job_id == "da34-t7-ft-c70-r1-s0"

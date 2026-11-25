@@ -1,0 +1,128 @@
+# DA-48: run M, one Psi0 stage 3 fine-tune on the fixed-jig tray scene (DA-41 jig2) over
+# one dataset joined from four demo sets. DRAFT: every pin not known yet is null, so
+# `mixplan check` passes as a draft and `mixplan freeze` and `check --launch` refuse and
+# list what is missing; `colab_train --branch M` also refuses while MIX_FROZEN is None.
+#
+# Hiếu 25/11/2026: keep the seeds whose placement error is within 3 cm and 5 degrees,
+# train once (no paired control; a control run K on the 498 full episodes alone is
+# optional, decided later). Comparison with the DA-34 runs is descriptive only: another
+# scene, other data, another step count and another eval env.
+#
+# Schema and checks: flywheel_psi0.tray.mixplan. Task 3.1 (rtx3060) fills the parts and
+# the stats; task 3.2 (freeze PR) writes the reading rules, drops `status`, freezes.
+name: he-tray-psi0-jig-m
+purpose: mix_train
+story: DA-48
+status: draft
+site_id: local
+task:
+  id: g1_wholebody_tray_transfer_jig_teleop # JIG_TASK_UID of flywheel_simple.tray.jig_task
+  env_id: simple/G1WholebodyTrayTransferJigTeleop-v0
+  config: configs/sim/tray_jig.yaml
+embodiment: g1_sonic_dwbc@1
+
+code:
+  # SIMPLE b75c678 generated both stores (docs/g0/tray/jig.md 4.12); Psi0 as DA-34
+  simple: {repo: physical-superintelligence-lab/SIMPLE, commit: b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11}
+  psi0: {repo: physical-superintelligence-lab/Psi0, commit: cda3fdfafe47cb6fa75400d013de1bd36e3cea05}
+
+psi_model: {repo: USC-PSI-Lab/psi-model, revision: cb1480f50d9764ab2f6261bc2e651a67ad54da17}
+
+# The release pair of the DA-34 pair plan's C branches (he-tray-pair60k.yaml). [Đề xuất]
+# Claude 25/11/2026, for Hiếu to confirm: the stage 1 parent of the B branches would need
+# its Drive folder on the VM as well (colab_train handles either).
+parents:
+  psi0-baseline-egodex-he:
+    vlm:
+      path: psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k/model.safetensors
+      sha256: 6e63da17bdd22430bc07c40e4b14ebb96c9d124d014c532449142862c186d3f9
+    action_header:
+      path: psi0/postpre.1by1.pad36.2601131206.ckpt.he30k/action_header.safetensors
+      sha256: 238b4d95862b0eb44bffa75a2ae69e120aeda3d159fd6f29802dd9338019e14d
+    clean_for_main_task: true
+    note: >-
+      Pretrained on EgoDex 200k + HE 30k steps; no tray data in pretraining. The parent of
+      C, C+, C_ALL and C_70.
+
+# Four parts, joined in this order by cplus_cut: each the set Q of one release, Q = the
+# seeds of that release's keep file (`demo_sets --keep-seeds`, one file per release split
+# from the generation host's {release_id: [seeds]}). n is the length of each keep list
+# (25/11/2026); release, demo_sets (file, file_sha256, salt, hashes) and set_name are
+# filled at task 3.1 from the demo_sets output, never by hand.
+cut:
+  name: M
+  rule: >-
+    From each release, every episode whose final placement error is within 3 cm and
+    5 degrees of the jig target (Hiếu 25/11/2026), as listed in that release's keep file;
+    no ranking, no cap. Full-episode releases first (level 1, level 2), then the place
+    cuts. Stats computed once on the joined set (own_train_set).
+  parts:
+    - release_id: tray_s1_bfbdcbcf719e # store tray-s1-jig2-20261122, level 1 full episodes
+      n: 356
+      release: null
+      demo_sets: null
+      set_name: null
+    - release_id: tray_s1_8631ace9b1b3 # store tray-s1-jig2-20261122, level 2 full episodes
+      n: 142
+      release: null
+      demo_sets: null
+      set_name: null
+    - release_id: tray_s1place_a1797e480160 # store tray-s1place-jig2-20261124, place cut of the level 1 jittered parent
+      n: 377
+      release: null
+      demo_sets: null
+      set_name: null
+    - release_id: tray_s1place_56e6d006d8d1 # store tray-s1place-jig2-20261124, place cut
+      n: 162
+      release: null
+      demo_sets: null
+      set_name: null
+  episodes: 1037 # 356 + 142 + 377 + 162
+  # Measured 25/11/2026 on the generation host (sum of the kept episodes' lengths); the
+  # joined dataset's meta/info.json total_frames must equal it (mixplan.cut_problems).
+  frames: 948639
+  stats_sha256: null # meta/stats_psi0.json of the joined set, task 3.1
+
+recipe:
+  file: configs/models/psi0-stage3.yaml # batch 16, lr 1e-4 cosine, warmup 1000, VLM frozen
+  sha256: 71ba5de8ef22a11432a829e86e93b7e662f5f38f453cca27f73d6fbe777a1dbd # recipe_sha256, no `estimate`
+  overrides:
+    train.validation_steps: 2000 # PO 4/11/2026 (S1-04 4.1), as the DA-34 plans
+    train.max_training_steps: 100000 # one A100; may change until the freeze (then the checkpoints too)
+  nproc_per_node: 1 # one Colab A100: global batch 16
+  dataset_stats: own_train_set
+train_seeds: [0]
+
+branches:
+  M: {parent: psi0-baseline-egodex-he, role: "run M: the four parts joined"}
+
+# Psi0 saves every 10000 steps (checkpointing_steps); the VM keeps the last 5, persist
+# copies every complete one to drive.runs. 100000 is the checkpoint DA-47 evaluates.
+checkpoints:
+  primary: 100000
+  reads: [60000, 80000]
+
+interpretation:
+  doc: docs/he/tray-jig.md # written by task 3.2 with the runbook
+  rules_marker: jig-m-rules
+  rules_sha256: null # pinned by task 3.2
+pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)"
+
+# Estimate, not measured on this data: about 130 CU for 100000 steps (77.27 CU measured
+# for 60000 steps of C70_R1 on an A100, DA-34 ledger, x 100/60); about 13 h at 0.47 s/step
+# (S1-04), up to about 19 h at C70_R1's pace (11.5 h for 60000 steps). [Đề xuất] cap 150
+# CU (about 15 % over the estimate); the floor 14 needs a balance of at least 164 CU.
+budget:
+  ceiling_cu: 150
+  cap_cu_per_run: 150
+  runs: [M]
+  watcher: "scripts/colab/cu_watch.py session --gpu A100 --cap 150 --floor 14, under one guard"
+
+schedule:
+  mode: sequential
+  floor_cu: 14
+  persist: "he1_colab.py persist --watch 600 --pid <train pid> --to /content/drive/MyDrive/denso/da48/runs: every complete ckpt_<step> (trainer/colab.py sync_job, no --delete); colab_train restore --branch M brings runs/da48-ft-m-s0 back on a new VM"
+
+drive:
+  cuts: denso/da48/cuts # M.tar and M.tar.json (mixplan pack)
+  runs: denso/da48/runs # runs/<job> copied by persist, read back by colab_train restore
