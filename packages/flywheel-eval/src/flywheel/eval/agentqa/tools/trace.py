@@ -98,7 +98,8 @@ def _rollouts(book: FactBook, run: RunScores, trace: RunTrace,
     is skipped whole and named in a fact, never merged.
     """
     by_sha: dict[str, list[str]] = {}
-    for sc in run.scores:
+    # a re-score (same file, new scorer_version) is the same rollout: one id per pair
+    for sc in {(s.trace_sha256, s.episode_id): s for s in run.scores}.values():
         by_sha.setdefault(sc.trace_sha256, []).append(sc.episode_id)
     held: dict[str, tuple[str, list[TraceStep]]] = {}
     for file in trace.files:

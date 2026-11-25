@@ -126,6 +126,18 @@ def test_one_file_per_rollout_joins_by_sha256_not_by_episode_id() -> None:
     assert cited == {"R/rollouts"}
 
 
+def test_a_re_scored_rollout_still_joins_by_sha256() -> None:
+    run, trace = per_rollout_run({"l1-s1": True, "l1-s2": False}, {"l1-s1": 0.01, "l1-s2": 0.5})
+    first = run.scores[0]  # the same rollout file scored again by a newer scorer
+    again = first.model_copy(update={"scorer_version": "1.1.0"})
+    rescored = RunScores("R", run.ref, (first, again, run.scores[1]))
+    book = FactBook()
+    got = values(book, trace_stats(book, [rescored], {"R": trace}, CFG, REF))
+    assert got["R_succeeded_rollouts"] == 1 and got["R_failed_rollouts"] == 1
+    assert got["R_trace_undecided_rollouts"] == 0 and got["R_scored_without_trace"] == 0
+    assert got["R_succeeded_track_error_upper"] == pytest.approx(0.01)
+
+
 def test_a_file_matching_no_score_by_sha256_still_joins_by_episode_id() -> None:
     run, trace = per_rollout_run({"l1-s1": True, "l1-s2": False}, {"l1-s1": 0.01, "l1-s2": 0.5})
     plain = trace_file("R/old/trace.jsonl", "e" * 64,
