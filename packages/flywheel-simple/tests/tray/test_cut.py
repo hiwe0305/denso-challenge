@@ -274,6 +274,21 @@ def test_meta_counts_and_episode_rows(world: dict[str, Any]) -> None:
     assert not (out / "meta" / "batch_summary.json").exists()
 
 
+def _reference_block(arr: np.ndarray) -> dict[str, list[float]]:
+    """SIMPLE's `stats_block` recipe, accumulated in float64 as the cut's stats are."""
+    wide = np.asarray(arr, dtype=np.float64)
+    if wide.ndim == 1:
+        wide = wide.reshape(-1, 1)
+    return {
+        "mean": wide.mean(axis=0).astype(np.float32).tolist(),
+        "std": wide.std(axis=0).astype(np.float32).tolist(),
+        "min": wide.min(axis=0).astype(np.float32).tolist(),
+        "max": wide.max(axis=0).astype(np.float32).tolist(),
+        "q01": np.quantile(wide, 0.01, axis=0).astype(np.float32).tolist(),
+        "q99": np.quantile(wide, 0.99, axis=0).astype(np.float32).tolist(),
+    }
+
+
 def _expected_stats(out: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     cols: dict[str, list[np.ndarray]] = {name: [] for name in DATASET_COLUMNS}
     rows = []
@@ -283,15 +298,15 @@ def _expected_stats(out: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         action = np.asarray(t.column("action").to_pylist(), dtype=np.float32)
         ts = np.asarray(t.column("timestamp").to_pylist(), dtype=np.float64)
         rows.append({"episode_index": i, "stats": {
-            "action": {**stats_block(action), "count": [n]},
-            "timestamp": {**stats_block(ts), "count": [n]}}})
+            "action": {**_reference_block(action), "count": [n]},
+            "timestamp": {**_reference_block(ts), "count": [n]}}})
         cols["states"].append(np.asarray(t.column("states").to_pylist(), dtype=np.float32))
         cols["action"].append(action)
         cols["timestamp"].append(ts)
         for name in ("frame_index", "episode_index", "index", "task_index"):
             cols[name].append(np.asarray(t.column(name).to_pylist(), dtype=np.int64))
         cols["next.done"].append(np.asarray(t.column("next.done").to_pylist(), np.float32))
-    return rows, {k: stats_block(np.concatenate(v)) for k, v in cols.items()}
+    return rows, {k: _reference_block(np.concatenate(v)) for k, v in cols.items()}
 
 
 def test_stats_are_recomputed_on_the_cut(world: dict[str, Any]) -> None:
@@ -306,6 +321,33 @@ def test_stats_are_recomputed_on_the_cut(world: dict[str, Any]) -> None:
     assert (meta / "stats.json").read_bytes() == (meta / "stats_psi0.json").read_bytes()
     assert (meta / "relative_stats.json").read_text() == "{}"
     assert stats["index"]["max"] == [sum(e[2] - s for e, s in zip(EPISODES, STARTS)) - 1]
+
+
+def test_stats_block_keeps_a_long_constant_column() -> None:
+    # Accumulated in float32, as SIMPLE does, this column gets mean 0.7381 and std 0.0019.
+    block = stats_block(np.full((300_000, 4), 0.74, dtype=np.float32))
+    assert np.abs(np.subtract(block["mean"], 0.74)).max() < 1e-6
+    assert max(block["std"]) < 1e-6
+
+
+def test_stats_block_matches_a_float64_reference() -> None:
+    values = (np.random.default_rng(0).normal(size=(50_000, 8)) * 0.1 + 0.5).astype(np.float32)
+    block, wide = stats_block(values), values.astype(np.float64)
+    for key, expected in (("mean", wide.mean(axis=0)), ("std", wide.std(axis=0))):
+        np.testing.assert_allclose(block[key], expected, rtol=1e-7, atol=1e-8, err_msg=key)
+    assert block == _reference_block(values)
+    for column in (np.arange(7, 40_007, dtype=np.int64), np.full(40_000, 3, dtype=np.int64)):
+        assert stats_block(column) == _reference_block(column)
+
+
+def test_a_cut_that_keeps_every_frame_has_the_parents_float64_stats(tmp_path: Path) -> None:
+    parent = make_parent(tmp_path / "releases" / "tray_s1_0123456789ab")
+    batch = make_batch(tmp_path / "gen-l2")
+    out = cut_release(parent, batch, tmp_path / "releases", lead_s=10.0, trim=StubTrim())
+    assert _meta(out, "info.json")["total_frames"] == sum(e[2] for e in EPISODES)
+    rows, dataset = _expected_stats(parent)
+    assert _meta(out, "episodes_stats.jsonl") == rows
+    assert _meta(out, "stats.json") == dataset
 
 
 def test_cut_marker_records_parent_and_ranges(world: dict[str, Any]) -> None:

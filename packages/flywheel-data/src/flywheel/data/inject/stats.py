@@ -11,11 +11,17 @@ recomputes them, so both copies get stats of their own data.
     meta/stats_psi0.json        the same content
     meta/relative_stats.json    {}
 
+Every column is accumulated in float64 (`stats_block_f64`), a deliberate departure from
+SIMPLE @ 6d10628: SIMPLE's `stats_block` accumulates a float32 input in float32, so its
+action stats drift with the frame count (a column of 0.74 in 300000 frames gets mean
+0.7381 and std 0.0019), and Psi0 may normalise with them. `stats_block` itself stays
+SIMPLE's recipe, accumulating in the precision it is given: the export checklist runs
+it at both precisions to recognise stats SIMPLE wrote.
+
 `index` is the one the parquet holds, found through the DA-03 reader's `check_index` (in
-a copy, the writer's dataset_from_index + row). psi-data e78fb93's own stats.json does
-not follow from its parquet for `states` (mean differs by up to 3.6e-4; likely taken
-before the export's downsampling): a D4 finding on the source, pinned in
-tests/unit/inject/test_source_stats.py.
+a copy, the writer's dataset_from_index + row). psi-data e78fb93's own stats.json
+follows from its parquet in float64 for `states` and in float32 for `action`, as SIMPLE
+computes them (tests/unit/inject/test_source_stats.py).
 """
 
 import json
@@ -39,6 +45,11 @@ DATASET_COLUMNS = (
 
 
 def stats_block(arr: NDArray[Any]) -> dict[str, list[float]]:
+    """SIMPLE's `stats_block`, verbatim: accumulates in the input's precision.
+
+    The export checklist uses it to recompute SIMPLE's stats; the files this module
+    writes use `stats_block_f64`.
+    """
     arr = np.asarray(arr)
     if arr.ndim == 1:
         arr = arr.reshape(-1, 1)
@@ -50,6 +61,15 @@ def stats_block(arr: NDArray[Any]) -> dict[str, list[float]]:
         "q01": np.quantile(arr, 0.01, axis=0).astype(np.float32).tolist(),
         "q99": np.quantile(arr, 0.99, axis=0).astype(np.float32).tolist(),
     }
+
+
+def stats_block_f64(arr: NDArray[Any]) -> dict[str, list[float]]:
+    """`stats_block` accumulated in float64, results as float32: what the stats files hold.
+
+    Departs from SIMPLE @ 6d10628 on purpose, which accumulates float32 inputs in float32.
+    Integer and flag columns give the values SIMPLE's recipe gives.
+    """
+    return stats_block(np.asarray(arr, dtype=np.float64))
 
 
 def compute_stats(root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -76,8 +96,8 @@ def compute_stats(root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
             {
                 "episode_index": frames.episode_index,
                 "stats": {
-                    "action": {**stats_block(frames.action), "count": [n]},
-                    "timestamp": {**stats_block(frames.timestamp), "count": [n]},
+                    "action": {**stats_block_f64(frames.action), "count": [n]},
+                    "timestamp": {**stats_block_f64(frames.timestamp), "count": [n]},
                 },
             }
         )
@@ -96,7 +116,7 @@ def compute_stats(root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         ):
             columns[name].append(values)
     rows.sort(key=lambda r: int(r["episode_index"]))
-    dataset = {name: stats_block(np.concatenate(v, axis=0)) for name, v in columns.items()}
+    dataset = {name: stats_block_f64(np.concatenate(v, axis=0)) for name, v in columns.items()}
     return rows, dataset
 
 
