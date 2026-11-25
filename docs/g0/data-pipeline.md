@@ -7,7 +7,7 @@ _Ngày 4/11/2026. Story [DA-03](../product/stories/DA-03-pipeline-teleop-synthet
 - Bốn lệnh `fw data ingest | qa | release | report` chạy hết trên hai nguồn và trả mã 0. Mỗi lệnh dưới 6 giây và dưới 0,5 GB RAM, chạy một tiến trình.
 - **psi-data** (task hai bàn, 99 episode): 95 `pass`, 4 `flag`, không episode nào `reject`. Release `rel_24363158e44e66b4` có 99 episode.
 - **Khay S1** (DA-33, 102 episode): cả 102 episode bị `flag` vì `action_jump.arm`, không episode nào `reject`. Release `rel_9f32f33779c904f2` có 102 episode.
-- **D4 thật trên cả hai nguồn.** `meta/stats.json` ghi `states.mean` lệch so với frame: 3,63e-4 ở psi-data (chiều 31) và 7,67e-4 ở khay S1 (chiều 6). Phần `action` khớp đến từng bit.
+- **D4 trên `states` là dương tính giả (sửa 25/11/2026).** QA báo `meta/stats.json` lệch `states.mean` so với frame: 3,63e-4 ở psi-data (chiều 31) và 7,67e-4 ở khay S1 (chiều 6). Nhưng SIMPLE tính `states` bằng float64, còn QA tính lại bằng float32; tính lại bằng float64 thì lệch chỉ 1,2e-7 và 1,8e-7 ([export-v21.md](export-v21.md) mục 4). Stats của hai nguồn đúng. Phần `action` khớp đến từng bit.
 - **Bản sao chấm lỗi bị chặn.** Hai bản sao của DA-27 (#53) đi qua `ingest` và `qa`, nhưng `release` từ chối cả hai bằng `has_injected_defect` và trả mã 2 (mục 3.5).
 - Chưa chạy được ba phép kiểm phát lại (`replay_kinematic`, `replay_dynamic`, `replay_success`) vì chưa có `ReplayReport` của DA-17. `qa.yaml` cho phép bỏ qua khi thiếu đầu vào (`when_missing: skip`), và trang báo cáo ghi rõ phép kiểm nào chưa chạy.
 
@@ -16,7 +16,7 @@ Việc phát sinh, Hiếu quyết:
 | # | Phát hiện | Ảnh hưởng | Ai |
 |---|---|---|---|
 | 1 | Cả 102 episode khay S1 có bước nhảy tay vượt p99,9 của psi-data (0,0869 rad), chủ yếu ở chiều 20 và 27 (`wrist_yaw`) quanh bước 205–211; trung vị 23 bước vượt ngưỡng mỗi episode (mục 3.2) | Hoặc planner nội suy cổ tay quá thô, hoặc ngưỡng hiệu chỉnh trên teleop người không hợp với planner | DA-33 xem planner; nếu bước nhảy là chủ ý thì thêm ngưỡng theo nguồn vào `qa.yaml` (PR riêng) |
-| 2 | `stats.json` của cả hai gói lệch `states.mean` (D4) | Design mục 10 ghi D4 là "chặn export": export Ψ₀ (DA-02) phải tính lại stats từ release, không chép `stats.json` của nguồn | DA-02 |
+| 2 | `stats.json` của cả hai gói lệch `states.mean` (D4). Sửa 25/11/2026: dương tính giả do QA tính lại bằng float32, xem phát hiện 2 của [export-v21.md](export-v21.md) | Design mục 10 ghi D4 là "chặn export": export Ψ₀ (DA-02) phải tính lại stats từ release, không chép `stats.json` của nguồn | DA-02 |
 | 3 | psi-data không ghi seed (đã biết từ [psi-data.md](psi-data.md) V6), nên 99 item của release có `seed: null` | `build_release` cho episode người (`operator_kind = human`) đi qua khi không có seed, nhưng chặn episode máy sinh khi không có seed. **[Đề xuất]** giữ như vậy | Hiếu |
 | 4 | Giấy phép `unknown` nên `combined_license` của release psi-data là `unknown` | Giới hạn của demo, như V9 | Đã chốt 3/11/2026 |
 
@@ -74,6 +74,8 @@ Cả 102 episode vượt ngưỡng nhóm `arm`. Bước nhảy lớn nhất mỗ
 ### 3.3 Stats của dataset (D4)
 
 QA tính lại `meta/stats.json` và `meta/episodes_stats.jsonl` từ frame. Phép tính dùng float32, giống `stats_block` của SIMPLE. So sánh chỉ ra một kết quả cho mỗi file và mỗi feature. Ngưỡng là 1e-5.
+
+Sửa 25/11/2026: SIMPLE tính `states` bằng float64 và `action` bằng float32, nên hai dòng **trượt** của `stats_json.states` dưới đây là dương tính giả của phép tính lại float32, không phải lỗi của nguồn ([export-v21.md](export-v21.md) mục 4 và phát hiện 2). Mã QA vẫn tính float32 tới khi phát hiện 2 được sửa.
 
 | Phép kiểm | psi-data | khay S1 |
 |---|---|---|

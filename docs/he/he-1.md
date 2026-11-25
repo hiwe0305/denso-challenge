@@ -257,7 +257,7 @@ Kiểm trên zip thật ngày 4/11/2026, trên laptop:
 | Tập | Kết quả |
 |---|---|
 | N20 (6 s) | 20 episode, 12 367 khung. `action`, `states`, task và số khung video của mỗi episode trùng episode nguồn. `check_index` sạch, giữ đủ 14 cột |
-| Cắt đủ 99 episode | `action` trùng `stats_psi0.json` của tác giả tuyệt đối. `states` lệch tối đa 3,6e-4, đúng phát hiện D4 đã biết về stats của nguồn |
+| Cắt đủ 99 episode | `action` trùng `stats_psi0.json` của tác giả tuyệt đối. `states` lệch tối đa 3,6e-4, đúng phát hiện D4 đã biết về stats của nguồn. Sửa 25/11/2026: lệch này do bộ tính stats của ta cộng dồn float32, không phải lỗi của nguồn ([export-v21.md](../g0/export-v21.md) mục 4); từ #215 bộ tính dùng float64 |
 
 **Điều kiện trước khi chạy.**
 
@@ -480,3 +480,4 @@ nohup setsid bash -c 'python3 scripts/he/he1_eval.py run --session "$1" --regist
 | 5/11/2026 | Mục 7.1: lần eval 2 dừng vì lệnh ssh khởi động client không trả về (`cd … && nohup … &` giữ pipe của ssh), 0,767 CU; chỉ `nohup` chạy nền; bỏ câu cũ "Chờ đợt C của DA-34…" | Hiếu (soạn với Claude) |
 | 5/11/2026 | Mục 6.2, 7.1: **[Đã chốt 5/11/2026, Hiếu]** "Nâng trần lên 54,31, giữ cap 18 (Recommended)": trần cứng DA-26 54,31 CU (33,85 + 1,692 + 0,767 + 18); lần 3 giữ trần 18, quy tắc theo cặp và thứ tự xen kẽ; ước lượng 16,1–16,8 CU (9–10 cặp ở 24,6 phút, trước reset đầu 1,6 hay 0,75 CU) | Hiếu (soạn với Claude) |
 | 6/11/2026 | Mục 6.2, 7.1: lần eval 3, 2 cặp đủ rồi dừng theo luật CU, 12,402 CU; kết quả sơ bộ V-EGO 0/2, V-NOEGO 0/2, khôi phục từ `eval_stats.txt` gốc. Episode khoảng 83 phút, kế hoạch 24,6; so với S1-03 (thất bại 42–52 phút); câu hỏi mở về `--clock sim`. Luật CU chỉ dừng container; `he1_fetch once --no-checkpoint` cho job eval | Hiếu (soạn với Claude) |
+| 25/11/2026 | Mục 1.2, bảng kiểm trên zip thật: lệch `states` 3,6e-4 không phải lỗi của nguồn mà do bộ tính stats cộng dồn float32 (#215) | Hiếu (soạn với Claude) |

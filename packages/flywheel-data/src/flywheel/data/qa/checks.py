@@ -35,8 +35,10 @@ nothing raises on data. Checks that need finite numbers are left out when
 
 `dataset_checks` covers D4, which belongs to a dataset, not to an episode: the
 stats files a LeRobot dataset ships against stats recomputed from its own
-parquet. psi-data e78fb93's `stats.json` is off for `states` (DA-27 measured
-3.63e-4 on the mean), so this is a finding on real data, reported, not fixed.
+parquet. Known false positive: the recompute is float32, but SIMPLE computes
+`states` in float64, so `stats_json.states` flags psi-data e78fb93 (3.63e-4 on
+the mean) and tray S1 (7.67e-4) although their stats are right; in float64 they
+match to 2e-7 (docs/g0/export-v21.md section 4, finding 2, still open here).
 """
 
 from __future__ import annotations
@@ -172,8 +174,9 @@ def dataset_checks(
     over all frames, `episodes_stats.action` and `episodes_stats.timestamp` over
     the episodes (the worst one named). Mean, std, min and max only, since
     quantiles depend on the method; each is computed in the dtype the reader gives
-    (float32 states and action), as SIMPLE's `stats_block` computes them, so float32
-    rounding is not mistaken for a finding. A file the dataset does not ship, or a
+    (float32 states and action). SIMPLE computes `action` that way but `states` in
+    float64, so float32 accumulation on `states` is reported as a finding (a known
+    false positive, see the module docstring). A file the dataset does not ship, or a
     feature it leaves out, is not checked.
     """
     findings: list[DatasetFinding] = []
