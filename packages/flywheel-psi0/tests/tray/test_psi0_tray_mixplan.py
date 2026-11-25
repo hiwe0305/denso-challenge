@@ -31,7 +31,7 @@ REPO = Path(__file__).resolve().parents[4]
 PAIR = REPO / "configs/runplans/tray/he-tray-pair60k.yaml"
 RECIPE = "configs/models/psi0-stage3.yaml"
 TASK = "carry the tray into the jig"
-ENV = "G1WholebodyTrayTransferJigTeleop-v0"
+ENV = JIG_ENV_NAME = "G1WholebodyTrayTransferJigTeleop-v0"
 DOC = "docs/he/tray-jig.md"
 RULES = "\n<!-- jig-m-rules -->\n\n(m1) M is read at ckpt 100000.\n\n<!-- /jig-m-rules -->\n"
 # Four parts, as run M joins them: two full releases, two place cuts. Seeds in release
