@@ -79,6 +79,9 @@ class CoverageSpec(_Frozen):
     percentile: float = Field(gt=0, le=100)
     components: list[Component] = Field(min_length=1)  # in the order of the vector
     level_components: dict[int, list[str]]  # the physical components each level varies
+    # True: tau_cov, d and the domain bounds use every train condition of the run, projected
+    # onto the level's components (spec 6.8); False: only the train conditions of that level.
+    pool_levels: bool = True
 
     @model_validator(mode="after")
     def names_known(self) -> Self:

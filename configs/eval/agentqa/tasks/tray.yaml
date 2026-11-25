@@ -131,6 +131,7 @@ relaxed:
 coverage:
   k: 5
   percentile: 95
+  pool_levels: true
   components:
     - {name: tray_x, scale: 0.05}
     - {name: tray_y, scale: 0.05}
@@ -145,4 +146,6 @@ coverage:
   level_components:
     1: [tray_x, tray_y, tray_yaw, target_x, target_y, target_yaw]
     2: [tray_x, tray_y, tray_yaw, target_x, target_y, target_yaw, table_gap, spawn_x,
-        part_mass, light_scale]
+        part_mass]
+    # light_scale is not a level-2 component here: light is judged by the visual check of
+    # spec step 7; kept out so tau_cov matches the round plan's definition.
