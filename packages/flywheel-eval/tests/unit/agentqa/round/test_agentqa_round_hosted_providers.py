@@ -1,7 +1,8 @@
 """The OpenAI-compatible provider and the hosted build seam, with a fake network (DA-43 5.4).
 
-The anthropic provider needs the optional SDK and is tested in
-test_agentqa_round_anthropic_provider.py.
+The anthropic provider against the real SDK classes is tested in
+test_agentqa_round_anthropic_provider.py (needs the optional SDK); what needs no SDK
+(the URL and environment checks, billed failures) runs here against a fake SDK module.
 """
 
 from __future__ import annotations
@@ -11,12 +12,15 @@ import io
 import json
 import urllib.error
 import urllib.request
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from flywheel.eval.agentqa.round.gateway import build_provider
 from flywheel.eval.agentqa.round.gateway_config import GatewayRefused, Profile
 from flywheel.eval.agentqa.round.providers import ProviderError
+from flywheel.eval.agentqa.round.providers import anthropic as anthropic_provider
+from flywheel.eval.agentqa.round.providers.anthropic import AnthropicModel
 from flywheel.eval.agentqa.round.providers.openai_hosted import OpenAICompatibleModel
 
 KEY_ENV = "FW_TEST_HOSTED_KEY"
@@ -168,3 +172,78 @@ def test_building_the_anthropic_kind_without_the_sdk_names_the_group(
     monkeypatch.setattr(importlib, "import_module", refuse)
     with pytest.raises(GatewayRefused, match="agentqa-hosted"):
         build_provider("a", hosted())
+
+
+# --- anthropic without the SDK: URL, environment ----------------------------------------
+
+class FakeSDK:
+    """Stands in for the `anthropic` module; keeps what the provider built the client with."""
+
+    class APIConnectionError(Exception):
+        pass
+
+    def __init__(self) -> None:
+        self.client_kwargs: dict[str, Any] = {}
+        self.http_kwargs: dict[str, Any] = {}
+
+    def DefaultHttpxClient(self, **kwargs: Any) -> str:  # noqa: N802 - the SDK's name
+        self.http_kwargs = kwargs
+        return "http-client"
+
+    def Anthropic(self, **kwargs: Any) -> Any:  # noqa: N802 - the SDK's name
+        self.client_kwargs = kwargs
+        return SimpleNamespace(messages=SimpleNamespace(create=None))
+
+
+@pytest.fixture
+def fake_sdk(monkeypatch: pytest.MonkeyPatch) -> FakeSDK:
+    sdk = FakeSDK()
+    monkeypatch.setattr(anthropic_provider, "_sdk", lambda: sdk)
+    return sdk
+
+
+@pytest.mark.parametrize("url", ["http://api.anthropic.com", "api.anthropic.com/v1",
+                                 "https:///v1", "ftp://h.example"])
+def test_anthropic_refuses_a_non_https_or_host_less_base_url(fake_sdk: FakeSDK,
+                                                             url: str) -> None:
+    with pytest.raises(GatewayRefused, match="https with a host"):
+        AnthropicModel("m", KEY_ENV, base_url=url)
+    assert fake_sdk.client_kwargs == {}
+
+
+def test_build_provider_refuses_an_http_anthropic_profile(fake_sdk: FakeSDK) -> None:
+    with pytest.raises(GatewayRefused, match="profile a: .*https"):
+        build_provider("a", hosted(base_url="http://api.xah.io"))
+
+
+def test_anthropic_without_base_url_sends_the_default_host_explicitly(
+        fake_sdk: FakeSDK, monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in ("ANTHROPIC_BASE_URL", "HTTPS_PROXY", "https_proxy", "ALL_PROXY"):
+        monkeypatch.setenv(name, "http://elsewhere.example:8080")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-other")
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "tok-other")
+    model = AnthropicModel("m", KEY_ENV)
+    sent = fake_sdk.client_kwargs
+    assert sent["base_url"] == "https://api.anthropic.com" and model.host == "api.anthropic.com"
+    assert sent["api_key"] == SECRET and sent["max_retries"] == 0
+    assert sent["http_client"] == "http-client"
+    assert fake_sdk.http_kwargs == {"trust_env": False, "mounts": {
+        "all://": None, "http://": None, "https://": None}}
+
+
+def test_anthropic_named_base_url_is_passed_as_given(fake_sdk: FakeSDK,
+                                                     monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://elsewhere.example")
+    model = AnthropicModel("m", KEY_ENV, base_url="https://api.xah.io/v1")
+    assert fake_sdk.client_kwargs["base_url"] == "https://api.xah.io/v1"
+    assert model.host == "api.xah.io"
+
+
+def test_anthropic_refuses_custom_headers_from_the_environment(
+        fake_sdk: FakeSDK, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_CUSTOM_HEADERS", "Authorization: Bearer other")
+    with pytest.raises(GatewayRefused, match="ANTHROPIC_CUSTOM_HEADERS") as info:
+        AnthropicModel("m", KEY_ENV)
+    assert "other" not in str(info.value) and fake_sdk.client_kwargs == {}
+    monkeypatch.setenv("ANTHROPIC_CUSTOM_HEADERS", "  ")  # blank: nothing to send
+    AnthropicModel("m", KEY_ENV)
