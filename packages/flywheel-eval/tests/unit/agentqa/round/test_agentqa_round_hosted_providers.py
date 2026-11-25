@@ -261,7 +261,7 @@ def test_anthropic_without_base_url_sends_the_default_host_explicitly(
     assert sent["base_url"] == "https://api.anthropic.com" and model.host == "api.anthropic.com"
     assert sent["api_key"] == SECRET and sent["max_retries"] == 0
     assert sent["http_client"] == "http-client"
-    assert fake_sdk.http_kwargs == {"trust_env": False, "mounts": {
+    assert fake_sdk.http_kwargs == {"trust_env": False, "follow_redirects": False, "mounts": {
         "all://": None, "http://": None, "https://": None}}
 
 

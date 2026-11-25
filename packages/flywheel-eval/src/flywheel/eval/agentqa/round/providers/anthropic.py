@@ -10,8 +10,10 @@ requests go and what they carry; every such input is given explicitly instead, s
 goes to the host the record names: the base URL (else `ANTHROPIC_BASE_URL` would win, and
 `https://api.anthropic.com` is passed when the profile names none), the key (else
 `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, a profile or federation would), and an HTTP
-client that ignores proxy and TLS variables. `ANTHROPIC_CUSTOM_HEADERS`, which the SDK lays
-over the key header and no argument can switch off, is refused when set.
+client that ignores proxy and TLS variables and follows no redirect (the SDK's client
+follows them, and a redirect to another host keeps the `x-api-key` header).
+`ANTHROPIC_CUSTOM_HEADERS`, which the SDK lays over the key header and no argument can
+switch off, is refused when set.
 
 Never sent: `temperature`, `top_p`, `top_k` (newer Claude models refuse them) and any
 provider-side reply schema (a reseller gateway may not support it; the code checks the
@@ -72,9 +74,11 @@ class AnthropicModel:
                 raise GatewayRefused(f"{CUSTOM_HEADERS_ENV} is set; the SDK would send its "
                                      "headers, which can replace the key, to the host: unset it")
             # No proxy (the SDK maps HTTP(S)_PROXY to mounts; ours win) and no TLS or
-            # netrc variables (trust_env), as the OpenAI-style provider ignores proxies.
+            # netrc variables (trust_env), as the OpenAI-style provider ignores proxies; no
+            # redirect, which would carry `x-api-key` to the host it names (a 3xx is an error).
             http = sdk.DefaultHttpxClient(
-                trust_env=False, mounts={"all://": None, "http://": None, "https://": None})
+                trust_env=False, follow_redirects=False,
+                mounts={"all://": None, "http://": None, "https://": None})
             client = sdk.Anthropic(api_key=key, base_url=url, max_retries=0, http_client=http)
         self._client = client
 
