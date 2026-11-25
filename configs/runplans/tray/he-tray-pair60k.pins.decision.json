@@ -1,0 +1,37 @@
+{
+ "site_id": "local",
+ "task_id": "g1_wholebody_tray_transfer_teleop",
+ "embodiment_id": "g1_sonic_dwbc@1",
+ "schema_version": "1.0.0",
+ "meta": {
+  "status": "signed",
+  "story": "DA-42",
+  "signed_at": "2026-11-25",
+  "signature_words": "Đồng ý, làm đi",
+  "signature_via": "answer to the DA-42 session's question 'Cho phép DA-42 ghi Decision vào configs/runplans/tray để gỡ 7 test?'"
+ },
+ "id": "dec_01M8893237QMTCCV3W0SW2GVP1",
+ "kind": "plan_review",
+ "subject_kind": "run_plan",
+ "subject_id": "rp_e2fb9f62c223",
+ "verdict": "approved",
+ "metrics": {},
+ "criteria": {
+  "accepted_files": {
+   "packages/flywheel-simple/src/flywheel_simple/tray/predicates.py": {
+    "pinned_sha256": "057b70222c31ad7a4240556b5136fecaa1c8f9147a87b3b7c9b6a1c5c7ddfe53",
+    "accepted_sha256": "710e01828fff1d6e61bd9de880e6aaea2bc163a5b4f8eda10c5e4c019fe84a6d"
+   },
+   "packages/flywheel-simple/src/flywheel_simple/tray/run.py": {
+    "pinned_sha256": "f6d9a690a47654cbc5ade1cc04bbbeb8cd68f5b12d97cd4a22f351c46b580b68",
+    "accepted_sha256": "767f0c6daa178cf7844a0deb8d53778b60b00ec3e8e248a75c59925c6249d976"
+   }
+  },
+  "scorer": "the plan's training runs and the eval results read before 25/11/2026 were scored by scorer version 1; evals run from now score with version 2, with version 1 recorded beside it as a shadow verdict, and are not comparable with version-1 numbers",
+  "pairing": "eval_results refuses pairing across scorer versions unless --cross-scorer",
+  "doc": "docs/g0/tray/scorer-v2.md"
+ },
+ "signed_by": "Hiếu",
+ "reason": "DA-42 changed predicates.py and run.py on purpose (scorer version 2, eval repeats); the plan's runs and the results read before 25/11/2026 stay scored by version 1. Evals from now score with version 2 beside a version-1 shadow verdict, are not compared with version-1 numbers, and eval_results pairs across versions only with --cross-scorer.",
+ "supersedes_decision_id": null
+}

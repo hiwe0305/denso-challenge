@@ -116,9 +116,9 @@ from flywheel_psi0.tray.runplan import (
     Stage1Vlm,
     TrayRoundPlan,
     TrayRunPlan,
+    accepted_pin_drift,
     check,
     check_round,
-    file_pin_drift,
     lock_path,
     pinned_file_drift,
     run_plan_id,
@@ -199,7 +199,9 @@ def load_plan(repo: Path = REPO, plan_file: str = PLAN) -> tuple[TrayRunPlan, st
     """The frozen v2 plan and its run_plan_id, or SystemExit with every reason not to run."""
     plan = TrayRunPlan.load(repo / plan_file)
     problems = check(plan, repo)
-    problems += [f"{d}: re-freeze or record a Decision" for d in pinned_file_drift(plan, repo)]
+    drift = pinned_file_drift(plan, repo)
+    drift = accepted_pin_drift(repo / plan_file, plan.pinned_files, FROZEN, repo, drift)
+    problems += [f"{d}: re-freeze or record a Decision" for d in drift]
     if plan.superseded_by is not None:
         problems.append(f"superseded by {plan.superseded_by}")
     lock = lock_path(repo / plan_file)
@@ -245,7 +247,9 @@ def load_b(repo: Path = REPO) -> tuple[TrayRunPlan, str]:
     """The frozen B plan and its run_plan_id, or SystemExit with every reason not to run."""
     plan = TrayRunPlan.load(repo / B_PLAN)
     problems = check(plan, repo)
-    problems += [f"{d}: re-freeze or record a Decision" for d in pinned_file_drift(plan, repo)]
+    drift = pinned_file_drift(plan, repo)
+    drift = accepted_pin_drift(repo / B_PLAN, plan.pinned_files, B_FROZEN, repo, drift)
+    problems += [f"{d}: re-freeze or record a Decision" for d in drift]
     if plan.superseded_by is not None:
         problems.append(f"superseded by {plan.superseded_by}")
     if plan.status == "draft":
@@ -275,9 +279,8 @@ def load_pair(repo: Path = REPO) -> tuple[TrayPairPlan, str]:
     """The frozen four-run plan and its id, or SystemExit with every reason not to run."""
     plan = TrayPairPlan.load(repo / PAIR_PLAN)
     problems = pair_check(plan, repo) + [f"PENDING: {p}" for p in pair_pending(plan)]
-    problems += [
-        f"{d}: re-freeze or record a Decision" for d in file_pin_drift(plan.pinned_files, repo)
-    ]
+    drift = accepted_pin_drift(repo / PAIR_PLAN, plan.pinned_files, PAIR_FROZEN, repo)
+    problems += [f"{d}: re-freeze or record a Decision" for d in drift]
     if plan.status == "draft":
         problems.append(f"{PAIR_PLAN} is a draft: no pair job runs before task 6.2")
     lock = lock_path(repo / PAIR_PLAN)

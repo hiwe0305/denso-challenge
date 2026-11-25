@@ -186,4 +186,4 @@ Cổng phát lại: release `tray_s1_0d84cc87b1e5`, seed 1000, mức 1, episode 
 3. `L-TRAY-TILT`: các lượt cũ có bật nhãn sau khi buông không; outcome cũ không có `failure_t`.
 4. Bản vá `compute_reward` của `eval_driver` đã chạy trong `eval-decoupled-wbc` thật, nhưng chỉ một episode phát lại của planner (mục 7.1); chưa chạy với Ψ₀ serve thật hay khi có lỗi.
 5. Hệ số thiết kế thật của eval lặp.
-6. Plan đã đóng băng ghim `predicates.py` bằng sha256 (`he-tray-v2`, `he-tray-pair60k`, `he-tray-b`, `he-tray-cmax`): sửa bộ chấm làm `pairplan check --launch` và 7 test của `flywheel-psi0` báo "pinned file ... changed". Đó là chốt bảo vệ đúng chức năng; cần `Decision` của Hiếu (story, chỗ cần quyết 4).
+6. Plan đã đóng băng ghim `predicates.py` và `run.py` bằng sha256. Từ 25/11/2026 (Hiếu duyệt), `he-tray-pair60k` và `he-tray-v2` có `<plan>.pins.decision.json` ghi sha256 đã ghim và sha256 được chấp nhận; chốt chỉ bỏ qua đúng hai file đó ở đúng nội dung đó, sửa tiếp là chốt bật lại. Số của hai plan đọc trước 25/11/2026 là bản 1. `he-tray-b` và `he-tray-cmax` là bản nháp, không có `Decision`.

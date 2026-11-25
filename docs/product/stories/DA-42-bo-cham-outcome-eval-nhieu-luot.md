@@ -35,20 +35,21 @@ Là người chạy vòng Failure → Data trên task khay, tôi muốn bộ ch�
 ## Nhiệm vụ
 
 - [x] 1. Viết story này (AC 1–6)
-- [ ] 2. Tín hiệu lỗi trong outcome (AC 1)
+- [x] 2. Tín hiệu lỗi trong outcome (AC 1)
   - [x] 2.1 `StepTracker` ghi tín hiệu: `failure_t`, trạng thái lúc lỗi, thời điểm chốt từng bước, khoảng cách lòng bàn tay–tay cầm nhỏ nhất
   - [x] 2.2 `eval_driver` ghi tín hiệu, `scorer_version` và kết quả của bản 1 trên cùng rollout vào dòng outcome
-- [ ] 3. Bộ chấm bản 2 (AC 2, 3)
+- [x] 3. Bộ chấm bản 2 (AC 2, 3)
   - [x] 3.1 Số phiên bản; `approach_a` đo tới đoạn tay cầm và chốt khi hai tay đã cầm
   - [x] 3.2 `L-TRAY-TILT` chỉ khi robot còn cầm khay bằng hai tay
   - [x] 3.3 `eval_results`, `place_error` ghi phiên bản và từ chối trộn
-- [ ] 4. Eval nhiều lượt mỗi điều kiện (AC 4)
+- [x] 4. Eval nhiều lượt mỗi điều kiện (AC 4)
   - [x] 4.1 `eval_batch --repeats N`, hạt nhiễu policy khác nhau theo lượt
   - [x] 4.2 `eval_results`: số thành công từng điều kiện, tỉ lệ từng bước, Wilson theo cỡ mẫu hiệu dụng
-- [ ] 5. Test MuJoCo và runbook (AC 5)
+- [x] 5. Test MuJoCo và runbook (AC 5)
   - [x] 5.1 Test `sim`: khay rơi nghiêng trên cảnh thật, bản 1 gắn `L-TRAY-TILT`, bản 2 không
   - [x] 5.2 Runbook đo bộ chấm bản 2 trên một lô eval
 - [x] 6. Tài liệu `docs/g0/tray/scorer-v2.md` (AC 6)
+- [x] 7. `Decision` chấp nhận hai file ghim đã đổi (`predicates.py`, `run.py`) cho `he-tray-pair60k` và `he-tray-v2`; chốt ghim đọc `Decision` đó (PO duyệt 25/11/2026)
 
 ## Phạm vi file
 
@@ -62,13 +63,14 @@ Theo 07 mục 3.1. pr-guard chặn PR sửa file ngoài danh sách này; file st
 - `docs/g0/tray/scorer-v2.md`, `docs/g0/tray/README.md` (một dòng liên kết)
 
 Không chạm: `simple_task.py`, `randomize.py`, `mjcf.py`, planner và `configs/sim/tray.yaml` (DA-41); `flywheel-eval` (DA-43, DA-44 và làn Đánh giá); `flywheel.contracts`.
+- Thêm 25/11/2026 (PO duyệt, nhiệm vụ 7): `configs/runplans/tray/he-tray-pair60k.pins.decision.json`, `configs/runplans/tray/he-tray-v2.pins.decision.json`; `packages/flywheel-psi0/src/flywheel_psi0/tray/runplan.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/pairplan.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/colab_train.py` (chỉ đường kiểm ghim); `packages/flywheel-psi0/tests/tray/conftest.py`, `packages/flywheel-psi0/tests/tray/test_psi0_tray_runplan.py`.
 
 ## Chỗ cần quyết hoặc chờ người khác
 
 1. **Outcome ngoài eval không có phiên bản.** `TrayTransferEnv.outcome()` nằm trong `simple_task.py` (DA-41 đang giữ). DA-42 thêm trường bằng bản vá lúc chạy trong `eval_driver`, như `scorer_steps` đã làm, nên chỉ outcome của eval có `scorer_version`. Outcome của replay QA và sinh dữ liệu vẫn chấm bằng bản 2 (bộ chấm mặc định đổi) mà không ghi phiên bản. Đề xuất PR riêng sau DA-41: `outcome()` thêm `**self.task.tracker.outcome_fields()`.
 2. **Đổi bộ chấm làm số cũ hết so được** (spec 6.4, tray.md 20.3). Bản 2 không áp lại cho các lô đã chấm; số của chúng vẫn là bản 1. Mọi so sánh bản 1 và bản 2 dùng cặp kết quả trên cùng rollout mà eval ghi (AC 2), không so hai lô.
 3. **Bộ chấm mặc định đổi cho mọi nơi dùng `StepTracker`**, gồm `check_success` khi sinh S1, S2 và replay QA. Ở episode mà bản 1 đã cho qua `approach_a`, lỗi của bản 2 là tập con lỗi của bản 1, nên episode planner đã nhận vẫn nhận. Ở lượt bản 1 không cho qua `approach_a`, bản 2 bật được `L-TRAY-TILT`, `L-ONE-HAND` mà bản 1 không bật, kể cả ở lượt bản 1 tính là thành công ([scorer-v2.md](../../g0/tray/scorer-v2.md) mục 2).
-4. **Plan đã đóng băng ghim `predicates.py` bằng sha256** (`configs/runplans/tray/he-tray-v2`, `he-tray-pair60k`, `he-tray-b`, `he-tray-cmax`). Sửa bộ chấm làm `python -m flywheel_psi0.tray.pairplan check <plan> --launch` báo "pinned file ... changed since the plan pinned it" và 7 test của `packages/flywheel-psi0/tests/tray` (`test_psi0_tray_colab_train.py` 6, `test_psi0_tray_pairplan.py` 1) thất bại; trên `origin/master` chúng qua. Đây là chốt bảo vệ làm đúng việc (spec 6.4), không phải lỗi của DA-42. Cần `Decision` của Hiếu: đóng các plan đó hay đóng băng lại. DA-42 không sửa `configs/runplans/`. DA-41 sửa `simple_task.py`, `randomize.py`, `mjcf.py`, cũng bị ghim, nên gặp cùng chốt này.
+4. **Plan đã đóng băng ghim `predicates.py` bằng sha256** (`configs/runplans/tray/he-tray-v2`, `he-tray-pair60k`, `he-tray-b`, `he-tray-cmax`). Sửa bộ chấm làm `python -m flywheel_psi0.tray.pairplan check <plan> --launch` báo "pinned file ... changed since the plan pinned it" và 7 test của `packages/flywheel-psi0/tests/tray` (`test_psi0_tray_colab_train.py` 6, `test_psi0_tray_pairplan.py` 1) thất bại; trên `origin/master` chúng qua. Đây là chốt bảo vệ làm đúng việc (spec 6.4), không phải lỗi của DA-42. Cần `Decision` của Hiếu: đóng các plan đó hay đóng băng lại. DA-42 không sửa `configs/runplans/`. DA-41 sửa `simple_task.py`, `randomize.py`, `mjcf.py`, cũng bị ghim, nên gặp cùng chốt này. **Đã xử lý 25/11/2026 (nhiệm vụ 7):** Hiếu duyệt ghi `Decision`; plan và lock không đổi. `he-tray-b` và `he-tray-cmax` là bản nháp chưa đóng băng nên không có `Decision`. `he-tray-v2` vẫn trôi ở `mjcf.py` và `simple_task.py` từ DA-33, ngoài DA-42.
 
 ## Ghi chú cho người làm
 
@@ -97,5 +99,5 @@ Không chạm: `simple_task.py`, `randomize.py`, `mjcf.py`, planner và `configs
 ## Ghi chép khi làm
 
 - Công cụ AI đã dùng: Claude Code.
-- Giờ tập trung theo nhiệm vụ con (Claude tự đặt): 1 · 1 · 1,5 · 1,5 · 1 · 1 · 1,5 · 2 · 1 · 1,5 · 1,5 = 14,5 giờ (1, 2.1, 3.1, 3.2, 2.2, 3.3, 4.1, 4.2, 5.1, 6, 5.2).
+- Giờ tập trung theo nhiệm vụ con (Claude tự đặt): 1 · 1 · 1,5 · 1,5 · 1 · 1 · 1,5 · 2 · 1 · 1,5 · 1,5 = 14,5 giờ (1, 2.1, 3.1, 3.2, 2.2, 3.3, 4.1, 4.2, 5.1, 6, 5.2); nhiệm vụ 7: 1 giờ (Opus viết, Fable thiết kế và duyệt).
 - Cổng phát lại trên laptop (19/11/2026): bản vá `eval_driver` chạy trong `eval-decoupled-wbc` thật; kết quả ở [scorer-v2.md](../../g0/tray/scorer-v2.md) mục 7.1.

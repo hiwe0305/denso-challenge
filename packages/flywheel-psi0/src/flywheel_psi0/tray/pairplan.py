@@ -84,9 +84,11 @@ from flywheel_psi0.tray.runplan import (
     Stage1Parent,
     Stats,
     TrayRunPlan,
+    accepted_pin_drift,
     demo_set_problems,
     file_pin_drift,
     lock_path,
+    locked_id,
     parent_problems,
     parents_pending,
     plan_json,
@@ -615,7 +617,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         text += ", draft"
     if todo:
         text += f", {len(todo)} pins pending"
-    drift = file_pin_drift(plan.pinned_files, repo)
+    drift = accepted_pin_drift(args.plan, plan.pinned_files, locked_id(args.plan), repo)
     warnings = []
     if args.launch:
         if plan.status == "draft":
