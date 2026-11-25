@@ -13,6 +13,7 @@ from flywheel.contracts.artifacts import QAReport, ReplayIssue, ReplayReport
 from flywheel.data.config import QAConfig
 from flywheel.data.ingest.lerobot import EpisodeFrames
 from flywheel.data.inject.codes import DATA_DEFECT_CODES
+from flywheel.data.inject.stats import stats_block
 from flywheel.data.qa.checks import (
     calibrate_action_jump,
     dataset_checks,
@@ -260,3 +261,78 @@ def test_shipped_stats_against_the_dataset_own_frames(
         assert findings["stats_json.states"].check.value == pytest.approx(3.6e-4)
         assert "at states.mean[0]" in findings["stats_json.states"].detail
         assert "at episode 0 action.mean[0]" in findings["episodes_stats.action"].detail
+
+
+def long_release(root: Path, mean_shift: float = 0.0) -> list[EpisodeFrames]:
+    """Two 10000-frame episodes with stats written as SIMPLE writes them.
+
+    Dim 0 of states and action is a constant 0.74, so float32 accumulation over the
+    20000 frames drifts past the 1e-5 threshold (the other dims are noise around 0.74
+    and 0.5). `states` stats come from SIMPLE's
+    `stats_block` on float64 input and `action` stats from it on float32 input, as the
+    postprocess computes them; `mean_shift` moves the shipped states mean on top.
+    """
+    rng = np.random.default_rng(0)
+    frames = []
+    for index in range(2):
+        frame = clean_frames(index, length=10_000)
+        states = (0.74 + 0.05 * rng.standard_normal(frame.states.shape)).astype(np.float32)
+        action = (0.5 + 0.05 * rng.standard_normal(frame.action.shape)).astype(np.float32)
+        states[:, 0] = action[:, 0] = 0.74  # a constant dim drifts most in float32
+        frames.append(with_(frame, states=states, action=action))
+    states = np.concatenate([f.states for f in frames])
+    action = np.concatenate([f.action for f in frames])
+    shipped_states = stats_block(states.astype(np.float64))
+    shipped_states["mean"] = [m + mean_shift for m in shipped_states["mean"]]
+    (root / "meta").mkdir(parents=True)
+    stats = {"states": shipped_states, "action": stats_block(action)}
+    (root / "meta" / "stats.json").write_text(json.dumps(stats))
+    rows = [{"episode_index": f.episode_index,
+             "stats": {"action": stats_block(f.action), "timestamp": stats_block(f.timestamp)}}
+            for f in frames]
+    (root / "meta" / "episodes_stats.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+    return frames
+
+
+def largest_gap(shipped: dict[str, list[float]], values: NDArray[Any]) -> float:
+    """Largest |shipped - recomputed| over mean, std, min and max, recomputed as given."""
+    mine = {"mean": values.mean(0), "std": values.std(0), "min": values.min(0),
+            "max": values.max(0)}
+    return max(float(np.abs(np.asarray(shipped[s]) - mine[s]).max()) for s in mine)
+
+
+def test_states_stats_simple_computed_in_float64_pass(
+    tmp_path: Path, qa_config: QAConfig
+) -> None:
+    frames = long_release(tmp_path)
+    shipped = json.loads((tmp_path / "meta" / "stats.json").read_text())
+    states = np.concatenate([f.states for f in frames])
+    # The float32 recompute alone drifts past the threshold: QA used to flag these stats.
+    assert largest_gap(shipped["states"], states) > 10 * qa_config.checks["stats_json"].threshold
+    findings = {f.check.name: f for f in dataset_checks(tmp_path, frames, qa_config)}
+    assert findings["stats_json.states"].check.passed
+    assert findings["stats_json.states"].check.value < 1e-6
+
+
+def test_action_stats_simple_computed_in_float32_pass(
+    tmp_path: Path, qa_config: QAConfig
+) -> None:
+    frames = long_release(tmp_path)
+    shipped = json.loads((tmp_path / "meta" / "stats.json").read_text())
+    action = np.concatenate([f.action for f in frames]).astype(np.float64)
+    # Only the float32 recompute matches SIMPLE's action stats.
+    assert largest_gap(shipped["action"], action) > 10 * qa_config.checks["stats_json"].threshold
+    findings = {f.check.name: f for f in dataset_checks(tmp_path, frames, qa_config)}
+    assert all(f.check.passed for f in findings.values()), {
+        name: f.detail for name, f in findings.items()}
+    assert findings["stats_json.action"].check.value < 1e-6
+
+
+def test_a_wrong_mean_fails_at_both_precisions(tmp_path: Path, qa_config: QAConfig) -> None:
+    frames = long_release(tmp_path, mean_shift=1e-3)
+    finding = {f.check.name: f for f in dataset_checks(tmp_path, frames, qa_config)}[
+        "stats_json.states"]
+    assert not finding.check.passed
+    assert finding.check.value == pytest.approx(1e-3, rel=1e-3)
+    assert "at states.mean[" in finding.detail
+    assert "nearest the float64 recompute" in finding.detail

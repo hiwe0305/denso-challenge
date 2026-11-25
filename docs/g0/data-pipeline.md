@@ -7,7 +7,7 @@ _Ngày 4/11/2026. Story [DA-03](../product/stories/DA-03-pipeline-teleop-synthet
 - Bốn lệnh `fw data ingest | qa | release | report` chạy hết trên hai nguồn và trả mã 0. Mỗi lệnh dưới 6 giây và dưới 0,5 GB RAM, chạy một tiến trình.
 - **psi-data** (task hai bàn, 99 episode): 95 `pass`, 4 `flag`, không episode nào `reject`. Release `rel_24363158e44e66b4` có 99 episode.
 - **Khay S1** (DA-33, 102 episode): cả 102 episode bị `flag` vì `action_jump.arm`, không episode nào `reject`. Release `rel_9f32f33779c904f2` có 102 episode.
-- **D4 trên `states` là dương tính giả (sửa 25/11/2026).** QA báo `meta/stats.json` lệch `states.mean` so với frame: 3,63e-4 ở psi-data (chiều 31) và 7,67e-4 ở khay S1 (chiều 6). Nhưng SIMPLE tính `states` bằng float64, còn QA tính lại bằng float32; tính lại bằng float64 thì lệch chỉ 1,2e-7 và 1,8e-7 ([export-v21.md](export-v21.md) mục 4). Stats của hai nguồn đúng. Phần `action` khớp đến từng bit.
+- **D4 trên `states` là dương tính giả (sửa 25/11/2026).** QA đã báo `meta/stats.json` lệch `states.mean` so với frame: 3,63e-4 ở psi-data (chiều 31) và 7,67e-4 ở khay S1 (chiều 6). Nhưng SIMPLE tính `states` bằng float64, còn QA khi đó tính lại bằng float32; tính lại bằng float64 thì lệch chỉ 1,2e-7 và 1,8e-7 ([export-v21.md](export-v21.md) mục 4). Stats của hai nguồn đúng. Phần `action` khớp đến từng bit. Từ 25/11/2026 QA so cả float32 và float64 (mục 3.3).
 - **Bản sao chấm lỗi bị chặn.** Hai bản sao của DA-27 (#53) đi qua `ingest` và `qa`, nhưng `release` từ chối cả hai bằng `has_injected_defect` và trả mã 2 (mục 3.5).
 - Chưa chạy được ba phép kiểm phát lại (`replay_kinematic`, `replay_dynamic`, `replay_success`) vì chưa có `ReplayReport` của DA-17. `qa.yaml` cho phép bỏ qua khi thiếu đầu vào (`when_missing: skip`), và trang báo cáo ghi rõ phép kiểm nào chưa chạy.
 
@@ -73,9 +73,9 @@ Cả 102 episode vượt ngưỡng nhóm `arm`. Bước nhảy lớn nhất mỗ
 
 ### 3.3 Stats của dataset (D4)
 
-QA tính lại `meta/stats.json` và `meta/episodes_stats.jsonl` từ frame. Phép tính dùng float32, giống `stats_block` của SIMPLE. So sánh chỉ ra một kết quả cho mỗi file và mỗi feature. Ngưỡng là 1e-5.
+QA tính lại `meta/stats.json` và `meta/episodes_stats.jsonl` từ frame. Lần chạy dưới đây tính bằng float32, giống `stats_block` của SIMPLE khi cho mảng float32. So sánh chỉ ra một kết quả cho mỗi file và mỗi feature. Ngưỡng là 1e-5.
 
-Sửa 25/11/2026: SIMPLE tính `states` bằng float64 và `action` bằng float32, nên hai dòng **trượt** của `stats_json.states` dưới đây là dương tính giả của phép tính lại float32, không phải lỗi của nguồn ([export-v21.md](export-v21.md) mục 4 và phát hiện 2). Mã QA vẫn tính float32 tới khi phát hiện 2 được sửa.
+Sửa 25/11/2026: SIMPLE tính `states` bằng float64 và `action` bằng float32, nên hai dòng **trượt** của `stats_json.states` dưới đây là dương tính giả của phép tính lại float32, không phải lỗi của nguồn ([export-v21.md](export-v21.md) mục 4 và phát hiện 2). Từ 25/11/2026 phát hiện 2 đã sửa: `dataset_checks` tính lại bằng `stats_block` của SIMPLE ở cả float32 và float64 (`PRECISIONS` của checklist xuất) và lấy bản gần hơn cho mỗi thống kê; chi tiết của phép kiểm ghi bản đó. Bảng dưới giữ nguyên số của lần chạy 4/11/2026; chạy lại thì `stats_json.states` sẽ qua. Test: `test_states_stats_simple_computed_in_float64_pass`, `test_a_wrong_mean_fails_at_both_precisions`.
 
 | Phép kiểm | psi-data | khay S1 |
 |---|---|---|
