@@ -16,7 +16,8 @@ as it reads the parent:
 - video: the parent's decoded, the first `start` frames dropped, the rest encoded as
   the recorder does (h264, rate fps, the parent's size and pix_fmt);
 - stats: the four files of `flywheel.data.inject.stats`, recomputed on the cut data
-  with the same recipe (that lane is not imported: this runs in the SIMPLE venv);
+  with the same recipe, every column accumulated in float64 (that lane is not imported:
+  this runs in the SIMPLE venv);
 - meta: info.json totals, episodes.jsonl rows, `flywheel_export.json` episodes under
   their new index plus `derived_from`, and `meta/flywheel_cut.json` with the parent's
   hash and each episode's source frame range;
@@ -153,9 +154,13 @@ def _scalars(table: Any, name: str, dtype: type[Any]) -> NDArray[Any]:
     return np.asarray(table.column(name).to_numpy(), dtype=dtype)
 
 
-# Copied from flywheel.data.inject.stats (itself from SIMPLE postprocess_psi0_sonic.py).
+# `flywheel.data.inject.stats.stats_block_f64`: SIMPLE postprocess_psi0_sonic.py's recipe,
+# accumulated in float64. A deliberate departure from SIMPLE @ 6d10628, which accumulates
+# a float32 input in float32, so its stats drift with the frame count: a column of 0.74
+# in 300000 frames gets mean 0.7381 and std 0.0019. `_floats` gives states and action as
+# float32. Integer and flag columns give the values SIMPLE's recipe gives.
 def stats_block(arr: NDArray[Any]) -> dict[str, list[float]]:
-    arr = np.asarray(arr)
+    arr = np.asarray(arr, dtype=np.float64)
     if arr.ndim == 1:
         arr = arr.reshape(-1, 1)
     return {

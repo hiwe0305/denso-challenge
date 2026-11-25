@@ -300,10 +300,15 @@ def test_a_declared_constant_dim_passes_and_the_same_dim_undeclared_fails(root: 
 def test_constant_dims_come_from_min_and_max_not_std(tmp_path: Path) -> None:
     # Dim 31 is 0.74 in every frame, yet SIMPLE's float32 stats give it a std above 0
     # (3.6e-4 on psi-data e78fb93): only min == max tells, as Psi0's normalizer does.
+    # The lane's own stats files accumulate in float64 and give it std 0.
     root = make_tray_dataset(tmp_path / "height", lengths=(3000,))
-    stats = json.loads((root / "meta/stats_psi0.json").read_text())["action"]
+    action = pq.read_table(root / "data/chunk-000/episode_000000.parquet").column("action")
+    stats = stats_block(np.asarray(action.to_pylist(), dtype=np.float32))
     assert stats["std"][31] > 0
     assert checklist.constant_dims(stats) == [31]
+    written = json.loads((root / "meta/stats_psi0.json").read_text())["action"]
+    assert written["std"][31] == 0
+    assert checklist.constant_dims(written) == [31]
     block = {"min": [0.0, 1.0, 0.74], "max": [0.5, 1.0, 0.74 + 1e-6]}
     assert checklist.constant_dims(block) == [1, 2]
 

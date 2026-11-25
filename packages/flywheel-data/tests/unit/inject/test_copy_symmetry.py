@@ -20,7 +20,7 @@ MARKER = "meta/benchmark_copy.json"
 WORDS = (b"inject", b"defect", b"duplicate", b"bench")
 
 
-def stats_block(arr: np.ndarray) -> dict[str, list[float]]:
+def simple_stats_block(arr: np.ndarray) -> dict[str, list[float]]:
     """SIMPLE scripts/postprocess_psi0_sonic.py @ 6d10628, `stats_block`, verbatim."""
     arr = np.asarray(arr)
     if arr.ndim == 1:
@@ -33,6 +33,11 @@ def stats_block(arr: np.ndarray) -> dict[str, list[float]]:
         "q01": np.quantile(arr, 0.01, axis=0).astype(np.float32).tolist(),
         "q99": np.quantile(arr, 0.99, axis=0).astype(np.float32).tolist(),
     }
+
+
+def stats_block(arr: np.ndarray) -> dict[str, list[float]]:
+    """SIMPLE's recipe on float64 input: the copies accumulate every column in float64."""
+    return simple_stats_block(np.asarray(arr, dtype=np.float64))
 
 
 @pytest.fixture(scope="module")
