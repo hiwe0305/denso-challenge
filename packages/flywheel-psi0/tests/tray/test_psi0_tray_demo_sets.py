@@ -278,3 +278,67 @@ def test_two_reports_for_one_episode_are_refused(
     _edit_reports(work, duplicate)
     with pytest.raises(ValueError, match="two DA-03 QA reports"):
         apply_qa(episodes, work, root)
+
+
+# --keep-seeds (DA-48): the candidates restricted to a given seed list before ranking.
+
+
+def test_keep_seeds_gives_exactly_the_list_and_records_the_file(tmp_path: Path) -> None:
+    episodes = _episodes()
+    root = tmp_path / "tray_s1place_test"  # a cut release reads the same: manifest + export
+    _write_release(root, episodes)
+    keep = [e.seed for e in episodes[::3]][::-1]  # any order, not ascending
+    keep_file = tmp_path / "keep.json"
+    keep_file.write_text(json.dumps(keep))
+    out = tmp_path / "demo_sets.json"
+    argv = ["--release", str(root), "--keep-seeds", str(keep_file), "--size", f"Q={len(keep)}"]
+    assert main([*argv, "--out", str(out)]) == 0
+    written = DemoSets.model_validate_json(out.read_text())
+    q = written.sets["Q"]
+    assert q.seeds == sorted(keep)
+    index_of = {e.seed: e.episode_index for e in episodes}
+    assert q.episode_indices == sorted(index_of[s] for s in keep)
+    assert q.set_hash == set_hash(written.release_hash, keep)
+    assert written.keep is not None
+    assert written.keep.file_sha256 == hashlib.sha256(keep_file.read_bytes()).hexdigest()
+    assert written.keep.seeds == len(keep)
+    assert main([*argv, "--check", str(out)]) == 0
+    # a smaller size draws from the kept seeds only
+    small = tmp_path / "small.json"
+    assert main([*argv[:-1], "Q=5", "--out", str(small)]) == 0
+    assert set(DemoSets.model_validate_json(small.read_text()).sets["Q"].seeds) <= set(keep)
+
+
+def test_keep_seeds_refuses_unknown_repeated_or_malformed_seeds(tmp_path: Path) -> None:
+    episodes = _episodes()
+    root = tmp_path / "tray_s1_test"
+    _write_release(root, episodes)
+    keep_file = tmp_path / "keep.json"
+    argv = ["--release", str(root), "--keep-seeds", str(keep_file), "--out", str(tmp_path / "o")]
+    cases = {
+        "not in the release": [episodes[0].seed, 999999],
+        "more than once": [episodes[0].seed, episodes[1].seed, episodes[0].seed],
+        "must be an integer": [episodes[0].seed, "1001"],
+        "non-empty JSON list": {"r": [episodes[0].seed]},
+    }
+    for message, content in cases.items():
+        keep_file.write_text(json.dumps(content))
+        with pytest.raises(ValueError, match=message):
+            main([*argv, "--size", "Q=1"])
+    keep_file.write_text(json.dumps([episodes[0].seed, episodes[1].seed]))
+    with pytest.raises(ValueError, match="asked for"):
+        main([*argv, "--size", "Q=3"])
+    assert not (tmp_path / "o").exists()
+
+
+REPO_SETS = Path(__file__).resolve().parents[4] / "configs/runplans/tray/demo_sets-v2.json"
+
+
+def test_without_keep_seeds_the_file_has_no_keep_field(tmp_path: Path) -> None:
+    root = tmp_path / "tray_s1_test"
+    _write_release(root, _episodes())
+    out = tmp_path / "demo_sets.json"
+    assert main(["--release", str(root), "--size", "A=80", "--out", str(out)]) == 0
+    assert "keep" not in json.loads(out.read_text())
+    assert "keep" not in REPO_SETS.read_text()  # files on master load as before
+    DemoSets.model_validate_json(REPO_SETS.read_text())
