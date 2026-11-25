@@ -462,3 +462,33 @@ Cách đọc:
 - c1 ra `weak_skill`, khớp chẩn đoán "bước đặt yếu" của đội. Với công cụ bản 2 cùng gói, c1 ra `coverage_gap` và đề xuất sinh dữ liệu sim: sai ngưỡng dẫn thẳng tới sai can thiệp.
 - D1 vẫn bằng 0, nhưng lý do đã đổi. Trước đây model không có gì để xếp; nay tín hiệu đủ nên bảng luật tự quyết, 5 trên 8 cụm lớn nhất chỉ còn một giả thuyết. Vai `rank` không còn chỗ để thêm giá trị trên ca này.
 - Ca này vẫn là tập phát triển, một ca. 24/24 không nói gì về vòng chưa thấy.
+
+### 9.7 Vai `adjudicate` và bộ lỗi cấy trên đường ống vòng, 25/11/2026
+
+Đường ống vòng có thêm bước `adjudicate` giữa `hypothesize` và `judge`. Nó chạy phần xét ứng viên của bản 3 (`analyze.py`, `agent.review_subject`, không đổi) cho từng nguồn trong gói, nhưng gọi model qua cổng model, nên rào lớp dữ liệu, ngân sách và ghi/phát lại đều áp dụng. Thư mục lần chạy có thêm `reports.jsonl`, `dropped.jsonl`, `estimates.jsonl` đúng dạng của `fw agentqa run`, nên bộ chấm DA-31 đọc được mà không sửa.
+
+| Loại mục của gói | Nguồn của bản 3 |
+|---|---|
+| `metrics` (kèm `action_layout`, `probe_p3`, `probe_p4`, `probe_p4_parent` cùng job) | train |
+| `rtc_log` | inference |
+| `qa_reports`, `dataset_report`, `episodes`, `replay_reports` | dataset |
+| `probe_p1`, `probe_p3` | stage 1, stage 3 |
+
+Với `--no-model`, bước này dùng lớp code: giữ mọi ứng viên của bộ phát hiện, không thêm gì. Vai `rank` chưa đọc các báo cáo này.
+
+**Bộ log cấy (C1), lớp code, đường mới.** Dựng lại hai bản bằng `log_defects` mặc định, khai gói bằng `python -m flywheel.eval.agentqa.round.declare`, chạy `fw agentqa round --no-model`, chấm bằng DA-31 (mã không sửa). Mã đã gồm DA-44.
+
+| Đại lượng | Đường bản 3, lớp code (mốc 6/11) | Đường ống vòng, lớp code |
+|---|---|---|
+| Recall T1–T8, R1, R2 | 3/3 mỗi loại (30/30) | 3/3 mỗi loại (30/30) |
+| Precision theo mã | 3/3 mỗi mã | 3/3 mỗi mã |
+| Báo nhầm trên bản sạch | 0/40 | 0/40 |
+| Thời gian, RAM một bản | | khoảng 1,6 giây, 150 MB |
+
+Đường bản 3 chạy lại hôm nay trên cùng hai bản cho đúng các phát hiện đó. **Chưa đo với model**: gói log cấy khai lớp `public` nhưng chưa có bản ghi `Source` xác nhận, nên cổng từ chối model thuê; model cục bộ cần `rtx3060`.
+
+Giới hạn đã biết:
+
+- `AgentModel.temperature` của hợp đồng phải là số. Model thuê không gửi temperature, nên báo cáo ghi 1,0 (mặc định của server), là **giả định**. Ghi đúng cần hợp đồng cho phép để trống.
+- Gói log cấy dùng `task_id: tray`, nên mỗi lần chạy mang trạng thái `degraded` vì thiếu điểm số và trace; bước `adjudicate` tự nó `ok`.
+- Ở chế độ có model, mỗi nguồn không có ứng viên vẫn tốn một lời gọi (như bản 3): 40 lời gọi mỗi bản log, so với trần 60 của config.

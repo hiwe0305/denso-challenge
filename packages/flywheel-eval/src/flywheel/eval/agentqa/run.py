@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -99,7 +99,7 @@ def subjects(found: InputSet, offline: OfflineThresholds,
     return out
 
 
-def _figures(analysis: Analysis, found: InputSet, fig_dir: Path, n: int) -> list[str]:
+def draw_figures(analysis: Analysis, found: InputSet, fig_dir: Path, n: int) -> list[str]:
     """Draw the subject's figures; return their paths relative to the report dir."""
     drawn: list[tuple[str, str]] = []
     if analysis.stage == "dataset":
@@ -178,7 +178,7 @@ def run(
         out.mkdir(parents=True)
         pages: list[tuple[str, AgentReport]] = []
         for n, analysis in enumerate(analyses, start=1):
-            analysis.figures = _figures(analysis, found, out / "figures", n)
+            analysis.figures = draw_figures(analysis, found, out / "figures", n)
             if vision_model is not None and images:
                 observe(analysis, [(p, p.as_posix()) for p in images], vision_model,
                         int((config.raw.get("vision") or {}).get("max_images", 6)))
@@ -194,10 +194,8 @@ def run(
             )
             pages.append((page, report))
             record_estimates(report, out / "estimates.jsonl")
-        with (out / "reports.jsonl").open("w", encoding="utf-8") as f:
-            for report in result.reports:
-                f.write(report.model_dump_json() + "\n")
-        _write_dropped(result, out / "dropped.jsonl")
+        write_reports(result.reports, out / "reports.jsonl")
+        write_dropped(result.reports, result.dropped, out / "dropped.jsonl")
         counts = {k: len(v) for k, v in result.dropped.items()}
         (out / "index.html").write_text(render_index(pages, counts), encoding="utf-8")
         return result
@@ -216,12 +214,20 @@ def run(
         )
 
 
-def _write_dropped(result: RunResult, path: Path) -> None:
+def write_reports(reports: Sequence[AgentReport], path: Path) -> None:
+    """`reports.jsonl`: every AgentReport, one per line (what DA-31 reads)."""
+    with path.open("w", encoding="utf-8") as f:
+        for report in reports:
+            f.write(report.model_dump_json() + "\n")
+
+
+def write_dropped(reports: Sequence[AgentReport],
+                  dropped: Mapping[str, Sequence[DroppedCandidate]], path: Path) -> None:
     """One row per dropped code candidate, with the facts it cited, for the reviewer."""
     with path.open("w", encoding="utf-8") as f:
-        for report in result.reports:
+        for report in reports:
             facts = {x.fact_id: x for x in report.facts}
-            for d in result.dropped.get(report.report_id, ()):
+            for d in dropped.get(report.report_id, ()):
                 row = {
                     "kind": d.kind,
                     "report_id": report.report_id,

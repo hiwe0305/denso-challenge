@@ -24,8 +24,12 @@ from pathlib import Path
 from typing import Any, BinaryIO
 
 from flywheel.contracts.artifacts import (
+    ActionLayout,
     DatasetReport,
     Episode,
+    ProbeP1,
+    ProbeP3,
+    ProbeP4,
     QAReport,
     ReplayReport,
     RTCInferenceRecord,
@@ -81,6 +85,13 @@ KINDS: dict[str, Kind] = {
     "dataset_report": Kind(DatasetReport, one=True),
     "ledger": Kind(LedgerEntry),  # a store snapshot (task 4.7); rows carry no data class
     "fix_rate": Kind(FixRateEvent),
+    # Read by the adjudicate role (version 3's subjects): a train job's layout and probe
+    # results beside its metrics, and the probes that are subjects of their own.
+    "action_layout": Kind(ActionLayout, one=True),
+    "probe_p1": Kind(ProbeP1, one=True),
+    "probe_p3": Kind(ProbeP3, one=True),
+    "probe_p4": Kind(ProbeP4, one=True),
+    "probe_p4_parent": Kind(ProbeP4, one=True),
 }
 # Kinds whose files can be large (real data: 1.5 GB of trace, 280 MB of metrics). Their
 # records are never kept: every read parses the file again, one record at a time.

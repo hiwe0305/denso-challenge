@@ -56,10 +56,14 @@ def ledger_entries(store: Path) -> list[LedgerEntry]:
             for line in path.read_text().splitlines()]
 
 
-def test_a_no_model_round_runs_six_steps_and_is_degraded(round_out: Path) -> None:
+def test_a_no_model_round_runs_seven_steps_and_is_degraded(round_out: Path) -> None:
     record = json.loads((round_out / "run.json").read_text())
     assert [s["name"] for s in record["steps"]] == list(NO_MODEL_STEPS)
-    assert len(NO_MODEL_STEPS) == 6 and record["no_model"] is True
+    assert len(NO_MODEL_STEPS) == 7 and record["no_model"] is True
+    # scores only: adjudicate has no source, so it writes nothing and stays ok
+    step = next(s for s in record["steps"] if s["name"] == "adjudicate")
+    assert step["status"] == "ok" and step["rows"] == 0 and step["outputs"] == {}
+    assert not (round_out / "reports.jsonl").exists()
     assert record["status"] == "degraded"
     assert record["agent_version"] == agent_version() and len(record["agent_hash"]) == 64
     a = assembly_of(round_out)

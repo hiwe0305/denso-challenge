@@ -1,8 +1,9 @@
 """Step B4, judge: the rank role asks the model to order each cluster's hypotheses.
 
-The only step that calls a model, always through the gateway (architecture 20/11 B4,
-section 25). One call per cluster, largest first, at most `max_clusters` of
-`roles.yaml`; the rest stay on the code floor (`over_cap`). The user message is ONE
+It calls a model only through the gateway, as adjudicate does (architecture 20/11 B4,
+section 25); the rank prompt does not hold adjudicate's reports yet. One call per
+cluster, largest first, at most `max_clusters` of `roles.yaml`; the rest stay on the
+code floor (`over_cap`). The user message is ONE
 JSON object; strings from artifacts (labels, fact values, notes) enter only as JSON
 values, cut to `FACT_TEXT_CHARS`. After each reply the rule library decides on the one
 resend (attempt 2, with the failures as `previous_errors`); `failed` and

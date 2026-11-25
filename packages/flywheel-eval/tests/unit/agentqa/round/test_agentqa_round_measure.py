@@ -36,7 +36,8 @@ def test_a_round_writes_every_file_and_the_published_numbers(
     # the fixture has no trace and no metrics: admit and measure say so; assemble: no model
     assert [(s.name, s.status) for s in record.steps] == [
         ("pack", "ok"), ("admit", "degraded"), ("measure", "degraded"),
-        ("hypothesize", "ok"), ("assemble", "degraded"), ("render", "ok")]
+        ("hypothesize", "ok"), ("adjudicate", "ok"), ("assemble", "degraded"),
+        ("render", "ok")]
     assert record.data_class == "public"
     for name in ("pack.json", "admission.json", "facts.jsonl", "tool_calls.jsonl", "run.json"):
         assert (out / name).is_file()
