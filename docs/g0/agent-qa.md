@@ -507,3 +507,16 @@ Giới hạn đã biết:
 - `AgentModel.temperature` của hợp đồng phải là số. Model thuê không gửi temperature, nên báo cáo ghi 1,0 (mặc định của server), là **giả định**. Ghi đúng cần hợp đồng cho phép để trống.
 - Gói log cấy dùng `task_id: tray`, nên mỗi lần chạy mang trạng thái `degraded` vì thiếu điểm số và trace; bước `adjudicate` tự nó `ok`.
 - Ở chế độ có model, mỗi nguồn không có ứng viên vẫn tốn một lời gọi (như bản 3): 40 lời gọi mỗi bản log, so với trần 60 của config.
+
+**Báo nhầm trên bốn job fine-tune 60k thật (7.3, một phần), 25/11/2026.** Gói `stage1-60k-out` (log train thật của C_70, C_ALL, B_70, B_ALL sau khi DA-44 sửa bộ phát hiện), lớp code, có bước `adjudicate`, 86 giây:
+
+| Đại lượng | Kết quả |
+|---|---|
+| Báo cáo log train | 4, đều `ok` |
+| Phát hiện | 1: T3 trên B_ALL. Ba job còn lại 0 |
+| Ứng viên bị bỏ | 0 |
+| Giả thuyết hạng 1 thuộc stage train | 0 trên 64 cụm |
+
+- T3 trên B_ALL là phát hiện DA-44 đã ghi là "cần người xem" (mục 3.3, `da34-t6-ft-b-all-s0`); chưa ai kết luận nó là overfit thật hay báo nhầm. Cận trên của báo nhầm vì vậy là 1 trên 4 job.
+- Đây là bốn job 60k của DA-34, không phải ba job 40k của mục 3.3; ba job đó chưa có gói.
+- Chưa đo: có model; gói chỉ gồm lượt thành công; hai run cùng cấu hình khác seed eval (chưa có dữ liệu).
