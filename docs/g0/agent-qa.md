@@ -422,7 +422,7 @@ Gói `stage1-60k-out` (`pack_d1b5f9462d0d6b36`, 258 file): gói 9.3 cộng `outc
 | Tập train | Chỉ điều kiện train cùng mức với lượt hỏng (362 ở mức 1, 63 ở mức 2) | Cả 425 điều kiện; mức chỉ quyết định thành phần nào vào vector |
 | Ánh sáng ở mức 2 | Có trong vector | Không; để cho phép kiểm thị giác của bước 7 |
 
-Hai định nghĩa cho kết luận khác nhau ở 11 trên 50 lượt hỏng của `C_70`. Bản 3 của công cụ theo định nghĩa của spec và của đội (`pool_levels: true` trong config task; đặt `false` để có cách cũ) và ra đúng 1,14288 và 1,52408. Ánh sáng bị bỏ khỏi mức 2 là theo cách của đội; spec 4.2 có ghi ánh sáng trong vector điều kiện, nên đây là điểm **[Đề xuất]** chờ Hiếu xác nhận.
+Hai định nghĩa cho kết luận khác nhau ở 11 trên 50 lượt hỏng của `C_70`. Bản 3 của công cụ theo định nghĩa của spec và của đội (`pool_levels: true` trong config task; đặt `false` để có cách cũ) và ra đúng 1,14288 và 1,52408. Ánh sáng bị bỏ khỏi mức 2 là theo cách của đội, dù spec 4.2 có ghi ánh sáng trong vector điều kiện. **[Đã chốt]** Hiếu, 25/11/2026: bỏ.
 
 **Kết quả, ca `tray-c70-step4`.**
 
