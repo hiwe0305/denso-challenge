@@ -147,15 +147,16 @@ def test_a_row_without_sim_time_is_refused(tmp_path: Path) -> None:
         export(eval_set(tmp_path), out, "C_70")
 
 
-def test_a_labelled_failure_is_refused_while_the_contract_needs_failure_t(
-    tmp_path: Path,
-) -> None:
-    """The batch has no failure time; `ScorerVerdict` sets `failure_t` exactly when a label
-    is set. The export refuses rather than invent one. Flip this test when the contract
-    lets `failure_t` be absent next to a label."""
+def test_a_labelled_failure_exports_with_its_time_left_absent(tmp_path: Path) -> None:
+    """The batch has no failure time. Since #211 `ScorerVerdict` takes a label without
+    `failure_t`, so the export writes the label and leaves the time absent, never invents
+    one; a reader treats the time as a missing signal."""
     out = tmp_path / "batch"
     rollout(out, 0, False, [True] * 5 + [False] * 2, "L-PLACE-POSE")
     rollout(out, 1, True, [True] * 7, None)
     rollout(out, 2, True, [True] * 7, None)
-    with pytest.raises(ValueError, match="failure_t"):
-        export(eval_set(tmp_path), out, "C_70")
+    outcomes = export(eval_set(tmp_path), out, "C_70")
+    failed = outcomes[0].verdict
+    assert (failed.success, failed.failure_label) == (False, "L-PLACE-POSE")
+    assert failed.failure_t is None and failed.at_failure is None
+    assert [o.verdict.success for o in outcomes[1:]] == [True, True]

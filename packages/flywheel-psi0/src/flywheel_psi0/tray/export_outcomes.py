@@ -35,9 +35,9 @@ outcome joins its `Score` by `episode_id`. Per rollout:
 
 A missing rollout, or a row without `sim_time_s`, `steps`, `scorer_steps`, `tray_pos` or
 `tray_quat`, stops the export (exit 1) and lists it; nothing is written. So does a row
-the contract refuses: the contract (`ScorerVerdict`) sets `failure_t` exactly when
-`failure_label` is, and the eval batch has no failure time, so a labelled failure cannot
-be written until the contract lets `failure_t` be absent; the error names the rollouts.
+the contract refuses; the error names the rollouts. A labelled failure is written with
+its label and no `failure_t`: the eval batch has no failure time, and `ScorerVerdict`
+takes a label without one (#211).
 
     python -m flywheel_psi0.tray.export_outcomes --set <eval set> --out <eval_batch dir> \
         --run C_70 --outcomes <file> [--max-chunks 6] [--chunk 10]
