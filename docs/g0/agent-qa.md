@@ -138,7 +138,7 @@ Ngưỡng lấy bằng lệnh mới `fw eval calibrate-train --job <log> …`, i
 
 Còn chưa kiểm hoặc chờ quyết:
 
-- **Đổi nghĩa T1 [Đề xuất]**: so loss đã làm mượt thay vì từng batch, khác chữ của design mục 10; chờ PO. `smooth_steps` = 100 là giả định, và `k` = 4 chỉ đúng với giá trị này.
+- **Đổi nghĩa T1 [Đã chốt, PO 25/11/2026]**: so loss đã làm mượt thay vì từng batch. Chữ của design mục 10 chưa sửa theo. `smooth_steps` = 100 là giả định, và `k` = 4 chỉ đúng với giá trị này.
 - 8 job cùng một công thức train (Ψ₀ stage 3 của DA-26, DA-34). Công thức khác (stage 1 egocentric, batch hay lr khác) phải chạy lại `calibrate-train`.
 - T8 báo ở bản ghi đầu tiên vượt ngưỡng (DA-08); job có một batch lẻ vượt rồi mới hỏng thật sẽ báo ở batch lẻ đó.
 - Chưa chạy lại agent (Nemotron) trên 3 job thật sau khi sửa; agent hết thấy T1, T2, T8 vì code không còn báo, chưa đo.

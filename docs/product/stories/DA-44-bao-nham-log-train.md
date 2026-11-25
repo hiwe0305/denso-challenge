@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Chờ review (PO duyệt làm 19/11/2026; nhiệm vụ 1–5 xong, chưa mở PR) |
+| Trạng thái | Chờ review (PO duyệt làm 19/11/2026; nhiệm vụ 1–5 xong; PO đồng ý đổi nghĩa T1 và mở PR ngày 25/11/2026) |
 | Người làm | Hiếu, làm cùng Claude (làn Đánh giá; chủ làn là Châu) |
 | Làn | Đánh giá (`flywheel-eval`) |
 | Story PRD | Sửa DA-08 (F-TRAIN T1–T8); [design 27/10/2026](../../superpowers/specs/2026-10-27-g1-psi0-demo-design.md) mục 10 |
@@ -54,7 +54,7 @@ Ngoài phạm vi, đề xuất PR riêng cho chủ file: bản sạch của bộ
 
 ## Chỗ cần quyết hoặc chờ người khác
 
-1. **Đổi nghĩa T1 nhánh spike [Đề xuất].** Design mục 10 nói "tăng quá k lần giá trị nhỏ nhất trong cửa sổ W". Story này so loss đã làm mượt (trung vị trượt) thay vì loss từng batch, vì loss từng batch của job khỏe dao động hơn 100 lần trong 500 step. Nhánh NaN và Inf giữ nguyên. Cần PO (Hiếu) xác nhận; nếu không đồng ý thì chỉ còn cách tăng `k` lên trên 200, và T1 nhánh spike gần như không còn bắt được gì.
+1. **Đổi nghĩa T1 nhánh spike [Đã chốt, PO 25/11/2026].** Design mục 10 nói "tăng quá k lần giá trị nhỏ nhất trong cửa sổ W". Story này so loss đã làm mượt (trung vị trượt) thay vì loss từng batch, vì loss từng batch của job khỏe dao động hơn 100 lần trong 500 step. Nhánh NaN và Inf giữ nguyên. Cần PO (Hiếu) xác nhận; nếu không đồng ý thì chỉ còn cách tăng `k` lên trên 200, và T1 nhánh spike gần như không còn bắt được gì.
 2. **Log thật chỉ là job cùng một công thức** (Ψ₀ stage 3, batch và lr như DA-26, DA-34). Ngưỡng hiệu chỉnh đúng cho công thức đó; công thức khác cần chạy lại lệnh hiệu chỉnh.
 3. Châu là chủ làn: PR này cần Châu xem phần thay đổi bộ phát hiện.
 
@@ -73,6 +73,7 @@ Ngoài phạm vi, đề xuất PR riêng cho chủ file: bản sạch của bộ
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 25/11/2026 | PO đồng ý đổi nghĩa T1 nhánh spike (so loss đã làm mượt) và mở PR; chữ của design mục 10 chưa sửa, cần một PR tài liệu riêng | PO (Hiếu) |
 | 19/11/2026 | Viết story từ agent-qa mục 3.3; PO duyệt làm | Hiếu, Claude |
 
 ## Ghi chép khi làm

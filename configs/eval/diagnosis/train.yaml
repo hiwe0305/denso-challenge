@@ -17,7 +17,7 @@
 t1:
   k: 4.0             # hiệu chỉnh DA-44 (19/11/2026): 2 × tỉ lệ lớn nhất của loss train đã làm mượt trên 8 job Ψ₀ khỏe của DA-26, DA-34 (1,80), làm tròn lên 0,5; `fw eval calibrate-train`
   window_steps: 500  # giả định; cửa sổ W tính lùi từ step đang xét, đơn vị step (issue #5, chốt 29/10/2026)
-  smooth_steps: 100  # giả định (DA-44, đề xuất chờ PO); trung vị trượt của loss train mà nhánh spike so, thay cho từng batch; k hiệu chỉnh theo giá trị này
+  smooth_steps: 100  # giả định (DA-44; PO đồng ý cách so 25/11/2026, giá trị 100 chưa hiệu chỉnh); trung vị trượt của loss train mà nhánh spike so, thay cho từng batch; k hiệu chỉnh theo giá trị này
 
 t2:
   n_steps: 2000             # giả định; "sau N step mà loss val chưa giảm"
