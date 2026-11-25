@@ -225,6 +225,15 @@ class Gateway:
                 raise GatewayRefused(f"{role} routes to hosted profile {name}: {reason}")
         return name, profile
 
+    def routed(self, role: str) -> tuple[Profile, ChatModel]:
+        """The profile and provider `role` calls on this pack, checked as `call` checks them.
+
+        For a caller that records which model answered (the adjudicate role's
+        `AgentModel`); building a provider opens no connection.
+        """
+        name, profile = self._route(role)
+        return profile, self._provider(name, profile)
+
     def _provider(self, name: str, profile: Profile) -> ChatModel:
         if name not in self._providers:
             self._providers[name] = self._factory(name, profile)

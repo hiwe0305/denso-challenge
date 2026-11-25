@@ -6,7 +6,13 @@
 
 A no-model run executes `NO_MODEL_STEPS` only; `run.json` records the mode and `--from`
 keeps it (a different mode is refused). `model_calls.jsonl` is never deleted by a redo:
-`--from judge` replays its answered requests, `--from verify` makes no call at all.
+`--from adjudicate` and `--from judge` replay its answered requests, `--from verify` makes
+no call at all.
+
+`adjudicate` (`adjudicate.py`) runs in both modes, before judge: version 3's report of
+each source the pack holds, through the gateway in a model run and on the code floor in a
+no-model run. A pack with no such source writes nothing there. One gateway serves both
+model roles of a command.
 
 Each step reads files and writes files. After every step its record is appended to
 `run.json`, so a crash leaves a run record that says how far the run got. Kept steps are
@@ -25,6 +31,13 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from flywheel.contracts.base import new_ulid
+from flywheel.eval.agentqa.round.adjudicate import (
+    DROPPED_FILE,
+    ESTIMATES_FILE,
+    FIGURES_DIR,
+    REPORTS_FILE,
+    adjudicate,
+)
 from flywheel.eval.agentqa.round.admit import ADMISSION_FILE, Admitted, admit, write_admission
 from flywheel.eval.agentqa.round.assemble import ASSEMBLY_FILE, assemble
 from flywheel.eval.agentqa.round.gateway import (
@@ -68,9 +81,11 @@ from flywheel.store.paths import StorePaths
 from pydantic import ValidationError
 
 RUN_FILE = "run.json"
-STEPS = ("pack", "admit", "measure", "hypothesize", "judge", "verify", "assemble", "render")
+STEPS = ("pack", "admit", "measure", "hypothesize", "adjudicate", "judge", "verify", "assemble",
+         "render")
 MODEL_STEPS = ("judge", "verify")
 NO_MODEL_STEPS = tuple(s for s in STEPS if s not in MODEL_STEPS)
+MODEL_ROLE_STEPS = ("adjudicate", "judge")  # steps that may call the gateway
 STORY = "DA-43"
 SECONDS_NO_MODEL = 5.0
 SECONDS_PER_MODEL_CALL = 30.0  # an assumption until a model round is measured
@@ -79,6 +94,8 @@ STEP_FILES: dict[str, tuple[str, ...]] = {
     "admit": (ADMISSION_FILE,),
     "measure": (FACTS_FILE, CALLS_FILE),
     "hypothesize": (HYPOTHESES_FILE,),
+    # Not model_calls.jsonl: judge appends to it after this step recorded its sha256.
+    "adjudicate": (REPORTS_FILE, DROPPED_FILE, ESTIMATES_FILE),
     "judge": (JUDGED_FILE, MODEL_CALLS_FILE),
     "verify": (VERDICTS_FILE,),
     "assemble": (ASSEMBLY_FILE,),
@@ -86,7 +103,7 @@ STEP_FILES: dict[str, tuple[str, ...]] = {
 }
 # Kept when a step is redone: the gateway replays answered requests from it.
 KEPT_ON_REDO: frozenset[str] = frozenset({MODEL_CALLS_FILE})
-STEP_DIRS: dict[str, tuple[str, ...]] = {"measure": (TABLES_DIR,)}
+STEP_DIRS: dict[str, tuple[str, ...]] = {"measure": (TABLES_DIR,), "adjudicate": (FIGURES_DIR,)}
 SEVERITY: dict[str, int] = {"ok": 0, "degraded": 1, "broken": 2}
 
 
@@ -111,6 +128,7 @@ class _Work:
     gateway_root: Path = GATEWAY_ROOT
     factory: ProviderFactory | None = None
     usage: Usage | None = None
+    gateway: Gateway | None = None
     run: RunRecord | None = None
     pack: Pack | None = None
     admitted: Admitted | None = None
@@ -188,11 +206,26 @@ def _step_assemble(w: _Work) -> int:
     return len(assembly.clusters)
 
 
+def _gateway(w: _Work) -> Gateway:
+    """The command's one gateway, built by the first model step that needs it."""
+    if w.gateway is None:
+        w.gateway = Gateway(w.out, load_gateway_config(w.gateway_root), factory=w.factory)
+        w.usage = w.gateway.usage
+    return w.gateway
+
+
+def _step_adjudicate(w: _Work) -> int:
+    assert w.pack is not None and w.admitted is not None
+    result = adjudicate(w.out, w.pack_path.parent, w.pack, w.admitted,
+                        None if w.no_model else (lambda: _gateway(w)))
+    w.degraded += result.problems
+    return len(result.reports)
+
+
 def _step_judge(w: _Work) -> int:
     # Built first: a refused config or a hosted route the pack may not take stops the
     # step before any call (GatewayRefused, recorded as broken like any failure).
-    gateway = Gateway(w.out, load_gateway_config(w.gateway_root), factory=w.factory)
-    w.usage = gateway.usage
+    gateway = _gateway(w)
     result = judge(w.out, gateway)
     w.degraded += result.problems
     return len(result.items)
@@ -212,7 +245,8 @@ def _step_render(w: _Work) -> int:
 
 
 RUNNERS = {"pack": _step_pack, "admit": _step_admit, "measure": _step_measure,
-           "hypothesize": _step_hypothesize, "judge": _step_judge, "verify": _step_verify,
+           "hypothesize": _step_hypothesize, "adjudicate": _step_adjudicate,
+           "judge": _step_judge, "verify": _step_verify,
            "assemble": _step_assemble, "render": _step_render}
 
 
@@ -412,7 +446,7 @@ def _run_steps(work: _Work, record: RunRecord, names: tuple[str, ...]) -> RunRec
                 status = "degraded"
                 problems = [f"{name}: {d}" for d in work.degraded]
         except Exception as error:  # every failure is recorded, then raised again
-            if name == "judge" and work.usage is not None:
+            if name in MODEL_ROLE_STEPS and work.usage is not None:
                 record = record.model_copy(update=_usage_update(work.usage))
             record = record.model_copy(update={
                 "steps": [*record.steps, StepRecord(
@@ -425,7 +459,7 @@ def _run_steps(work: _Work, record: RunRecord, names: tuple[str, ...]) -> RunRec
             update["pack_id"] = work.pack.pack_id
         if name == "admit" and work.admitted is not None:
             update["data_class"] = work.admitted.admission.data_class
-        if name == "judge" and work.usage is not None:
+        if name in MODEL_ROLE_STEPS and work.usage is not None:
             update.update(_usage_update(work.usage))
         steps = [*record.steps, StepRecord(
             name=name, status=status, seconds=time.monotonic() - began, rows=rows,

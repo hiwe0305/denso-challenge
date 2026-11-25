@@ -49,6 +49,11 @@ class LocalEndpointModel:
         return self.endpoint.revision
 
     @property
+    def temperature(self) -> float:
+        """The temperature the endpoint sends (agent.yaml); hosted providers send none."""
+        return self.endpoint.temperature
+
+    @property
     def host(self) -> str:
         return urlparse(self.endpoint.base_url).hostname or ""
 

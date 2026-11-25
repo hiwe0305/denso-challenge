@@ -27,9 +27,12 @@ def agent_hash(task_id: str, plan: Path | None = None, root: Path = CONFIG_ROOT,
     under `root`), every rule file, the check catalog, the cost keys and the model
     gateway's `routing.yaml` and `hosted.yaml` (architecture section 11; the hosted file
     holds key variable names, never keys), `agent.yaml` (model, revision and endpoint of
-    the local models), `../diagnosis/system.yaml` (the tau_track values `trace_stats`
-    reads), the model roles' limits `roles.yaml` and the rank prompt `prompts/rank.md`.
-    A file that does not exist is skipped.
+    the local models, and the limits and prompt file of the adjudicate role),
+    `../diagnosis/system.yaml` (the tau_track values `trace_stats` reads, R1 and R2),
+    `../diagnosis/train.yaml` (T1-T8, which the adjudicate role's train subjects run),
+    the model roles' limits `roles.yaml` and every prompt `prompts/*.md` (rank, and
+    version 3's `system.md` the adjudicate role sends). A file that does not exist is
+    skipped.
 
     `gateway_root` is the directory the gateway read `routing.yaml` and `hosted.yaml`
     from; by default (or when it is `root`) the hash is the one of `root` alone.
@@ -40,7 +43,8 @@ def agent_hash(task_id: str, plan: Path | None = None, root: Path = CONFIG_ROOT,
              root / "checks.yaml", root / "costs.yaml",
              *([] if gateway else [root / "routing.yaml", root / "hosted.yaml"]),
              root / "agent.yaml", root.parent / "diagnosis" / "system.yaml",
-             root / "roles.yaml", root / "prompts" / "rank.md"]
+             root.parent / "diagnosis" / "train.yaml", root / "roles.yaml",
+             *sorted((root / "prompts").glob("*.md"))]
     pairs = sorted((f.relative_to(root.parent).as_posix(),
                     hashlib.sha256(f.read_bytes()).hexdigest()) for f in files if f.is_file())
     if gateway_root is not None and gateway:

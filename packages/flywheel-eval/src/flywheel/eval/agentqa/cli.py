@@ -98,7 +98,8 @@ def round_command(
     gateway_config: Path | None = typer.Option(
         None, "--gateway-config", help="Directory with routing.yaml and hosted.yaml."),
 ) -> None:
-    """Run a round: pack, admit, measure, hypothesize, judge, verify, assemble, render."""
+    """Run a round: pack, admit, measure, hypothesize, adjudicate, judge, verify, assemble,
+    render."""
     mode: bool | None = True if no_model else (None if from_step is not None else False)
     try:
         record = run_round(pack, out, plan_path=plan, from_step=from_step,
