@@ -35,10 +35,11 @@ nothing raises on data. Checks that need finite numbers are left out when
 
 `dataset_checks` covers D4, which belongs to a dataset, not to an episode: the
 stats files a LeRobot dataset ships against stats recomputed from its own
-parquet. Known false positive: the recompute is float32, but SIMPLE computes
-`states` in float64, so `stats_json.states` flags psi-data e78fb93 (3.63e-4 on
-the mean) and tray S1 (7.67e-4) although their stats are right; in float64 they
-match to 2e-7 (docs/g0/export-v21.md section 4, finding 2, still open here).
+parquet. The recompute is SIMPLE's `stats_block` in float32 and in float64, as the
+export checklist runs it (`PRECISIONS`): SIMPLE computes `states` in float64 and
+`action` in float32, and a float32-only recompute put psi-data e78fb93 3.63e-4 and
+tray S1 7.67e-4 off their right `states` stats (docs/g0/export-v21.md section 4,
+finding 2).
 """
 
 from __future__ import annotations
@@ -53,8 +54,10 @@ from typing import Any
 import numpy as np
 from flywheel.contracts.artifacts import Episode, QACheck, QAReport, ReplayReport
 from flywheel.data.config import QAConfig, QADecision
+from flywheel.data.export.checklist import PRECISIONS
 from flywheel.data.ingest.lerobot import EpisodeFrames
 from flywheel.data.ingest.sources import EpisodeLineage
+from flywheel.data.inject.stats import stats_block
 from numpy.typing import NDArray
 
 SEVERITY: dict[str, int] = {"pass": 0, "flag": 1, "quarantine": 2, "reject": 3}
@@ -173,11 +176,11 @@ def dataset_checks(
     One finding per file and feature: `stats_json.states` and `stats_json.action`
     over all frames, `episodes_stats.action` and `episodes_stats.timestamp` over
     the episodes (the worst one named). Mean, std, min and max only, since
-    quantiles depend on the method; each is computed in the dtype the reader gives
-    (float32 states and action). SIMPLE computes `action` that way but `states` in
-    float64, so float32 accumulation on `states` is reported as a finding (a known
-    false positive, see the module docstring). A file the dataset does not ship, or a
-    feature it leaves out, is not checked.
+    quantiles depend on the method. Each statistic is recomputed with SIMPLE's
+    `stats_block` in float32 and in float64 and compared with the nearer one, since
+    SIMPLE accumulates `states` in float64 and `action` in float32; the detail names
+    the precision of the worst gap. A file the dataset does not ship, or a feature it
+    leaves out, is not checked.
     """
     findings: list[DatasetFinding] = []
     if not episodes:
@@ -343,21 +346,31 @@ def _stats_finding(
     pairs: dict[str, tuple[dict[str, Any], NDArray[Any]]],
     cfg: QAConfig,
 ) -> DatasetFinding:
-    """The largest |shipped - recomputed| over `pairs` (where -> shipped block, values)."""
+    """The largest |shipped - recomputed| over `pairs` (where -> shipped block, values).
+
+    Each statistic counts at the precision of `PRECISIONS` whose recompute is nearer.
+    """
     worst, at = 0.0, "every value equal"
     for where, (block, values) in pairs.items():
         data = np.asarray(values).reshape(len(values), -1)
-        mine = {"mean": data.mean(0), "std": data.std(0), "min": data.min(0), "max": data.max(0)}
+        mine = {kind: stats_block(data.astype(dtype)) for kind, dtype in PRECISIONS.items()}
         for stat in STATS:
             if stat not in block:
                 continue
             theirs = np.asarray(block[stat], dtype=np.float64).reshape(-1)
-            if theirs.shape != mine[stat].shape:
+            if theirs.shape != (data.shape[1],):
                 worst, at = float("inf"), f"{where}{feature}.{stat} shape {theirs.shape}"
                 continue
-            gap = np.abs(theirs - mine[stat].astype(np.float64))
+            gaps = {
+                kind: np.abs(theirs - np.asarray(recomputed[stat], dtype=np.float64))
+                for kind, recomputed in mine.items()
+            }
+            kind = min(gaps, key=lambda k: float(gaps[k].max()))
+            gap = gaps[kind]
             if float(gap.max()) > worst:
-                worst, at = float(gap.max()), f"{where}{feature}.{stat}[{int(gap.argmax())}]"
+                worst = float(gap.max())
+                at = (f"{where}{feature}.{stat}[{int(gap.argmax())}]"
+                      f" (nearest the {kind} recompute)")
     rule = cfg.checks[name]
     value = worst if np.isfinite(worst) else 1e300  # QACheck holds finite numbers only
     passed = value <= rule.threshold
