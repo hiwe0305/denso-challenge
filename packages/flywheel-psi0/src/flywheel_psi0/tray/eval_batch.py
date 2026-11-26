@@ -36,6 +36,12 @@ Psi0 server a different policy noise seed per repeat (`FLYWHEEL_TRAY_REPEAT`, se
 `flywheel_simple.tray.run`), so repeats differ by more than EGL noise when the server seeds
 its noise. N = 1 (default) is the order, directories and seeds of before.
 
+`--scene {zone1,jig2}` (DA-47) picks the env: zone1 (default) is DA-32's scene, the
+command, directories and `runs.jsonl` rows of before; jig2 is DA-41's fixed-jig scene
+(`jig_task.JIG_ENV_ID`), and each `runs.jsonl` row gets `scene`. A set records its scene
+(`environment_config.flywheel.scene`, none for zone1, see `eval_set`); a set of another
+scene is refused before any client starts.
+
     python -m flywheel_psi0.tray.eval_batch --set <eval set> --conditions-sha256 <sha> \
         --out <dir> --server 127.0.0.1:22185 --simple-python <SIMPLE venv>/bin/python \
         --pythonpath <repo>/packages/*/src joined by ':'
@@ -60,6 +66,11 @@ from typing import Any
 from flywheel_psi0.tray.eval_set import conditions_sha256
 
 ENV_ID = "simple/G1WholebodyTrayTransferTeleop-v0"
+SCENES = {  # scene -> env id: simple_task.ENV_ID, jig_task.JIG_ENV_ID
+    "zone1": ENV_ID,
+    "jig2": "simple/G1WholebodyTrayTransferJigTeleop-v0",
+}
+DEFAULT_SCENE = "zone1"
 POLICY = "psi0_decoupled_wbc"
 PHASES: tuple[tuple[int, ...], ...] = ((1, 2), (0,))  # Hiếu 6/11/2026
 STATS_LINE = re.compile(r"^episode_(\d+):\s*(True|False)\s*$")
@@ -123,6 +134,11 @@ def chunk_plan(
     return plan
 
 
+def set_scene(row: dict[str, Any]) -> str:
+    """The scene a condition row was built for; a row without one is zone1."""
+    return str(row["environment_config"]["flywheel"].get("scene", DEFAULT_SCENE))
+
+
 def finished(chunk: Chunk, attempt: Path) -> dict[int, dict[str, Any]]:
     """Episode index -> outcome row of the chunk's episodes that this attempt finished."""
     stats = attempt / "eval/eval_stats.txt"
@@ -162,6 +178,7 @@ class Setup:
     proxy_python: Path
     pythonpath: str
     run_plan_id: str
+    env_id: str = ENV_ID
 
 
 Launch = Callable[[Chunk, int, int, Path], int]
@@ -221,7 +238,7 @@ def launcher(setup: Setup) -> Launch:
                 str(setup.simple_python),
                 "-m",
                 "flywheel_psi0.tray.eval_driver",
-                ENV_ID,
+                setup.env_id,
                 POLICY,
                 "--host",
                 "127.0.0.1",
@@ -263,6 +280,7 @@ def run_batch(
     launch: Launch,
     max_attempts: int = 3,
     log: Callable[[str], None] = print,
+    scene: str = DEFAULT_SCENE,
 ) -> int:
     """Runs every chunk's missing episodes; 1 when a chunk still misses some after its attempts."""
     for chunk in chunks:
@@ -290,6 +308,8 @@ def run_batch(
                 "finished": done,
                 "missing": missing(out, chunk),
             }
+            if scene != DEFAULT_SCENE:
+                row["scene"] = scene
             with (out / "runs.jsonl").open("a") as f:
                 f.write(json.dumps(row) + "\n")
             log(json.dumps(row))
@@ -316,6 +336,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--repeats", type=int, default=1, help="rollouts per condition (DA-42); default 1"
     )
+    parser.add_argument(
+        "--scene", choices=sorted(SCENES), default=DEFAULT_SCENE, help="env (DA-47)"
+    )
     args = parser.parse_args(argv)
     if args.max_chunks is not None and args.max_chunks < 1:
         parser.error("--max-chunks must be at least 1")
@@ -334,6 +357,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if len(plan_ids) != 1:
         print(f"set mixes run plans {sorted(plan_ids)}", file=sys.stderr)
         return 1
+    scenes = {set_scene(row) for row in rows}
+    if scenes != {args.scene}:
+        print(f"set is for scene {sorted(scenes)}, --scene is {args.scene}", file=sys.stderr)
+        return 1
     chunks = chunk_plan(rows, args.chunk, phases_for(rows))[: args.max_chunks]
     if only is not None:
         unknown = sorted(set(only) - {c.id for c in chunks})
@@ -343,7 +370,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     chunks = with_repeats(chunks, args.repeats)
     if args.dry_run:
         for chunk in chunks:
-            print(chunk.dir_id, chunk.seeds[0], chunk.seeds[-1], len(chunk.seeds))
+            print(chunk.dir_id, chunk.seeds[0], chunk.seeds[-1], len(chunk.seeds), args.scene)
         return 0
     args.out.mkdir(parents=True, exist_ok=True)
     setup = Setup(
@@ -354,8 +381,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         proxy_python=args.proxy_python,
         pythonpath=args.pythonpath,
         run_plan_id=plan_ids.pop(),
+        env_id=SCENES[args.scene],
     )
-    return run_batch(args.out, chunks, launcher(setup), args.attempts)
+    return run_batch(args.out, chunks, launcher(setup), args.attempts, scene=args.scene)
 
 
 if __name__ == "__main__":
