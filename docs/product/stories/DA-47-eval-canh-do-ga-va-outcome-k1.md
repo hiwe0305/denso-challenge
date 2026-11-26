@@ -55,16 +55,16 @@ Tên số đo K1 đề xuất (hợp đồng yêu cầu hậu tố đơn vị):
 ## Nhiệm vụ
 
 - [x] 1. Viết story này
-- [ ] 2. Eval trên cảnh đồ gá (AC 1, 2)
+- [x] 2. Eval trên cảnh đồ gá (AC 1, 2)
   - [x] 2.1 `eval_driver`: đăng ký env đồ gá, ghi `task_uid` vào dòng outcome
   - [x] 2.2 `eval_batch --scene`, từ chối lệch cảnh với tập điều kiện
   - [x] 2.3 `colab_serve --branch M`: serve run M của plan `mix_train` từ Colab, cùng các kiểm tra sha256 như nhánh DA-34 (Hiếu chọn ba làn Colab L4 ngày 26/11/2026)
 - [x] 3. Đích theo cảnh trong `export_outcomes` và `place_error` (AC 3)
 - [x] 4. `export_outcomes` xuất tín hiệu của DA-42 và `repeat` (AC 4)
 - [x] 5. Tập điều kiện `jig2` (AC 5)
-- [ ] 6. Thử trên laptop và runbook (AC 6, 7)
+- [x] 6. Thử trên laptop và runbook (AC 6, 7)
   - [x] 6.1 Cổng phát lại trên `jig2`, xuất K1, ghi kết quả
-  - [ ] 6.2 Runbook eval checkpoint trên `jig2`
+  - [x] 6.2 Runbook eval checkpoint trên `jig2` (scorer-v2.md mục 9.2; lô run M thật ở 9.3)
 - [x] 8. Sửa theo review PR 221: Wilson mô tả dùng n_eff = số điều kiện; `missing` ghi lượt; `--stage1` chỉ kiểm lượt 0; báo khi thư mục có nhiều lượt hơn số đọc; `evidence` từ chối lô có `.rN`
 - [ ] 7. Kiểm tra đủ, `pr_guard`, mở PR (AC 8)
 
@@ -78,6 +78,7 @@ Theo 07 mục 3.1. File story luôn được sửa.
 - `packages/flywheel-psi0/tests/tray/`
 - `packages/flywheel-simple/src/flywheel_simple/tray/run.py`, `packages/flywheel-simple/tests/tray/test_run_eval.py`
 - `docs/g0/tray/`
+- `docs/g0/ledger/DA-47.csv` (dòng thực đo của lô eval run M; phiên điều phối giao 26/11/2026)
 
 ## Chỗ cần quyết hoặc chờ người khác
 
