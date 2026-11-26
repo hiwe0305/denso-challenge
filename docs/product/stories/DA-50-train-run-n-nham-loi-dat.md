@@ -54,8 +54,8 @@ Dữ liệu thêm, theo thứ tự ưu tiên, **đã sửa theo số đo trên**
 
 | Ưu tiên | Dữ liệu | Lý do | Điều chưa chắc |
 |---|---|---|---|
-| 2 | Thêm episode mức 2 (đầy đủ và đoạn đặt cắt) | Tập của M có 304/1 037 episode mức 2 (29 %); mức 2 hỏng nhiều nhất (31/44 lượt hỏng) | Không biết tham số nào của mức 2 gây lỗi |
 | 1 | Đoạn đặt có lệch **góc** lúc tới bàn B (thêm trục xoay vào độ lệch của planner) | Chưa có demo nào sửa lệch góc; 10/28 lượt đặt lệch có lệch góc trên 10° | Cần sửa planner (`flywheel_simple/tray/planner.py`, lớp độ lệch CARRY) và đo tỉ lệ thành công của planner khi tới lệch góc |
+| 2 | Thêm episode mức 2 (đầy đủ và đoạn đặt cắt) | Tập của M có 304/1 037 episode mức 2 (29 %); mức 2 hỏng nhiều nhất (31/44 lượt hỏng) | Không biết tham số nào của mức 2 gây lỗi |
 | 3 | Thêm đoạn đặt lệch ngang cùng loại | Lỗi lệch ngang là nhiều nhất | Số đo trên cho thấy khoảng lệch đã được phủ; lợi ích là giả thuyết yếu |
 
 **Video camera đầu của 28 lượt `L-PLACE-POSE` (xem 26/11/2026, một khung 5 giây trước lỗi và một khung lúc lỗi cho mỗi lượt; đếm bằng mắt, số gần đúng):**
