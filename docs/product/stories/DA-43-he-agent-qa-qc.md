@@ -67,6 +67,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [x] 4.9 Bộ nhớ: B1 đọc và kiểm từng file theo dòng, không giữ bản ghi của `trace`, `metrics`, `rtc_log`; công cụ đọc lại khi cần và kiểm lại sha256 (23/11/2026; đỉnh RAM trên gói thật từ 5,8 GB xuống 365 MB)
   - [x] 4.10 Bảng luật giả thuyết lên 7 trên 8 dòng của design 5.3 (23/11/2026): controller, kỹ năng yếu, thiếu vùng phủ, ngoài miền, lỗi ở stage train; 4 phép kiểm mới; luật mang danh sách chẩn đoán nó loại trừ. Dòng "policy, không phải controller" chờ quyết định hợp đồng của Hiếu
   - [x] 4.11 Hai luật cơ chế cho cụm `L-PLACE-POSE` (26/11/2026): `relaxed_sweep` bản 2 ghi fact sai số góc và độ cao, độ nghiêng cuối của khay so với mốc lấy từ lượt thành công của chính run; luật `place_rests_raised` và `place_yaw_miss`; bốn tên số đo lúc lỗi của DA-47 trong `tasks/tray.yaml`
+  - [x] 4.12 Luật `tilt_while_carried` cho cụm `L-TRAY-TILT` (26/11/2026): `signal_presence` bản 3 ghi fact về cách khay được giữ lúc lỗi (hai tay còn chạm, chưa ở bàn nào, độ nghiêng, thời điểm) từ khối `carry` của `tasks/tray.yaml`
 - [ ] 5. Lớp model (2 ngày; kiến trúc 20/11 mục 8, 19–25)
   - [x] 5.1 Cổng model: hồ sơ, bảng vai × lớp dữ liệu, chặn hosted, ngân sách, ghi và phát lại
   - [ ] 5.2 Vai `adjudicate` và `rank`: prompt, schema câu trả lời
@@ -144,7 +145,7 @@ Danh sách chung của story:
 
 | Ngày | Nội dung | Người |
 |---|---|---|
-| 26/11/2026 | Thêm nhiệm vụ 4.11 (hai luật cơ chế của lỗi đặt) và 7.5 (vòng thật run M) | Hiếu (soạn với Claude) |
+| 26/11/2026 | Thêm nhiệm vụ 4.11, 4.12 (ba luật cơ chế: lỗi đặt và nghiêng khay) và 7.5 (vòng thật run M) | Hiếu (soạn với Claude) |
 | 26/11/2026 | Thêm nhiệm vụ 5.9 (chủ thể dataset trên đường ống vòng) | Hiếu (soạn với Claude) |
 | 25/11/2026 | Thêm nhiệm vụ 5.8 (vai `adjudicate`); 5.2 và 5.3 còn mở phần vai `look` | Hiếu (soạn với Claude) |
 | 25/11/2026 | 1.4 xong (outcome thật); thêm nhiệm vụ 2.5 (ngưỡng vùng phủ theo spec 6.8) | Hiếu (soạn với Claude) |

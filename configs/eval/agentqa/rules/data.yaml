@@ -30,6 +30,13 @@
 # above the generic near miss. `place_yaw_miss` and `near_miss_placement` cannot both hold:
 # a member within the widest tolerance has its yaw within the scorer's, so the two
 # majorities are disjoint.
+#
+# `tilt_while_carried` reads `signal_presence` v3 (the task view's `carry` label, L-TRAY-TILT
+# for the tray): `_tilted_while_carried` is true when most judged members had both hands on
+# the tray and the tray on no table when the label was raised, i.e. the tray tilted past the
+# scorer's limit (`threshold_tilt_max_deg`, task_lookup) during the carry, not while being
+# put down or after a drop. It speaks only for clusters of that label, so it never competes
+# with the placement rules above.
 
 rules:
   - id: place_rests_raised
@@ -71,6 +78,27 @@ rules:
       - "{run}_cluster_{cluster_slug}_yaw_error_median"
       - "relaxed_yaw_tolerance"
       - "{run}_relaxed_first_grid_matches_scorer"
+    contra: []
+
+  - id: tilt_while_carried
+    title: "Most failures of this cluster tilt the tray past the limit while both hands still hold it off the tables: the tray is unsteady in the hands before it is put down, not misplaced"
+    source: "signal_presence v3 (carry at the failure); spec 6.9 (weak_skill); jig eval M"
+    group: data
+    diagnosis: weak_skill
+    note: tilt_while_carried
+    system: false
+    interventions: [teleop_correction]
+    when:
+      - {fact: "{run}_cluster_{cluster_slug}_tilted_while_carried", is: true}
+    support:
+      - "{run}_cluster_{cluster_slug}_tilted_while_carried"
+      - "{run}_cluster_{cluster_slug}_carried_at_failure"
+      - "{run}_cluster_{cluster_slug}_carried_judged"
+      - "{run}_cluster_{cluster_slug}_both_hands_at_failure"
+      - "{run}_cluster_{cluster_slug}_off_table_at_failure"
+      - "{run}_cluster_{cluster_slug}_tilt_at_failure_median"
+      - "{run}_cluster_{cluster_slug}_failure_time_median"
+      - "threshold_tilt_max_deg"
     contra: []
 
   - id: near_miss_placement

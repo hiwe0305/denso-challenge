@@ -339,7 +339,8 @@ REGISTRY: dict[str, ToolSpec] = {spec.name: spec for spec in (
              context_runs=True),
     ToolSpec("latch_consistency", 1, ("scores",), {"runs": "runs"}, _latch_consistency),
     # v2: a signal of `signal_measures` counts when the run's outcomes carry its measures
-    ToolSpec("signal_presence", 2, ("scores",), {"labels": "labels"}, _signal_presence,
+    # v3: per cluster of the `carry` label, how the tray was held at the failure
+    ToolSpec("signal_presence", 3, ("scores",), {"labels": "labels"}, _signal_presence,
              reads_all=True),
     ToolSpec("paired_compare", 1, ("scores",), {"pairs": "pairs", "levels": "levels"},
              _paired_compare),

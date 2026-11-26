@@ -596,11 +596,21 @@ Số đếm của agent so với số nhóm A đo tay độc lập:
 
 Nhóm A đo tay: 22 lượt khay gác lên thành đồ gá và khoảng 10 lượt lệch góc trên 10°. Mọi cụm trên đề xuất `teleop_correction`, trừ cụm một lượt ở `approach_a` bị chặn tiêu dữ liệu vì còn giả thuyết hệ thống.
 
+**Sau nhiệm vụ 4.12** (`signal_presence` bản 3, lớp code). Ba cụm `L-TRAY-TILT` nhận luật `tilt_while_carried`, đề xuất `teleop_correction`:
+
+| Cụm `L-TRAY-TILT` | Số lượt | Hai tay còn chạm và khay chưa ở bàn nào | Trung vị độ nghiêng lúc lỗi | Trung vị thời điểm lỗi |
+|---|---|---|---|---|
+| `release_stand`, mức 2 | 8 | 8 | 15,30° | 21,45 s |
+| `place`, mức 1 | 3 | 3 | 15,09° | 20,71 s |
+| `release_stand`, mức 1 | 2 | 2 | 15,12° | 20,23 s |
+
+Ngưỡng nghiêng của bộ chấm là 15° (fact `threshold_tilt_max_deg`). Sau ba luật, 41 trong 44 lượt hỏng nằm trong cụm có giả thuyết cơ chế; ba cụm một lượt còn lại là thiếu số đo hoặc chưa có luật.
+
 Giới hạn:
 
+- Luật nghiêng khay chỉ nói khay nghiêng quá ngưỡng khi hai tay còn giữ và chưa đặt xuống; nó không nói vì sao (bước đi, tay lệch, va vào đồ gá). Tên cụm ghi bước `place` hoặc `release_stand` vì các bước vẫn được chốt tiếp sau khi nhãn lỗi đã đặt, không phải vì khay nghiêng ở bước đó.
 - 24 trong 136 lượt **thành công** cũng có khay nằm cao hơn mốc quá biên (fact `M_successes_raised`). Nằm cao tự nó không phải là hỏng; luật trích con số này làm nền, nhưng chưa dùng nó làm điều kiện.
 - `place_yaw_miss` cần quá nửa cụm: cụm 8 lượt có đúng 4 lượt lệch góc không được gắn luật.
-- 13 lượt `L-TRAY-TILT` vẫn chưa có luật. Tín hiệu đã đủ sau khi thêm tên số đo của DA-47 (nghiêng lúc lỗi, hai tay chạm khay, khay chưa ở bàn nào).
 - `L-TIMEOUT` và `L-PART-DROP` còn thiếu số đo (`cmd_*`, `meas_*`, `part_positions`); tín hiệu chốt bước `approach_a` (`palm_handle_distance_min`) chưa nối với tên mới của outcome.
 - Lượt `M/l2-s1000100-r1` tới bàn B mà không bước nào được chốt; agent xếp vào lỗi bộ chấm, cần nhóm A xem.
 - Agent chỉ đề xuất loại dữ liệu (`teleop_correction`), chưa nói nội dung demo (sửa góc, hạ khay vào lòng đồ gá) và chưa có chi phí.
