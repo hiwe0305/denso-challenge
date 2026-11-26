@@ -520,3 +520,35 @@ Giới hạn đã biết:
 - T3 trên B_ALL là phát hiện DA-44 đã ghi là "cần người xem" (mục 3.3, `da34-t6-ft-b-all-s0`); chưa ai kết luận nó là overfit thật hay báo nhầm. Cận trên của báo nhầm vì vậy là 1 trên 4 job.
 - Đây là bốn job 60k của DA-34, không phải ba job 40k của mục 3.3; ba job đó chưa có gói.
 - Chưa đo: có model; gói chỉ gồm lượt thành công; hai run cùng cấu hình khác seed eval (chưa có dữ liệu).
+
+### 9.8 Nửa dataset của bộ lỗi cấy trên đường ống vòng, 26/11/2026
+
+Nửa dataset của DA-31 trước đây chưa chấm lần nào (bản sao psi-data chỉ có trên `rtx3060`). Lần này dựng lại trên laptop từ gói zip `G1WholebodyLocomotionPickBetweenTablesTeleop-v0` (sha256 khớp [psi-data.md](psi-data.md); hash cây nguồn `35984186…958ce9` và id hai bản `bench-1e258c0a78ca`, `bench-d19e112835e3` trùng lần chạy 4/11/2026 của [DA-27](defect-inject.md); sha256 hai manifest cũng trùng). Dựng 13 giây; `fw data ingest`, `qa`, `report` mỗi bản dưới 7 giây, RAM đỉnh 685 MB.
+
+Gói nhận thêm loại mục `episode_index` (nhiệm vụ 5.9), và `round.declare` khai báo được thư mục làm việc của `fw data qa`:
+
+```bash
+uv run python -m flywheel.eval.agentqa.round.declare --root <work dir> --task tray --declared-by <ai> --data-class public
+uv run fw agentqa pack --round <work dir>/round.yaml
+uv run fw agentqa round --pack <work dir>/pack.json --out <run> --no-model
+```
+
+Kết quả lớp code (`--no-model`), chấm bằng DA-31 (`da31-3`, hash kết quả `1303b472…535f3c1b`). Lớp agent trên đường vòng bằng đúng lớp QA của code ở mọi ô (`agent_adds` 0):
+
+| Loại lỗi cấy | Mã | Bắt được |
+|---|---|---|
+| `nan_values` | D1 | 3/3 |
+| `drop_frames` | D2 | 3/3 |
+| `joint_jump`, `joint_limit_exceeded`, `unit_deg_rad` | D3 | 9/9 |
+| `holdout_seed_leak` | D5 | 3/3 |
+| `timestamp_sync_offset` | D2 | 0/3 |
+| `duplicate_episode` | D5 | 0/3 |
+| `corrupted_success_label`, `wrong_task_instruction` | D6 | 0/6 |
+| `action_sign_flip` | D7 | 0/3 |
+| **Tổng** | | **18/33** |
+
+- Precision trên bản cấy: 18 trúng, 4 phát hiện D3 là lỗi có sẵn của psi-data (episode 35, 68, 80, 84; bốn `flag` đã ghi ở [data-pipeline.md](data-pipeline.md)), không phát hiện sai nào khác.
+- Bản sạch: 4/99, chính là bốn episode trên. Đây là cận trên theo định nghĩa của DA-31.
+- 15 lỗi sót là giới hạn của QA tầng 4, không phải của agent: lớp code của agent chỉ diễn giải fact của QA. Riêng `duplicate_episode` có hint "cùng dấu vân tay QA" (bản 3), nhưng hint chỉ thành phát hiện khi model giữ nó; `--no-model` bỏ mọi hint. Đây là chỗ đầu tiên model có thể thêm so với code.
+- Chưa đo: có model. Gói dataset chưa có bản ghi `Source` trong khai báo nên cổng chặn đường hosted; `source.json` của `fw data ingest` (lớp `public`) có sẵn trong thư mục làm việc nhưng `round.declare` chưa khai báo nó.
+- Hai lượt chạy mang trạng thái `degraded` như gói log (không có điểm số, trace).
