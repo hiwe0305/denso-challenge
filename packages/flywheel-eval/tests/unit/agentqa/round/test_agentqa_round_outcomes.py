@@ -187,7 +187,12 @@ def test_a_round_with_outcomes_sweeps_and_hypothesizes_a_near_miss(tmp_path: Pat
     assert facts["R_cluster_place_L-PLACE-POSE_l1_near_miss"].value is True
     assert facts[f"{PLACE}_judgeable"].value is True
     calls = {c.tool: c for c in calls_of(out)}
-    assert calls["relaxed_sweep"].status == "ran" and calls["relaxed_sweep"].version == 1
+    assert calls["relaxed_sweep"].status == "ran" and calls["relaxed_sweep"].version == 2
+    # the successes of this set carry no final position: only the rest part is not judged
+    assert calls["relaxed_sweep"].not_judged == [
+        "no successful rollout carries final.tray_pos_m, so there is no rest height to "
+        "compare with"]
+    assert "R_rest_height_reference" not in facts
     sha = {e.ref: e.sha256 for e in read_pack(out / "pack.json").entries}
     assert sha["R/outcomes.jsonl"] in calls["relaxed_sweep"].input_sha256
     assert (out / "tables" / "T13-relaxed_sweep.json").is_file()
@@ -259,3 +264,68 @@ def test_near_miss_cites_its_facts_and_offers_the_coverage_check(tmp_path: Path)
     top = hyps[0]
     assert len(top.support) == 5 and not top.blocked_data_spend
     assert "coverage_distance_check" in [c.check_id for c in top.checks]
+
+
+# --- the place_rests_raised and place_yaw_miss rules (relaxed_sweep v2) --------------------
+
+
+def mechanism(raised: bool | None = None, yaw: bool | None = None,
+              miss: bool | None = None) -> dict[str, Any]:
+    """Facts of one place cluster as relaxed_sweep v2 writes them."""
+    facts: dict[str, Any] = {"relaxed_position_widest": 0.2, "relaxed_yaw_tolerance": 10.0,
+                             "relaxed_rest_margin": 0.01, "C_70_rest_height_reference": 0.852,
+                             "C_70_rest_height_reference_successes": 136,
+                             "C_70_successes_raised": 24,
+                             "C_70_relaxed_first_grid_matches_scorer": True,
+                             f"{KEY}_relaxed_within_widest": 2,
+                             f"{KEY}_relaxed_distance_median": 0.08,
+                             f"{KEY}_relaxed_distance_max": 0.12,
+                             f"{KEY}_yaw_over_tolerance": 2, f"{KEY}_yaw_error_median": 12.0,
+                             f"{KEY}_rest_judged": 3, f"{KEY}_final_height_median": 0.87,
+                             f"{KEY}_raised": 2, f"{KEY}_final_tilt_median": 6.0}
+    for name, value in (("rests_raised", raised), ("yaw_miss", yaw), ("near_miss", miss)):
+        if value is not None:
+            facts[f"{KEY}_{name}"] = value
+    return facts
+
+
+@pytest.mark.parametrize("facts, expect", [
+    (mechanism(raised=True), ["place_rests_raised"]),
+    (mechanism(raised=False), ["none"]),
+    (mechanism(yaw=True), ["place_yaw_miss"]),
+    (mechanism(yaw=False), ["none"]),
+    (mechanism(raised=False, yaw=False, miss=False), ["none"]),
+    # the more specific mechanism ranks above the generic near miss
+    (mechanism(raised=True, miss=True), ["place_rests_raised", "near_miss_placement"]),
+    (mechanism(raised=True, yaw=True), ["place_rests_raised", "place_yaw_miss"]),
+])
+def test_the_placement_mechanism_rules(tmp_path: Path, facts: dict[str, Any],
+                                       expect: list[str]) -> None:
+    assert ids(run(tmp_path, facts, [PLACE_CLUSTER])["C_70/place/L-PLACE-POSE/l2"]) == expect
+
+
+def test_the_yaw_miss_asks_that_the_measures_reproduce_the_scorer(tmp_path: Path) -> None:
+    facts = mechanism(yaw=True)
+    facts["C_70_relaxed_first_grid_matches_scorer"] = False
+    assert ids(run(tmp_path, facts, [PLACE_CLUSTER])["C_70/place/L-PLACE-POSE/l2"]) == ["none"]
+
+
+def test_the_mechanism_rules_cite_their_facts(tmp_path: Path) -> None:
+    facts = mechanism(raised=True, yaw=True)
+    hyps = run(tmp_path, facts, [PLACE_CLUSTER])["C_70/place/L-PLACE-POSE/l2"]
+    fid = {name: f"F{k}" for k, name in enumerate(facts, start=1)}
+    raised, yaw = hyps
+    assert raised.support == [fid[f"{KEY}_{n}"] for n in (
+        "rests_raised", "raised", "rest_judged", "final_height_median", "final_tilt_median")] + [
+        fid["C_70_rest_height_reference"], fid["C_70_rest_height_reference_successes"],
+        fid["C_70_successes_raised"], fid["relaxed_rest_margin"]]
+    assert yaw.support == [fid[f"{KEY}_{n}"] for n in (
+        "yaw_miss", "yaw_over_tolerance", "yaw_error_median")] + [
+        fid["relaxed_yaw_tolerance"], fid["C_70_relaxed_first_grid_matches_scorer"]]
+    rules = {r.id: r for r in load_rules()}
+    for rule_id in ("place_rests_raised", "place_yaw_miss"):
+        assert (rules[rule_id].group, rules[rule_id].diagnosis) == ("data", "weak_skill")
+        assert rules[rule_id].interventions == ["teleop_correction"]
+    check = next(c for c in load_checks(load_rules()) if c.id == "coverage_distance_check")
+    assert ["place_rests_raised", "coverage_gap"] in check.separates
+    assert ["place_yaw_miss", "out_of_domain"] in check.separates

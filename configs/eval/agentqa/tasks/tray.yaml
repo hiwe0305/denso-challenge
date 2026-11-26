@@ -102,17 +102,35 @@ signal_measures:
   final_tray_pose: {where: final, names: [tray_pos_m, tray_quat]}
   target_pose: {where: final, names: [target_xy_m, target_yaw_rad]}
   failure_t: {where: verdict, names: [failure_t]}
+  # at_failure names of the tray export since DA-47 (scorer `simple-tray-predicates@2`)
+  tray_tilt_at_failure: {where: at_failure, names: [tilt_deg]}
+  tray_contact_at_failure: {where: at_failure, names: [hand_contact_left, hand_contact_right]}
+  tray_on_table_at_failure: {where: at_failure, names: [tray_on_table]}
+  hand_tray_contact: {where: at_failure, names: [hand_contact_left, hand_contact_right]}
   # the relaxed sweep's: one name in _m (distance to the target), one in _deg (yaw error)
   place_error: {where: final, names: [place_distance_m, place_yaw_error_deg]}
 
 # Relaxed success (tray.md 19.2 c): only this label is relaxed, on this grid; the
 # yaw tolerance stays the scorer's. The first position is the scorer's own.
 # `signal` names the `signal_measures` entry whose final measures the sweep compares.
+#
+# Where the tray comes to rest, for the same label: `rest_signal` names the `signal_measures`
+# entry with the final tray position (the name in _m, [x, y, z]) and orientation (the name in
+# _quat, w x y z). The rest height of reference is the median final z of the run's
+# successful rollouts (data, not a constant); a failed rollout rests raised when its final
+# z is above that reference by more than `rest_margin_m`.
+# ASSUMPTION (giả định): rest_margin_m 0.01 m, read off one run (jig eval "M", 100k): the
+# median success rests at the reference, and the raised failures there (tray on the jig
+# wall) are 14 mm or more above it. Successes can rest raised too (their count is the fact
+# `{run}_successes_raised`), so resting raised is not by itself a failure. Not measured over
+# other runs or targets.
 relaxed:
   label: L-PLACE-POSE
   position_m: [0.05, 0.075, 0.10, 0.15, 0.20]
   yaw_deg: 10.0
   signal: place_error
+  rest_signal: final_tray_pose
+  rest_margin_m: 0.01
 
 # How `coverage_distance` reads `Condition.vector` (spec 6.8 step 8): d is the mean distance
 # to the k nearest TRAIN conditions of the same level, tau_cov the percentile of the same
