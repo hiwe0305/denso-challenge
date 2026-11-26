@@ -50,16 +50,16 @@ Thiết kế:
 
 Ba ràng buộc không được nới:
 
-- **Lớp dữ liệu.** Máy chủ không biết model phía sau vỏ chat là tự host hay hosted. Vì vậy mặc định chỉ mở gói mà `admit` xác nhận `public` (cùng phép kiểm `hosted_refusal` của cổng model). Gói `internal` hoặc `restricted` bị từ chối, trừ khi người chạy khai `--self-hosted-client`; lời khai này được ghi vào nhật ký cùng tên người khai.
+- **Lớp dữ liệu.** Máy chủ không biết model phía sau vỏ chat là tự host hay hosted. Vì vậy nó chỉ mở gói mà `admit` xác nhận `public` (cùng phép kiểm `hosted_refusal` của cổng model). Gói `internal` hoặc `restricted` luôn bị từ chối và story này không có cờ nào để mở chúng: dữ liệu của demo đều `public`, còn mở gói khác lớp chỉ bằng một lời khai thì không kiểm được. Cần phục vụ gói không `public` cho model tự host thì mở story riêng.
 - **Chỉ đọc gói.** Máy chủ chỉ đọc các file mà gói khai. Không có công cụ đọc file theo đường dẫn, không đọc `vault/`, file đáp án hay `docs/`.
 - **Số từ code.** Máy chủ chỉ trả fact do công cụ sinh. Nó không sinh văn bản và không gọi model. Việc chặn câu trả lời cuối của vỏ chat (mọi câu phải dẫn fact) không thuộc story này, vì harness không có chỗ để chặn; ghi rõ là giới hạn.
 
 ## Tiêu chí chấp nhận
 
-1. `fw agentqa mcp --pack <pack.json>` trả lời `initialize`, `ping`, `tools/list` và `tools/call` trên stdio theo JSON-RPC 2.0; phương thức lạ trả lỗi `-32601`; dòng không phải JSON trả lỗi `-32700` và máy chủ chạy tiếp. Có test chạy máy chủ như tiến trình con.
+1. `fw agentqa mcp --pack <pack.json>` trả lời `initialize`, `ping`, `tools/list` và `tools/call` trên stdio theo JSON-RPC 2.0; phương thức lạ trả lỗi `-32601`; dòng không phải JSON trả lỗi `-32700` và máy chủ chạy tiếp. Thông điệp không có `id` là notification (ví dụ `notifications/initialized` mà vỏ chat gửi sau `initialize`): máy chủ không trả lời gì, kể cả lỗi `-32601` khi không biết phương thức. Có test chạy máy chủ như tiến trình con, gồm ca notification.
 2. `tools/list` trả đúng 13 công cụ của sổ đăng ký; một test so tên với `registry` để thêm công cụ mới thì test báo. Schema của mỗi tham số có `enum` là miền đóng tính từ gói.
 3. `tools/call` với tham số ngoài miền trả `isError` kèm lý do của `check_params` và không ghi fact nào. Với tham số hợp lệ, các fact trả về bằng đúng fact mà bước `measure` của đường ống vòng sinh cho cùng công cụ và cùng tham số trên cùng gói (test trên gói giả của `flywheel.testkit`).
-4. Gói không được xác nhận `public` bị từ chối khi khởi động, mã thoát khác 0, trừ khi có `--self-hosted-client`. Có test cho cả hai nhánh.
+4. Gói không được xác nhận `public` bị từ chối khi khởi động, mã thoát khác 0, và không có cờ nào bỏ qua phép kiểm này. Có test cho gói `public` và gói không `public`.
 5. Không có công cụ hay tham số nào nhận đường dẫn file. Có test quét schema.
 6. Mã chạy trên CPU, không thêm phụ thuộc, không import adapter hay làn khác. `uv run ruff check`, `uv run mypy` (không thêm lỗi), `uv run pytest`, `uv run lint-imports`, `scripts/repo/check_links.py`, `scripts/repo/pr_guard.py` qua.
 7. `docs/g0/agent-qa.md` có một mục ngắn: cách chạy, cách khai máy chủ trong cấu hình MCP của một vỏ chat, ba ràng buộc ở trên, và giới hạn. Có một lần chạy tay trên gói thật `stage1-60k-out` (liệt kê công cụ và một lời gọi), ghi kết quả vào thân commit.
@@ -68,7 +68,7 @@ Ba ràng buộc không được nới:
 
 - [x] 1.1 Viết story (file này)
 - [ ] 2.1 Lớp nối: từ `ToolSpec` và `MeasureContext` ra schema công cụ và từ `ToolResult` ra nội dung trả về, có test (AC 2, 3, 5)
-- [ ] 2.2 Vòng lặp stdio JSON-RPC: `initialize`, `ping`, `tools/list`, `tools/call`, xử lý lỗi, có test tiến trình con (AC 1)
+- [ ] 2.2 Vòng lặp stdio JSON-RPC: `initialize`, `ping`, `tools/list`, `tools/call`, notification, xử lý lỗi, có test tiến trình con (AC 1)
 - [ ] 2.3 Lệnh `fw agentqa mcp`, phép kiểm lớp dữ liệu khi khởi động, nhật ký lời gọi, có test (AC 4)
 - [ ] 3.1 Mục tài liệu trong `docs/g0/agent-qa.md`, lần chạy tay trên gói thật, chạy đủ kiểm tra (AC 6, 7)
 
