@@ -79,6 +79,13 @@ def test_a_row_keeps_phase_times_and_carry_offset(tmp_path: Path) -> None:
     assert row["carry_offset"] == [0.03, -0.02]
 
 
+def test_a_row_keeps_the_carry_yaw(tmp_path: Path) -> None:
+    log = tmp_path / "gen_log.jsonl"
+    append_attempt(log, replace(ROW, carry_yaw=-0.1234))
+    append_attempt(log, replace(ROW, seed=1))
+    assert [r["carry_yaw"] for r in read_log(log)] == [-0.1234, 0.0]
+
+
 def test_a_row_without_them_logs_the_defaults(tmp_path: Path) -> None:
     log = tmp_path / "gen_log.jsonl"
     append_attempt(log, ROW)
@@ -87,7 +94,7 @@ def test_a_row_without_them_logs_the_defaults(tmp_path: Path) -> None:
 
 
 def test_rows_before_da46_are_still_read_and_counted(tmp_path: Path) -> None:
-    old = {k: v for k, v in asdict(ROW).items() if k not in ("phases", "carry_offset")}
+    old = {k: v for k, v in asdict(ROW).items() if k not in ("phases", "carry_offset", "carry_yaw")}
     log = shard_dir(tmp_path, 0) / "gen_log.jsonl"
     log.parent.mkdir(parents=True)
     log.write_text(json.dumps(old) + "\n")

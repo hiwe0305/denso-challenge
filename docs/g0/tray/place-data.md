@@ -214,3 +214,32 @@ Kho có thêm sau bước 10: `demo_sets-tray_s1place_*.json` (tập `ALL` của
 - `dataset_report.json` báo `replay_dynamic` trên mọi episode và `replay_success` trên 226/459 (mức 1), 99/193 (mức 2), cùng kiểu với kho gốc `tray-s1-jig2-20261122` (ngưỡng phát lại của DA-17 hiệu chỉnh trên psi-data). Cờ D4 trên `stats.json` được ghi là báo nhầm theo cách ghi của kho gốc; **chưa kiểm riêng cho lô này**.
 - Bộ lọc ≤ 3 cm và ≤ 5° mà run M (DA-48) dùng nằm ở `analysis/da48-clean/` của kho, không thuộc `ALL` của lô.
 - Mốc thời gian không có trong `gen_log.jsonl`; file sinh đầu tiên ghi 19:42 ngày 24/11, log sinh kết thúc 21:12, phát lại xong 22:49, cắt xong 09:29 ngày 25/11 (giờ máy).
+
+## 8. Lệch góc ở bước CARRY: lô mẫu trên laptop (DA-50 nhiệm vụ 3.1, thực đo 26/11/2026)
+
+Story: [DA-50](../../product/stories/DA-50-train-run-n-nham-loi-dat.md). Mẫu nhỏ, một lần chạy, một worker; số là sơ bộ.
+
+**Cách làm.** `CarryJitter` có thêm biên độ `yaw`: mỗi seed rút một góc, hướng CARRY quay đi góc đó, robot tới bàn B với khay lệch góc so với đồ gá, rồi ARRIVE_B xoay lại. Cờ dòng lệnh `--carry-jitter-yaw-deg`. Độ lệch dọc và ngang của mọi seed giữ nguyên; `planner_version` có thêm hậu tố `y<phần mười độ>` chỉ khi có lệch góc (ví dụ `da41-planner-8+cfg.bee61399+cj.a000s000y150`). Nhật ký sinh và bản cắt ghi `carry_yaw` (rad).
+
+**Hai lần chạy trên cùng 40 seed train chưa dùng** (mức 1 `531000–531019`, mức 2 `532000–532019`), lệch góc ±15°, không lệch vị trí. Thư mục `fwdata/simple/tray/gen/da50-sample/` ở thư mục gốc của repo (ngoài git).
+
+| | Trước khi sửa ARRIVE_B (`y15-l*`) | Sau khi sửa (`y15fix-l*`) |
+|---|---|---|
+| Thành công | 29/40 (72,5 %) | 36/40 (90 %) |
+| Mức 1, mức 2 | 14/20, 15/20 | 19/20, 17/20 |
+| Lệch tới 10° | 19/21 | 21/21 |
+| Lệch trên 10°, dương | 8/8 | 8/8 |
+| Lệch trên 10°, âm | 2/11 | 7/11 |
+| Lượt hỏng | `L-PLACE-POSE` 9, `L-ONE-HAND` 1, hết giờ RELEASE 1 | `L-PLACE-POSE` 2, `L-ONE-HAND` 2 |
+
+**Lỗi tìm thấy và bản sửa.** ARRIVE_B chỉ xoay thân trong lúc bước sửa vị trí; tới nơi không lệch vị trí thì robot không bước và không xoay lại, phần lệch góc dồn xuống động tác tay lúc hạ (tối đa 8°). Bản sửa: khi `carry_yaw` khác 0 và thân lệch trên 2° so với hướng đích, ARRIVE_B xoay tại chỗ tới khi còn dưới 1° rồi mới hạ (`ARRIVE_YAW_TOL`, hằng của module, không đổi hash cấu hình). Episode không lệch góc không chạy đoạn mã này; test "lệnh giống từng bit" giữ nguyên.
+
+**Điều chưa biết.**
+
+- Lệch âm trên 10° vẫn hỏng 4/11, lệch dương 0/8. ARRIVE_B và LOWER đối xứng theo dấu; giả thuyết (chưa kiểm) là chiều quay của pha TURN đổi theo dấu lệch. Mẫu 11 và 8 lượt quá nhỏ để kết luận.
+- Sai số đặt cuối của các episode thành công chưa đo (cần phát lại như mục 7).
+- ARRIVE_B chạm trần 7,02 s ở 18/40 lượt sau khi sửa.
+- Hai lô mẫu mang cùng `planner_version` dù khác mã ARRIVE_B; không trộn hai thư mục.
+
+Cổng 85 % của story: đạt ở ±15° sau khi sửa (36/40), trên mẫu 40 lượt.
+

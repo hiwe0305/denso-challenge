@@ -86,7 +86,7 @@ Luật đọc: khối `jig-n-rules` ở [tray-jig.md](../../he/tray-jig.md) mụ
 - [ ] 1. Đo tập train của run M (laptop hoặc `rtx3060`, không GPU)
   - [ ] 1.1 Độ lệch vị trí và góc lúc bắt đầu hạ khay, theo từng phần
   - [ ] 1.2 Đỉnh nghiêng của khay khi mang, theo từng phần
-- [ ] 2. Hiếu chốt thành phần dữ liệu của run N từ số đo của nhiệm vụ 1
+- [x] 2. Hiếu chốt thành phần dữ liệu của run N từ số đo của nhiệm vụ 1. **[Đã chốt]** (Hiếu, 26/11/2026, "Chốt như đề xuất"): (1) thêm lệch góc ở bước CARRY của planner, sinh episode đầy đủ rồi cắt đoạn đặt; (2) lô mới nghiêng về mức 2, khoảng 60 %; (3) không thêm lệch ngang cùng loại. Cổng dừng: planner dưới khoảng 85 % khi tới lệch góc thì giảm biên độ, vẫn không được thì bỏ mục 1 và báo Hiếu
 - [ ] 3. Sinh dữ liệu thêm trên `rtx3060` (Hiếu chạy hoặc cho phép; tối đa 14 worker)
   - [ ] 3.1 Lô mẫu nhỏ, xem trước khi sinh cả lô
   - [ ] 3.2 Sinh cả lô, lọc theo ngưỡng đặt ≤ 3 cm và ≤ 5° như run M
@@ -109,6 +109,7 @@ Theo 07 mục 3.1. File story luôn được sửa.
 - `packages/flywheel-psi0/tests/tray/`
 - `scripts/g0/tray/` (chỉ script đo của nhiệm vụ 1)
 - `packages/flywheel-simple/src/flywheel_simple/tray/planner.py` và test của nó (chỉ thêm trục xoay vào độ lệch CARRY, nếu Hiếu chọn dữ liệu lệch góc)
+- `packages/flywheel-simple/src/flywheel_simple/tray/agent.py`, `generate.py`, `cut.py`, `scripts/g0/tray/generate.py` và test của chúng (chỉ đưa `carry_yaw` từ seed tới planner, nhật ký sinh và bản cắt; thêm 26/11/2026, cần Hiếu duyệt trong PR)
 - `configs/runplans/tray/` (chỉ file mới của run N)
 - `docs/g0/ledger/DA-50.csv`
 - `docs/he/tray-jig.md` (mục 6 trở đi; không sửa khối `jig-m-rules` và, sau khi đóng băng, khối `jig-n-rules`)
@@ -139,5 +140,6 @@ Hiếu (làm cùng Claude), duyệt cuối: Hiếu.
 | 26/11/2026 | Tạo từ kết quả eval run M | Hiếu (soạn với Claude) |
 | 26/11/2026 | Thêm số đo ban đầu của tập train run M; sửa bảng dữ liệu thêm (bỏ lọc theo độ nghiêng, thêm lệch góc), thêm mục rủi ro | Hiếu (soạn với Claude) |
 | 26/11/2026 | Thêm nhận xét từ video camera đầu của 28 lượt đặt lệch; đưa dữ liệu lệch góc lên ưu tiên 1 | Hiếu (soạn với Claude) |
+| 26/11/2026 | Nhiệm vụ 2: ghi quyết định của Hiếu về thành phần dữ liệu; thêm bốn file vào Phạm vi file cho trục xoay của độ lệch CARRY; lô mẫu laptop ở place-data.md mục 8 | Hiếu (soạn với Claude) |
 | 27/11/2026 | 6.1 xong: hiệu ghép cặp trên mọi lượt và `--bootstrap-seed` trong `eval_results` | Hiếu (soạn với Claude) |
 | 27/11/2026 | Thêm và làm xong 6.4 (hai điểm review sau merge của PR 228); chờ Hiếu xác nhận việc này thuộc DA-50 | Hiếu (soạn với Claude) |
