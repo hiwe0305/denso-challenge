@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Nháp, chờ Hiếu duyệt story và chốt năm điểm ở mục "Chờ Hiếu chốt" |
+| Trạng thái | Sẵn sàng làm; Hiếu chốt năm điểm thiết kế ngày 27/11/2026 |
 | Người làm | Hiếu, cùng Claude |
 | Làn | Đánh giá (`flywheel.eval.agentqa`); không sửa nhân, làn khác hay adapter |
 | Nguồn yêu cầu | Hiếu ngày 27/11/2026: "tôi muốn hệ thống agent này có thêm loop để nó có khả năng reasoning rồi làm nó thì mới đạt được mục tiêu chứ!" |
@@ -21,7 +21,7 @@ Vì sao cần, đo ngày 26/11/2026 trên run M (`docs/g0/agent-qa.md` mục 9.9
 
 ## Cách làm
 
-**[Đề xuất]** Claude 27/11/2026, theo yêu cầu thiết kế của phiên điều phối cùng ngày; các điểm chờ chốt ở cuối mục.
+**[Đề xuất]** Claude 27/11/2026, theo yêu cầu thiết kế của phiên điều phối cùng ngày. **[Đã chốt]** năm điểm ở cuối mục: Hiếu 27/11/2026.
 
 ### Chỗ đứng trong đường ống
 
@@ -71,9 +71,9 @@ Với mỗi giả thuyết giữ lại: loại dữ liệu (danh sách đóng, n
 
 Giới hạn của phép thử 1, nói trước: người thiết kế hai công cụ mới đã biết đáp án của run M, nên công cụ có thể vô tình hợp với ca này. Chỉ run N mới là phép thử mù. Ngoài ra 24 trong 136 lượt thành công của run M cũng có khay nằm cao, nên cơ chế "khay nằm cao" có thể không tách biệt theo phân vị; nếu vậy agent không tới được và đó là kết quả cần báo, không phải lỗi cần lách.
 
-### Chờ Hiếu chốt
+### Năm điểm Hiếu đã chốt (27/11/2026)
 
-| # | Câu hỏi | Đề xuất |
+| # | Câu hỏi | Đã chốt |
 |---|---|---|
 | 1 | Giả thuyết của model đã qua kiểm có được xếp trên giả thuyết của luật không | Có, trong cùng nhóm; giả thuyết hệ thống (bộ chấm, đo) của luật vẫn đứng trên và vẫn chặn tiêu dữ liệu |
 | 2 | Trần ngân sách một vòng | 30 bước, 40 lời gọi, 400 000 token vào, 1 USD (ước lượng, chưa đo) |
