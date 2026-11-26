@@ -49,9 +49,16 @@ between-condition variance of a ratio estimator, at least 1, descriptive beside 
 when p is 0 or 1 or there are fewer than two conditions. With one rollout per condition
 n_eff is n and `wilson` is the plain Wilson interval of before. `paired` and
 `paired_diff` pair repeat 0 of each condition only, the rollout an old
-one-per-condition run has. `missing` lists (level, seed, repeat) of each rollout not
-found. A directory holding more repeats than `--repeats` reads is named in the summary
-(`repeats_note`), never read silently short.
+one-per-condition run has. With `--baseline` and `--repeats` above 1 (not `--stage1`),
+`paired.repeats` adds the reading of docs/he/tray-jig.md 6 (`jig-n-rules`) on every
+repeat: per condition the variant's success rate minus the baseline's, the same
+rollouts per condition on both sides, its mean and bootstrap CI resampled within each
+level (`paired_diff_repeats`), for the headline levels pooled and for each level; the
+baseline is read with the same `--repeats`, and a missing rollout on either side skips
+the block. `--bootstrap-seed` replaces the plan's stats seed in every bootstrap CI
+printed and is recorded as `bootstrap_seed`. `missing` lists (level, seed, repeat) of
+each rollout not found. A directory holding more repeats than `--repeats` reads is named
+in the summary (`repeats_note`), never read silently short.
 
 Scorer version (DA-42): every result names the version of the tray scorer that labelled
 its rollouts (`scorer_version` of the outcome rows, written by `eval_driver` since
@@ -262,6 +269,83 @@ def paired_diff(
         "mcnemar_exact_p": round(mcnemar_exact(variant_only, baseline_only), 4),
         "scorer_versions": versions,
     }
+
+
+def paired_diff_repeats(
+    variant: Sequence[Rollout],
+    baseline: Sequence[Rollout],
+    levels: Sequence[int],
+    resamples: int,
+    seed: int,
+    ci: float,
+    cross_scorer: bool = False,
+) -> dict[str, Any]:
+    """Paired difference variant - baseline over the conditions of `levels`, all repeats.
+
+    The condition is the unit (docs/he/tray-jig.md 6, `jig-n-rules`): d_i is the mean
+    success of the variant's rollouts of condition i minus the baseline's. Both sides must
+    cover the same conditions with the same number of rollouts each. The CI resamples d_i
+    within each level (bootstrap_ci), so pooled levels keep their weights. Identical sides
+    give d_i = 0, the CI (0, 0) and `ci_vs_0` "contains": no difference shown.
+    """
+    versions = scorer_versions(variant, baseline, cross_scorer)
+    a = by_condition([r for r in variant if r.level in levels])
+    b = by_condition([r for r in baseline if r.level in levels])
+    if a.keys() != b.keys():
+        raise ValueError("variant and baseline cover different conditions")
+    if not a:
+        raise ValueError(f"no condition at levels {list(levels)}")
+    per_side = {}
+    for side, conditions in (("variant", a), ("baseline", b)):
+        counts = sorted({len(ok) for ok in conditions.values()})
+        if len(counts) > 1:
+            raise ValueError(f"{side} has uneven rollouts per condition: {counts}")
+        per_side[side] = counts[0]
+    if per_side["variant"] != per_side["baseline"]:
+        raise ValueError(
+            f"variant has {per_side['variant']} rollouts per condition, baseline "
+            f"{per_side['baseline']}: not paired"
+        )
+    keys = sorted(a)
+    mean_a = {k: sum(a[k]) / len(a[k]) for k in keys}
+    mean_b = {k: sum(b[k]) / len(b[k]) for k in keys}
+    d = {k: mean_a[k] - mean_b[k] for k in keys}
+    groups = [[d[k] for k in keys if k[0] == level] for level in levels]
+    groups = [g for g in groups if g]
+    n = len(keys)
+    low, high = bootstrap_ci(groups, resamples, seed, ci)
+    return {
+        "levels": list(levels),
+        "conditions": n,
+        "repeats": per_side["variant"],
+        "variant_rate": round(sum(mean_a.values()) / n, 4),
+        "baseline_rate": round(sum(mean_b.values()) / n, 4),
+        "diff": round(sum(d.values()) / n, 4),
+        "ci": (round(low, 4), round(high, 4)),
+        "ci_vs_0": "above" if low > 0 else "below" if high < 0 else "contains",
+        "conditions_variant_higher": sum(1 for v in d.values() if v > 0),
+        "conditions_baseline_higher": sum(1 for v in d.values() if v < 0),
+        "conditions_equal": sum(1 for v in d.values() if v == 0),
+        "resamples": resamples,
+        "seed": seed,
+        "scorer_versions": versions,
+        "cross_scorer": versions["variant"] != versions["baseline"],
+    }
+
+
+def repeats_line(name: str, diff: dict[str, Any], ci: float) -> str:
+    """One Vietnamese line of `paired_diff_repeats` for the printed summary."""
+    where = {"above": "nằm hẳn trên 0", "below": "nằm hẳn dưới 0", "contains": "chứa 0"}
+    low, high = diff["ci"]
+    return (
+        f"Cặp theo điều kiện, mọi lượt ({diff['repeats']} lượt/điều kiện), mức {name}: "
+        f"{diff['conditions']} điều kiện, biến thể {100 * diff['variant_rate']:.1f} %, "
+        f"gốc {100 * diff['baseline_rate']:.1f} %, hiệu {100 * diff['diff']:+.1f} điểm, "
+        f"CI {100 * ci:.0f} % {100 * low:+.1f} đến {100 * high:+.1f} "
+        f"(bootstrap {diff['resamples']} lần, seed {diff['seed']}): {where[diff['ci_vs_0']]}; "
+        f"điều kiện biến thể cao hơn {diff['conditions_variant_higher']}, "
+        f"gốc cao hơn {diff['conditions_baseline_higher']}, bằng {diff['conditions_equal']}"
+    )
 
 
 def stage1_outcome(diff: dict[str, Any]) -> str:
@@ -612,6 +696,40 @@ def table(result: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def paired_repeats(
+    plan: TrayRunPlan,
+    chosen: Sequence[Rollout],
+    missing: Sequence[Missing],
+    baseline_out: Path,
+    chunks: Sequence[Chunk],
+    headline: Sequence[int],
+    cross_scorer: bool,
+) -> dict[str, Any]:
+    """`paired.repeats`: `paired_diff_repeats` on every repeat of both sides, the headline
+    levels pooled and each level. The baseline is read with the variant's repeats; a
+    missing rollout on either side skips the block (named in `skipped`), it never pairs
+    uneven conditions."""
+    block: dict[str, Any] = {"on": "all repeats of each condition"}
+    base, _, base_missing = collect(baseline_out, chunks)
+    if missing or base_missing:
+        block["skipped"] = f"missing: variant {len(missing)}, baseline {len(base_missing)}"
+        return block
+    stats = plan.stats
+
+    def diff(levels: Sequence[int]) -> dict[str, Any]:
+        return paired_diff_repeats(
+            chosen, base, levels, stats.resamples, stats.seed, stats.ci, cross_scorer
+        )
+
+    block["headline"] = diff(headline)
+    block["by_level"] = {
+        str(c.level): diff([c.level])
+        for c in plan.eval.by_level or []
+        if any(r.level == c.level for r in chosen)
+    }
+    return block
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("plan", type=Path)
@@ -636,10 +754,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="pair with a baseline scored by another scorer version (not comparable)",
     )
+    parser.add_argument(
+        "--bootstrap-seed",
+        type=int,
+        help="seed of every bootstrap CI printed, in place of the plan's stats seed",
+    )
     args = parser.parse_args(argv)
     if args.stage1 and args.baseline is None:
         parser.error("--stage1 pairs with a baseline: give --baseline")
     plan = TrayRunPlan.load(args.plan)
+    if args.bootstrap_seed is not None:
+        stats = plan.stats.model_copy(update={"seed": args.bootstrap_seed})
+        plan = plan.model_copy(update={"stats": stats})
     rows = [json.loads(line) for line in (args.set / "conditions.jsonl").read_text().splitlines()]
     chunks = chunk_plan(rows, args.chunk, phases_for(rows))
     if args.stage1:
@@ -662,6 +788,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 yaw[(r.level, r.seed, r.repeat)] = yaw_errors(steps)
     result = summarize(plan, chosen, extra, missing, yaw, full)
     result["repeats_note"] = repeats_note(args.out, chunks, args.repeats)
+    if args.bootstrap_seed is not None:
+        result["bootstrap_seed"] = plan.stats.seed
     if args.baseline is not None:
         first = [c for c in chunks if c.repeat == 0]
         base, _, base_missing = collect(args.baseline, first)
@@ -680,6 +808,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 for c in plan.eval.by_level
                 if any(r.level == c.level for r in variant)
             }
+            if args.repeats > 1 and not args.stage1:
+                result["paired"]["repeats"] = paired_repeats(
+                    plan, chosen, missing, args.baseline, chunks, headline, args.cross_scorer
+                )
             if args.stage1:
                 result["stage1"] = {
                     "chunks": [chunk.id for chunk in first],
@@ -692,6 +824,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(table(result))
     if result["repeats_note"] is not None:
         print(result["repeats_note"])
+    repeats = result.get("paired", {}).get("repeats")
+    if repeats is not None:
+        if "skipped" in repeats:
+            print(f"Cặp theo điều kiện, mọi lượt: không đọc ({repeats['skipped']})")
+        else:
+            print(repeats_line("1+2 gộp", repeats["headline"], plan.stats.ci))
+            for level, diff in repeats["by_level"].items():
+                print(repeats_line(level, diff, plan.stats.ci))
     counts: dict[str, Any] = {
         "scorer_version": result["scorer_version"],
         "scorer_v1_vs_v2": result["scorer_v1_vs_v2"],
