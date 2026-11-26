@@ -91,7 +91,7 @@ Luật đọc: khối `jig-n-rules` ở [tray-jig.md](../../he/tray-jig.md) mụ
   - [x] 3.1 Lô mẫu nhỏ, xem trước khi sinh cả lô. Bằng chứng: place-data.md mục 8 (commit `713dd05a`); Hiếu xem mẫu và cho sinh cả lô ngày 26/11/2026
   - [x] 3.2 Sinh cả lô, lọc theo ngưỡng đặt ≤ 3 cm và ≤ 5° như run M. Bằng chứng: [place-data.md mục 9](../../g0/tray/place-data.md#9-lô-lệch-góc-trên-rtx3060-da-50-nhiệm-vụ-32-thực-đo-2627112026): 700 lượt, 649 ghi, 608 trong `ALL`, giữ 554 (91,1 %), mức 2 chiếm 59,0 %
 - [ ] 4. Plan của run N
-  - [ ] 4.1 Dựng tập ghép, kiểm seed (tiêu chí 3)
+  - [x] 4.1 Dựng tập ghép, kiểm seed (tiêu chí 3). Tập N trên `rtx3060` (`~/fwdata/da50-n/N/`): 1 591 episode (1 037 của M, cộng 227 và 327 đoạn đặt lệch góc), 1 230 839 khung; 554 seed mới không trùng seed eval và seed của M (lệnh và output trong commit)
   - [ ] 4.2 Viết và đóng băng `he-tray-jig-n.yaml`; dòng ledger ước tính
 - [ ] 5. Train run N trên Colab L4 (Hiếu chạy), dừng VM ngay khi xong
 - [ ] 6. Eval và đọc
