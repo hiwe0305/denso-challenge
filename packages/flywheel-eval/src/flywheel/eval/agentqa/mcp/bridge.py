@@ -1,7 +1,7 @@
 """A transport-free bridge between the tool registry and a tool-calling shell (DA-49 task 2.1).
 
 `ToolSession` holds one admitted pack open: its `MeasureContext` and one `FactBook` for
-the session's life. From them it describes the 13 tools of `tools/registry.py` (name,
+the session's life. From them it describes the tools of `tools/registry.py` (name,
 version, a short English description and a JSON Schema of the parameters whose closed
 domains are `enum`s computed from the pack), and it runs a call exactly as step B2
 (`round/measure.py`) runs one call of a plan: the parameters are checked with
@@ -158,6 +158,46 @@ def _window_steps(ctx: MeasureContext) -> dict[str, Any] | None:
             "description": "Must be a logged step of each job the call names."}
 
 
+def _runs_schema(ctx: MeasureContext) -> dict[str, Any] | None:
+    return _strings(list(ctx.runs))
+
+
+def _pairs(ctx: MeasureContext) -> list[dict[str, Any] | None]:
+    runs = _runs_schema(ctx)
+    pair = None if runs is None else {"type": "array", "minItems": 2, "maxItems": 2,
+                                      "items": runs}
+    return [_words("all"), _list_of(pair)]
+
+
+def _levels(ctx: MeasureContext) -> list[dict[str, Any] | None]:
+    present = sorted({lv for r in ctx.runs.values() for lv in r.levels()})
+    return [_words("all"), _list_of({"type": "integer", "enum": present} if present else None)]
+
+
+def _interventions(ctx: MeasureContext) -> list[dict[str, Any] | None]:
+    return [_words("all"), _list_of(_strings([str(k) for k in get_args(InterventionKind)]))]
+
+
+Alternatives = Callable[[MeasureContext], list["dict[str, Any] | None"]]
+
+# domain name of `ToolSpec.params` -> the alternatives its value may take on a pack. A new
+# domain of the registry gets one entry here and one in `_PARAM_HELP`; a tool also needs
+# its entry in `DESCRIPTIONS`. An alternative that is None (an empty domain) is left out.
+DOMAIN_SCHEMAS: dict[str, Alternatives] = {
+    "runs": lambda ctx: [_words("all"), _list_of(_runs_schema(ctx))],
+    "run": lambda ctx: [_runs_schema(ctx)],
+    "pairs": _pairs,
+    "levels": _levels,
+    "labels": lambda ctx: [_words("seen", "all"),
+                           _list_of(_strings(sorted(ctx.task.labels)))],
+    "jobs": lambda ctx: [_words("all"), _list_of(_strings(list(ctx.jobs)))],
+    "window": lambda ctx: [_words("all", "last"), _window_steps(ctx)],
+    "checks": lambda ctx: [_words("all"), _list_of(_strings(list(check_costs())))],
+    "interventions": _interventions,
+    "step": lambda ctx: [_strings(list(ctx.task.steps))],
+}
+
+
 def param_schema(domain: str, ctx: MeasureContext) -> dict[str, Any]:
     """The JSON Schema of one parameter of `domain`, its closed domain read from `ctx`.
 
@@ -165,36 +205,19 @@ def param_schema(domain: str, ctx: MeasureContext) -> dict[str, Any]:
     lacks; it is wider only where the domain depends on the other parameters of the call
     (the levels of the runs it concerns, the steps of the jobs it names, a pair of one run
     with itself). `window` streams the training logs: call it once per pack.
+
+    A domain without an entry in `DOMAIN_SCHEMAS` raises: no fallback schema could keep
+    the value inside a closed domain, and a free value is what the bridge must not offer.
     """
-    if domain not in _PARAM_HELP:
-        raise ValueError(f"unknown parameter domain {domain!r}")
-    help_ = _PARAM_HELP[domain]
-    runs = _strings(list(ctx.runs))
-    if domain == "runs":
-        return _one_of(help_, _words("all"), _list_of(runs))
-    if domain == "run":
-        return _one_of(help_, runs)
-    if domain == "pairs":
-        pair = None if runs is None else {"type": "array", "minItems": 2, "maxItems": 2,
-                                          "items": runs}
-        return _one_of(help_, _words("all"), _list_of(pair))
-    if domain == "levels":
-        present = sorted({lv for r in ctx.runs.values() for lv in r.levels()})
-        level = {"type": "integer", "enum": present} if present else None
-        return _one_of(help_, _words("all"), _list_of(level))
-    if domain == "labels":
-        return _one_of(help_, _words("seen", "all"), _list_of(_strings(sorted(ctx.task.labels))))
-    if domain == "jobs":
-        return _one_of(help_, _words("all"), _list_of(_strings(list(ctx.jobs))))
-    if domain == "window":
-        return _one_of(help_, _words("all", "last"), _window_steps(ctx))
-    if domain == "checks":
-        return _one_of(help_, _words("all"), _list_of(_strings(list(check_costs()))))
-    if domain == "interventions":
-        kinds = [str(k) for k in get_args(InterventionKind)]
-        return _one_of(help_, _words("all"), _list_of(_strings(kinds)))
-    assert domain == "step"
-    return _one_of(help_, _strings(list(ctx.task.steps)))
+    build = DOMAIN_SCHEMAS.get(domain)
+    if build is None:
+        raise ValueError(f"unknown parameter domain {domain!r}: add it to DOMAIN_SCHEMAS")
+    return _one_of(_PARAM_HELP.get(domain, f"A value of the domain {domain!r}."), *build(ctx))
+
+
+def describe(spec: ToolSpec) -> str:
+    """What a model reads about `spec`; its name and version when no text is written yet."""
+    return DESCRIPTIONS.get(spec.name, f"{spec.name} (version {spec.version}).")
 
 
 def _object_schema(spec: ToolSpec, schema_of: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
@@ -305,7 +328,7 @@ class ToolSession:
             described = []
             for spec in REGISTRY.values():
                 missing = self._missing(spec)
-                text = DESCRIPTIONS[spec.name]
+                text = describe(spec)
                 if missing:
                     text += (" Not available on this pack: no entry of kind "
                              f"{', '.join(missing)}.")
