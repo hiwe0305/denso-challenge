@@ -323,3 +323,36 @@ def test_the_cli_builds_a_jig2_set(jig_release: Path, tmp_path: Path) -> None:
     ]  # fmt: skip
     assert main(argv) == 0
     assert len(lines(tmp_path / "set/conditions.jsonl")) == 60
+
+
+# --- DA-50: the scene must be the one the plan's env names ------------------------------
+
+
+def test_the_mirrored_scene_envs_are_eval_batch_s() -> None:
+    from flywheel_psi0.tray import eval_batch, eval_set
+
+    assert eval_set.SCENE_ENVS == eval_batch.SCENES
+
+
+def test_a_jig_plan_with_the_default_scene_is_refused(jig_release: Path) -> None:
+    with pytest.raises(ValueError, match=r"JigTeleop-v0 is scene jig2; got --scene zone1"):
+        build(MIX_PLAN, jig_release, None, levels=MIX_LEVELS)
+    argv = [str(MIX_PLAN), "--release", str(jig_release), "--check", "0" * 64]
+    with pytest.raises(ValueError, match="is scene jig2"):
+        main([*argv, "--levels", "1:1000300:1000330"])
+    assert build(MIX_PLAN, jig_release, None, scene="jig2", levels=MIX_LEVELS)
+
+
+def test_a_zone1_plan_with_scene_jig2_is_refused(jig_release: Path) -> None:
+    with pytest.raises(ValueError, match=r"TrayTransferTeleop-v0 is scene zone1; got --scene jig2"):
+        build(PLAN, jig_release, None, scene="jig2")
+    with pytest.raises(ValueError, match="is scene zone1"):
+        build(PLAN, jig_release, None, train_set=("C", 20), scene="jig2")
+
+
+def test_a_plan_with_an_unknown_env_id_is_not_refused() -> None:
+    from flywheel_psi0.tray.eval_set import check_scene
+
+    for scene in ("zone1", "jig2"):
+        check_scene({"task": {"env_id": "simple/Other-v0"}}, scene)  # no guess, no refusal
+        check_scene({}, scene)

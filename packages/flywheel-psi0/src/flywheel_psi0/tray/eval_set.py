@@ -69,6 +69,12 @@ from flywheel_psi0.tray.runplan import REPO, TrayRunPlan, file_sha256, lock_path
 DATA = "data/chunk-000/episode_{:06d}.parquet"
 SCENES = ("zone1", "jig2")  # as eval_batch.SCENES
 DEFAULT_SCENE = "zone1"
+# scene -> env id, as eval_batch.SCENES (eval_batch imports this module, so it is mirrored;
+# a test keeps the two equal). A plan's task.env_id tells which scene its set must be.
+SCENE_ENVS = {
+    "zone1": "simple/G1WholebodyTrayTransferTeleop-v0",
+    "jig2": "simple/G1WholebodyTrayTransferJigTeleop-v0",
+}
 JIG_REVISION = "jig2"  # flywheel_simple.tray.jig.JIG_REVISION, the suffix of visuals_revision
 DEV_SEEDS = range(1_000_000, 1_001_000)  # flywheel_simple.tray.randomize.SEED_RANGES["dev"]
 
@@ -164,6 +170,14 @@ def frozen_plan_id(plan: TrayMixPlan, plan_path: Path) -> str:
     if frozen != run_plan_id(plan):
         raise ValueError(f"{plan_path} changed since it was frozen as {frozen}")
     return frozen
+
+
+def check_scene(raw: dict[str, Any], scene: str) -> None:
+    """Refuses a scene other than the one the plan's task.env_id names; unknown env ids pass."""
+    env_id = (raw.get("task") or {}).get("env_id")
+    expected = next((name for name, env in SCENE_ENVS.items() if env == env_id), None)
+    if expected is not None and expected != scene:
+        raise ValueError(f"plan env {env_id} is scene {expected}; got --scene {scene}")
 
 
 def check_template(template: dict[str, Any], scene: str) -> None:
@@ -323,6 +337,7 @@ def build(
     info, template, tasks, stats = read_template(release)
     check_template(template, scene)
     raw = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
+    check_scene(raw, scene)
     if raw.get("purpose") == "mix_train":
         mix = TrayMixPlan.load(plan_path)
         if levels is None or train_set is not None:

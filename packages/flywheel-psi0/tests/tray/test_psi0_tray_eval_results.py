@@ -742,3 +742,78 @@ def test_cli_skips_the_all_repeats_pairing_when_a_rollout_is_missing(tmp_path: P
     assert eval_results.main([*common, "--repeats", "3", "--json", str(out)]) == 0
     block = json.loads(out.read_text())["paired"]["repeats"]
     assert "headline" not in block and block["skipped"] == "missing: variant 0, baseline 2"
+
+
+# --- DA-50: a plan that is not the set's plan -----------------------------------------------
+
+
+def _tag_set(tmp_path: Path, plan_id: str | None) -> None:
+    """Writes `plan_id` as run_plan_id of every row of the CLI set (None: no environment_config)."""
+    path = tmp_path / "set/conditions.jsonl"
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    if plan_id is not None:
+        for r in rows:
+            r["environment_config"] = {"flywheel": {"run_plan_id": plan_id}}
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows))
+
+
+def test_cli_reports_a_set_built_for_another_plan(tmp_path: Path, capsys: Any) -> None:
+    from flywheel_psi0.tray import eval_results
+    from flywheel_psi0.tray.runplan import run_plan_id
+
+    common = _cli_set(tmp_path, VAR, BASE)
+    _tag_set(tmp_path, "rp_other")
+    out = tmp_path / "r.json"
+    assert eval_results.main([*common, "--json", str(out)]) == 0
+    expected = {
+        "set_run_plan_id": "rp_other",
+        "plan_run_plan_id": run_plan_id(PLAN),
+        "plan": "he-tray-v2.yaml",
+        "bootstrap_seed_from": "plan",
+    }
+    assert json.loads(out.read_text())["plan_mismatch"] == expected
+    seen = capsys.readouterr()
+    for text in (seen.out, seen.err):
+        assert "rp_other" in text and "he-tray-v2.yaml" in text
+        assert f"seed bootstrap {PLAN.stats.seed} lấy từ kế hoạch đang đọc" in text
+        assert "--bootstrap-seed đặt lại" in text
+    assert seen.out.index("CẢNH BÁO") < seen.out.index("| Mức")
+    assert json.loads(seen.out.splitlines()[-1])["plan_mismatch"] == expected
+
+    assert eval_results.main([*common, "--bootstrap-seed", "7", "--json", str(out)]) == 0
+    given = json.loads(out.read_text())["plan_mismatch"]
+    assert given["bootstrap_seed_from"] == "--bootstrap-seed"
+    # the plan named is the one on disk, not the copy carrying the overriding seed
+    assert given["plan_run_plan_id"] == run_plan_id(PLAN)
+    seen = capsys.readouterr()
+    assert "seed bootstrap 7 do --bootstrap-seed đặt" in seen.out
+    assert "lấy từ kế hoạch đang đọc" not in seen.out
+
+
+def test_cli_lists_several_set_plan_ids(tmp_path: Path) -> None:
+    from flywheel_psi0.tray import eval_results
+
+    common = _cli_set(tmp_path, VAR, BASE)
+    path = tmp_path / "set/conditions.jsonl"
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    for i, r in enumerate(rows):
+        r["environment_config"] = {"flywheel": {"run_plan_id": f"rp_{i % 2}"}}
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    out = tmp_path / "r.json"
+    assert eval_results.main([*common, "--json", str(out)]) == 0
+    assert json.loads(out.read_text())["plan_mismatch"]["set_run_plan_id"] == ["rp_0", "rp_1"]
+
+
+def test_cli_says_nothing_when_the_ids_match_or_are_unknown(tmp_path: Path, capsys: Any) -> None:
+    from flywheel_psi0.tray import eval_results
+    from flywheel_psi0.tray.runplan import run_plan_id
+
+    common = _cli_set(tmp_path, VAR, BASE)
+    out = tmp_path / "r.json"
+    for plan_id in (run_plan_id(PLAN), None):  # same plan; rows without a run_plan_id
+        _tag_set(tmp_path, plan_id)
+        assert eval_results.main([*common, "--json", str(out)]) == 0
+        assert "plan_mismatch" not in json.loads(out.read_text())
+        seen = capsys.readouterr()
+        assert "CẢNH BÁO" not in seen.out + seen.err
+        assert "plan_mismatch" not in seen.out
