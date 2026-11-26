@@ -631,8 +631,8 @@ Chạy từ gốc repo, vì công cụ đọc `configs/eval/agentqa/` theo đư�
 
 | Phần | Nội dung |
 |---|---|
-| Bản giao thức | Ghim `2025-11-25`, trả đúng bản này ở `initialize` dù vỏ chat hỏi bản nào. Bản hiện hành của MCP là `2026-07-28`, đã bỏ `initialize` và `ping` mà story yêu cầu, nên máy chủ ghim bản cuối còn hai phương thức này. Nguồn đặc tả ghi ở đầu `agentqa/mcp/server.py` |
-| Phương thức | `initialize`, `ping`, `tools/list`, `tools/call`. Phương thức lạ trả `-32601`; dòng không phải JSON trả `-32700` và máy chủ chạy tiếp; thông điệp không có `id` (notification) không được trả lời |
+| Bản giao thức | Ghim `2025-11-25`, trả đúng bản này ở `initialize` dù vỏ chat hỏi bản nào. Theo [trang phiên bản](https://modelcontextprotocol.io/specification/versioning) và [change log bản `2026-07-28`](https://modelcontextprotocol.io/specification/2026-07-28/changelog) của đặc tả (đọc ngày 27/11/2026), bản hiện hành là `2026-07-28` và bản đó bỏ bước bắt tay `initialize` cùng `ping` mà story yêu cầu; vì vậy máy chủ ghim bản cuối còn hai phương thức này. Các trang đặc tả của [bản `2025-11-25`](https://modelcontextprotocol.io/specification/2025-11-25/basic) mà mã theo được ghi ở đầu `agentqa/mcp/server.py` |
+| Phương thức | `initialize`, `ping`, `tools/list`, `tools/call`. Phương thức lạ trả `-32601`; dòng không phải JSON hoặc không phải UTF-8 trả `-32700` và máy chủ chạy tiếp; thông điệp không có `id` (notification) không được trả lời |
 | `tools/list` | Tên, mô tả và JSON Schema của tham số. Miền đóng của mỗi tham số (run, mức, nhãn, job, bước của task) là `enum` tính từ gói đang mở. Công cụ thiếu dữ liệu vẫn được liệt kê, mô tả ghi rõ loại artifact còn thiếu |
 | `tools/call` | Kết quả có `structuredContent` (`status`, `facts`, `rows`, `not_judged`) và cùng nội dung dạng chuỗi JSON trong `content`. Tham số ngoài miền trả `isError: true` kèm lý do của `check_params`, không chạy gì và không ghi fact. Tên công cụ lạ trả lỗi giao thức `-32602` |
 | Nhật ký | Mỗi dòng một JSON, ra stderr hoặc file `--log` (ghi nối). Dòng đầu là `started` (id và sha256 của gói, lớp dữ liệu, số công cụ, các entry bị loại); sau đó mỗi lời gọi một dòng `call`: công cụ, tham số, trạng thái, id các fact, số giây |
@@ -679,6 +679,7 @@ Số ở dòng `paired_compare` là số sơ bộ trong sim, cùng nguồn với
 - Máy chủ không chặn được câu trả lời cuối của vỏ chat: việc mọi câu phải dẫn fact là việc của vỏ. Máy chủ chỉ nhắc điều đó trong `instructions` của `initialize`.
 - Chỉ có phần công cụ của MCP: không có resource, prompt, phân trang hay kiểu truyền HTTP.
 - Schema rộng hơn miền thật ở ba chỗ, `check_params` vẫn kiểm đúng: `levels` liệt kê mức của mọi run chứ không riêng các run của lời gọi; `window` thành khoảng số nguyên khi log có hơn 64 bước; `pairs` không cấm ghép một run với chính nó.
-- Một công cụ ném lỗi giữa chừng trả `-32603` và máy chủ chạy tiếp, nhưng các fact nó đã ghi trước đó vẫn ở lại trong `FactBook` của phiên.
+- Một công cụ ném lỗi giữa chừng trả kết quả `isError: true` (chỉ tên công cụ và loại lỗi) và máy chủ chạy tiếp, nhưng các fact nó đã ghi trước đó vẫn ở lại trong `FactBook` của phiên.
+- Máy chủ chỉ chạy được từ gốc repo (10.1); chạy ở thư mục khác thì thoát mã 2 với một dòng lỗi.
 - Lệnh chưa có `--store` như dòng lệnh trong story: không công cụ nào đọc store lúc gọi, và phiên máy chủ chưa ghi `LedgerEntry`. Cần Hiếu quyết phiên máy chủ có tính là một job hay không.
 - Test tương đương với bước `measure` chạy trên gói giả chỉ có `scores`: 7 công cụ chạy thật, 6 công cụ chỉ được kiểm ở nhánh thiếu dữ liệu.
