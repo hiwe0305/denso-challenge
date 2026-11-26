@@ -116,7 +116,7 @@ Chưa chạy trên lô mẫu: ingest, phát lại DA-17, QA DA-03, lọc chất 
 
 ## 5. Runbook nháp cho lô trên `rtx3060`
 
-**[Đề xuất]**, chưa chạy. Biên độ ±10 cm đã chốt ngày 24/11/2026; lệnh chạy lô còn chờ Hiếu đồng ý. Claude không chạy gì trên `rtx3060` trong story này cho tới khi Hiếu đồng ý. Đường dẫn code và venv trên `rtx3060` lấy theo jig.md mục 5 (`~/denso-da41`), **chưa kiểm lại** ngày 23/11/2026.
+Đã chạy ngày 24–25/11/2026 theo lời Hiếu; số thực đo ở mục 7. Phần dưới giữ nguyên như lúc viết (ước lượng trước khi chạy). Claude không chạy gì trên `rtx3060` trong story này cho tới khi Hiếu đồng ý. Đường dẫn code và venv trên `rtx3060` lấy theo jig.md mục 5 (`~/denso-da41`), **chưa kiểm lại** ngày 23/11/2026.
 
 | Mục | Giá trị |
 |---|---|
@@ -178,6 +178,39 @@ Gửi Claude: output của bước 1, 2, 6, 8 và 9.
 
 ## 6. Việc tiếp theo (ngoài phiên đầu của DA-46)
 
-- Hiếu xem video mẫu và chọn biên độ; sau đó chạy mục 5 (nhiệm vụ 5.1).
+- Hiếu xem video mẫu và chọn biên độ; sau đó chạy mục 5 (nhiệm vụ 5.1). Xong, xem mục 7.
 - Ghép tập train: 568 episode gốc và các episode cắt (`demo_subset` từng phần rồi ghép như `cplus_cut`), stats tính trên tập ghép. Thuộc story train.
 - `run_shards.py` cho cảnh đồ gá và lô có lệch, nếu cần chạy lại shard hỏng.
+
+## 7. Lô trên `rtx3060` (nhiệm vụ 5.1, thực đo 24–26/11/2026)
+
+Kho: `~/fwdata/datasets/tray-s1place-jig2-20261124/` trên `rtx3060`, 14 GB. Bản sao trên laptop ở `fwdata/datasets/tray-s1place-jig2-20261124/` (7,0 GB, không có `gen-l*` và `replay17`; 3 965 file, số byte khớp, sha256 của `meta/info.json` và `meta/episodes.jsonl` khớp cho cả bốn release). Mọi số dưới đây lấy từ `reports/batch_summary.json` của kho, file đó ghi nguồn của từng số.
+
+| | Mức 1 | Mức 2 | Tổng |
+|---|---|---|---|
+| Seed | `520000–520496` | `521000–521212` | |
+| Lượt sinh | 497 | 213 | 710 |
+| Ghi được | 459 | 193 | 652 (91,8 %) |
+| QA phát lại lúc sinh | 459/459 | 193/193 | 652/652 |
+| QA loại | 2 | 2 | 4 |
+| Lọc chất lượng bỏ | 26 | 10 | 36 |
+| Tập `ALL` | 431 | 181 | 612 (86,2 % số lượt) |
+| Release cha | `tray_s1_b71a17f250f1`, 459 episode, 681 541 khung | `tray_s1_45031800e357`, 193 episode, 288 177 khung | |
+| Bản cắt | `tray_s1place_a1797e480160`, 431 episode, 198 903 khung | `tray_s1place_56e6d006d8d1`, 181 episode, 83 372 khung | 612 episode, 282 275 khung |
+| Độ dài bản cắt trung bình | 461,5 khung | 460,6 khung | |
+| Tỉ trọng đoạn cắt trong episode `ALL` của cha | 31,1 % | 30,8 % | |
+| Lệch vị trí khi đặt xong (`ALL`): trung vị, p90, lớn nhất | 1,57; 2,92; 4,95 cm | 1,51; 2,70; 4,78 cm | |
+| Lệch góc khi đặt xong (`ALL`): trung vị, p90, lớn nhất | 0,85; 4,47; 9,89° | 0,81; 2,90; 6,12° | |
+| Thời gian mỗi lượt sinh: trung bình, p95 | 79,9 s; 95,2 s | 74,3 s; 94,5 s | 15,4 giờ-worker |
+| Dung lượng: thô, cha, cắt | 4,3; 3,9; 1,1 GB | 1,9; 1,7; 0,43 GB | |
+
+So với ước lượng ở mục 5: tỉ lệ giữ 86,2 % (ước 85 %), không mức nào dưới ngưỡng dừng 75 %; thời gian mỗi lượt gần đúng 79 s; 612 episode cắt (ước khoảng 600). Lượt hỏng lúc sinh: `L-ONE-HAND` 24, `L-TRAY-TILT` 14, `L-PLACE-POSE` 12, hết giờ ở RELEASE 7, hết giờ ở LIFT 1.
+
+Kho có thêm sau bước 10: `demo_sets-tray_s1place_*.json` (tập `ALL` của hai bản cắt), `cards/` (bốn thẻ; bản cắt có `kind: cut` và `lineage.parents`), `round.yaml` (chỉ khai hai release cha, vì bản cắt không có pipeline hay QA riêng), `README.md`, `reports/batch_summary.json`.
+
+Điều cần biết khi dùng lô này:
+
+- Thẻ để `null` các trường không có nguồn trong kho: `generator.simple_commit`, `lineage.ledger`, `quality.place_stage_share`, `place_error_cm.along_mean`. Lô này không có dòng sổ chi phí (0 CU, chỉ CPU của `rtx3060`); đây là một chỗ sót.
+- `dataset_report.json` báo `replay_dynamic` trên mọi episode và `replay_success` trên 226/459 (mức 1), 99/193 (mức 2), cùng kiểu với kho gốc `tray-s1-jig2-20261122` (ngưỡng phát lại của DA-17 hiệu chỉnh trên psi-data). Cờ D4 trên `stats.json` được ghi là báo nhầm theo cách ghi của kho gốc; **chưa kiểm riêng cho lô này**.
+- Bộ lọc ≤ 3 cm và ≤ 5° mà run M (DA-48) dùng nằm ở `analysis/da48-clean/` của kho, không thuộc `ALL` của lô.
+- Mốc thời gian không có trong `gen_log.jsonl`; file sinh đầu tiên ghi 19:42 ngày 24/11, log sinh kết thúc 21:12, phát lại xong 22:49, cắt xong 09:29 ngày 25/11 (giờ máy).
