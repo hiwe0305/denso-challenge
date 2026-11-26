@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Nháp, chờ Hiếu duyệt story và chốt phương án ở mục Cách làm |
+| Trạng thái | Sẵn sàng làm; Hiếu chốt phương án A ngày 26/11/2026 |
 | Người làm | Hiếu, cùng Claude |
 | Làn | Đánh giá (`flywheel.eval.agentqa`); không sửa nhân, làn khác hay adapter |
 | Nguồn yêu cầu | Hiếu ngày 26/11/2026: dùng ngay phần nào của DeepSeek Harness dùng được cho hệ agent, sau đó đưa lên website; đồng ý mở story cho máy chủ MCP |
@@ -25,13 +25,13 @@ Story này **không** làm vỏ chat, không cài DeepSeek Harness và không s�
 
 ## Cách làm
 
-**[Đề xuất] Claude 26/11/2026; chờ Hiếu chốt.**
+**[Đã chốt]** Hiếu chọn phương án A ngày 26/11/2026 (đề xuất của Claude cùng ngày).
 
 Vì sao MCP là phần dùng được ngay của DeepSeek Harness (khảo sát chỉ đọc ngày 26/11/2026, bản `dsh-v0.2.3-alpha.2`, chưa cài và chưa chạy): harness không cho đăng ký công cụ bằng Python; công cụ ngoài chỉ vào được qua plugin TypeScript hoặc MCP. Máy chủ MCP do đội viết thì dùng được với harness mà không cần sửa harness, và dùng được với vỏ khác nếu sau này không chọn harness.
 
 | Phương án | Nội dung | Được | Mất |
 |---|---|---|---|
-| **A (đề xuất)** | Viết máy chủ stdio bằng thư viện chuẩn của Python: `initialize`, `tools/list`, `tools/call`, `ping` | Không thêm phụ thuộc, không đụng `pyproject.toml` và `uv.lock`; làm được ngay | Tự giữ đúng giao thức; chỉ có phần công cụ, không có resource hay prompt |
+| **A (chọn)** | Viết máy chủ stdio bằng thư viện chuẩn của Python: `initialize`, `tools/list`, `tools/call`, `ping` | Không thêm phụ thuộc, không đụng `pyproject.toml` và `uv.lock`; làm được ngay | Tự giữ đúng giao thức; chỉ có phần công cụ, không có resource hay prompt |
 | B | Dùng thư viện MCP chính thức của Python | Đúng giao thức theo bản thư viện; dễ thêm kiểu truyền HTTP | Cần Hiếu thêm phụ thuộc vào `pyproject.toml` và `uv.lock`; thư viện kéo theo máy chủ HTTP mà L0 không cần |
 | C | Viết plugin TypeScript cho harness | Tích hợp sâu nhất với harness | Máy không có Node; khóa vào một vỏ đang ở bản preview |
 
