@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,7 @@ from typing import Any
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
+from flywheel_psi0.tray.demo_sets import EXPORT_META, MANIFEST
 from flywheel_psi0.tray.eval_set import DATA, build, conditions_sha256, main
 from flywheel_psi0.tray.runplan import TrayRunPlan, run_plan_id
 
@@ -189,3 +191,135 @@ def test_the_cli_takes_a_train_set_or_a_subset(release: Path, tmp_path: Path) ->
     assert main([*base, "--out", str(tmp_path / "b"), "--only", "1:1000100:1000120"]) == 0
     with pytest.raises(SystemExit):
         main([*base, "--out", str(tmp_path / "c"), "--train-set", "C"])
+
+
+# --- DA-47 5: the jig2 scene and mix plans ---------------------------------------------
+
+MIX_PLAN = ROOT / "configs/runplans/tray/he-tray-jig-m.yaml"
+MIX_LEVELS = [(1, 1000300, 1000330), (2, 1000300, 1000330)]
+
+
+def test_zone1_rows_are_the_rows_before_da47(release: Path) -> None:
+    # sha256 of the full set, T1 and T2 of the fixture, built by eval_set at 9f9cd204
+    assert build(PLAN, release, None) == (
+        "e57e664649faf1e836e8ada8b73cf1feca9f49e3f8e7ed53462a68b31e5886bc"
+    )
+    assert build(PLAN, release, None, train_set=("C", 20)) == (
+        "cfe908379e4191c2d7e929520579e7407d0fe00fe2dd67d9691ad541be436376"
+    )
+    assert build(PLAN, release, None, subset=(1, 1000100, 1000120)) == (
+        "fc7723a1d20178bca8ea091a674c6725079ad15a7edc0514525df200bf9dcf68"
+    )
+
+
+def test_the_mirrored_simulator_constants_hold() -> None:
+    from flywheel_psi0.tray import eval_batch, eval_set
+    from flywheel_simple.tray.jig import JIG_REVISION
+    from flywheel_simple.tray.randomize import SEED_RANGES
+
+    assert eval_set.JIG_REVISION == JIG_REVISION
+    assert eval_set.DEV_SEEDS == SEED_RANGES["dev"]
+    assert eval_set.SCENES == tuple(eval_batch.SCENES)
+
+
+@pytest.fixture
+def jig_release(release: Path) -> Path:
+    """The fixture release with a jig episode's config as its template."""
+    config = {
+        **TEMPLATE_CONFIG,
+        "uid": "g1_wholebody_tray_transfer_jig_teleop",
+        "tray": {**TEMPLATE_CONFIG["tray"], "jig": {"clearance": 0.006}},
+        "flywheel": {"seed": 500000, "visuals_revision": "4763fbfa+zone1+jig2"},
+    }
+    episode = {"episode_index": 0, "length": 2, "environment_config": json.dumps(config)}
+    (release / "meta/episodes.jsonl").write_text(json.dumps(episode) + "\n")
+    return release
+
+
+def test_a_jig2_set_of_a_mix_plan_takes_the_levels_and_the_frozen_id(
+    jig_release: Path, tmp_path: Path
+) -> None:
+    digest = build(MIX_PLAN, jig_release, tmp_path / "set", scene="jig2", levels=MIX_LEVELS)
+    rows = lines(tmp_path / "set/conditions.jsonl")
+    assert digest == conditions_sha256(rows)
+    assert [(r["level"], r["seed"]) for r in rows] == [
+        (lv, s) for lv, a, b in MIX_LEVELS for s in range(a, b)
+    ]
+    assert {r["unit"] for r in rows} == {"condition"}
+    lock = json.loads(MIX_PLAN.with_name("he-tray-jig-m.lock.json").read_text())
+    config = rows[31]["environment_config"]
+    assert config["tray"] == {"sample": {"level": 2, "seed": 1000301}}  # no tray.jig
+    assert config["flywheel"] == {
+        "seed": 1000301,
+        "level": 2,
+        "purpose": "eval",
+        "split": "dev",
+        "run_plan_id": lock["run_plan_id"],
+        "scene": "jig2",
+    }
+    assert sorted(p.name for p in (tmp_path / "set").glob("dr-level-*")) == [
+        "dr-level-1",
+        "dr-level-2",
+    ]
+
+
+def test_levels_belong_to_mix_plans_only(jig_release: Path) -> None:
+    with pytest.raises(ValueError, match="give --levels"):
+        build(MIX_PLAN, jig_release, None, scene="jig2")
+    with pytest.raises(ValueError, match="drop --levels"):
+        build(PLAN, jig_release, None, levels=MIX_LEVELS)
+    with pytest.raises(ValueError, match="dev seeds"):
+        build(MIX_PLAN, jig_release, None, scene="jig2", levels=[(1, 1100000, 1100030)])
+    with pytest.raises(ValueError, match="repeats a level"):
+        build(MIX_PLAN, jig_release, None, scene="jig2", levels=[*MIX_LEVELS, MIX_LEVELS[0]])
+
+
+def test_a_mix_plan_must_be_frozen_as_it_is(jig_release: Path, tmp_path: Path) -> None:
+    plan = tmp_path / "he-tray-jig-m.yaml"
+    plan.write_text(MIX_PLAN.read_text())
+    with pytest.raises(ValueError, match="not frozen"):
+        build(plan, jig_release, None, scene="jig2", levels=MIX_LEVELS)
+    plan.with_name("he-tray-jig-m.lock.json").write_text(json.dumps({"run_plan_id": "rp_0"}))
+    with pytest.raises(ValueError, match="changed since it was frozen"):
+        build(plan, jig_release, None, scene="jig2", levels=MIX_LEVELS)
+
+
+def test_jig2_needs_a_jig_release_as_template(release: Path) -> None:
+    with pytest.raises(ValueError, match="needs a jig release"):
+        build(MIX_PLAN, release, None, scene="jig2", levels=MIX_LEVELS)
+
+
+def write_seed_release(root: Path, seeds: list[int]) -> Path:
+    """A release with only what demo_sets.read_release checks: manifest and export meta."""
+    (root / "meta").mkdir(parents=True)
+    rows = [{"episode_index": i, "seed": s} for i, s in enumerate(seeds)]
+    (root / EXPORT_META).write_text(json.dumps({"episodes": rows}))
+    meta = (root / EXPORT_META).read_bytes()
+    files = [{"path": EXPORT_META, "sha256": hashlib.sha256(meta).hexdigest(), "size": len(meta)}]
+    canonical = json.dumps(files, sort_keys=True, separators=(",", ":")).encode()
+    manifest = {"release_hash": hashlib.sha256(canonical).hexdigest(), "files": files}
+    (root / MANIFEST).write_text(json.dumps(manifest))
+    return root
+
+
+def test_conditions_on_train_seeds_are_refused(jig_release: Path, tmp_path: Path) -> None:
+    clean = write_seed_release(tmp_path / "a", [500000, 500001])
+    dirty = write_seed_release(tmp_path / "b", [400000, 1000305, 1000310])
+
+    def jig_set(exclude: list[Path]) -> str:
+        return build(MIX_PLAN, jig_release, None, scene="jig2", levels=MIX_LEVELS, exclude=exclude)
+
+    assert jig_set([clean]) == jig_set([])
+    with pytest.raises(ValueError, match=r"b: 2 seeds, \[1000305, 1000310\]"):
+        jig_set([clean, dirty])
+
+
+def test_the_cli_builds_a_jig2_set(jig_release: Path, tmp_path: Path) -> None:
+    clean = write_seed_release(tmp_path / "a", [500000])
+    argv = [
+        str(MIX_PLAN), "--release", str(jig_release), "--out", str(tmp_path / "set"),
+        "--scene", "jig2", "--levels", "1:1000300:1000330", "2:1000300:1000330",
+        "--exclude-seeds-of", str(clean), "--exclude-seeds-of", str(clean),
+    ]  # fmt: skip
+    assert main(argv) == 0
+    assert len(lines(tmp_path / "set/conditions.jsonl")) == 60
