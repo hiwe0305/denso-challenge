@@ -58,6 +58,7 @@ Tên số đo K1 đề xuất (hợp đồng yêu cầu hậu tố đơn vị):
 - [ ] 2. Eval trên cảnh đồ gá (AC 1, 2)
   - [x] 2.1 `eval_driver`: đăng ký env đồ gá, ghi `task_uid` vào dòng outcome
   - [x] 2.2 `eval_batch --scene`, từ chối lệch cảnh với tập điều kiện
+  - [x] 2.3 `colab_serve --branch M`: serve run M của plan `mix_train` từ Colab, cùng các kiểm tra sha256 như nhánh DA-34 (Hiếu chọn ba làn Colab L4 ngày 26/11/2026)
 - [x] 3. Đích theo cảnh trong `export_outcomes` và `place_error` (AC 3)
 - [x] 4. `export_outcomes` xuất tín hiệu của DA-42 và `repeat` (AC 4)
 - [x] 5. Tập điều kiện `jig2` (AC 5)
@@ -73,7 +74,7 @@ Thứ tự: 2.1, 3 và 4 làm được ngay sau khi DA-42 merge. 5 và 6.2 cần
 
 Theo 07 mục 3.1. File story luôn được sửa.
 
-- `packages/flywheel-psi0/src/flywheel_psi0/tray/eval_driver.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/eval_batch.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/eval_set.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/export_outcomes.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/place_error.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/replay_server.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/export_scores.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/eval_results.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/evidence.py`
+- `packages/flywheel-psi0/src/flywheel_psi0/tray/eval_driver.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/eval_batch.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/eval_set.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/export_outcomes.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/place_error.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/replay_server.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/export_scores.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/eval_results.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/evidence.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/colab_serve.py`
 - `packages/flywheel-psi0/tests/tray/`
 - `packages/flywheel-simple/src/flywheel_simple/tray/run.py`, `packages/flywheel-simple/tests/tray/test_run_eval.py`
 - `docs/g0/tray/`

@@ -181,3 +181,105 @@ def test_serve_checks_then_starts_one_server_with_the_local_args(tmp_path: Path)
             serve(expected, work, port, sys.executable, launcher)
     finally:
         os.killpg(row["pid"], signal.SIGTERM)
+
+
+MIX = REPO / "configs/runplans/tray/he-tray-jig-m.yaml"
+M_RUN = "fw-da48-ft-m-s0.simple.flow1000.cosine.lr1.0e-04.b16.gpus1.da48-ft-m-s0"
+
+
+def _mix(tmp_path: Path, stats: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A copy of the M plan pinned to the fake stats, frozen, its id approved as MIX_FROZEN."""
+    from flywheel_psi0.tray.mixplan import TrayMixPlan
+    from flywheel_psi0.tray.runplan import lock_path, run_plan_id
+
+    raw = yaml.safe_load(MIX.read_text())
+    raw["cut"]["stats_sha256"] = sha256(stats)
+    out = tmp_path / "mix.yaml"
+    out.write_text(yaml.safe_dump(raw, allow_unicode=True))
+    rp = run_plan_id(TrayMixPlan.load(out))
+    lock_path(out).write_text(json.dumps({"run_plan_id": rp}))
+    monkeypatch.setattr(colab_serve.colab_train, "MIX_FROZEN", rp)
+    return out
+
+
+def _m_run(runs: Path, steps: tuple[int, ...] = (60000, 100000)) -> Path:
+    src = runs / "da48-ft-m-s0" / "psi0" / "finetune" / M_RUN
+    for step in steps:
+        (src / f"checkpoints/ckpt_{step}").mkdir(parents=True)
+        (src / f"checkpoints/ckpt_{step}/model.safetensors").write_bytes(b"weights")
+    (src / "argv.txt").write_text("train ...")
+    (src / "run_config.json").write_text(json.dumps(_config(STATS)))
+    return src
+
+
+def test_expect_serves_run_m_only_from_the_frozen_mix_plan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # DA-48 run M: the plan's id must be MIX_FROZEN, steps 100000 or the early reads
+    stats = tmp_path / "stats_psi0.json"
+    stats.write_text(json.dumps(STATS))
+    mix = _mix(tmp_path, stats, monkeypatch)
+    runs = tmp_path / "jig-m"
+    _m_run(runs)
+    pair = _plan(tmp_path, stats)
+    want = expect(runs, "M", 100000, stats, pair, mix_path=mix)
+    assert (want["job"], want["run"], want["ckpt_step"]) == ("da48-ft-m-s0", M_RUN, 100000)
+    assert want["run_plan_id"] == colab_serve.colab_train.MIX_FROZEN
+    assert want["drive_runs"] == "denso/da48/runs"
+    assert json.loads((runs / want["job"] / "expected-100000.json").read_text()) == want
+    assert expect(runs, "M", 60000, stats, pair, mix_path=mix)["ckpt_step"] == 60000
+    with pytest.raises(SystemExit, match="the rules read"):
+        expect(runs, "M", 90000, stats, pair, mix_path=mix)
+    other = tmp_path / "other.json"
+    other.write_text("{}")
+    with pytest.raises(SystemExit, match="not the joined set's stats"):
+        expect(runs, "M", 100000, other, pair, mix_path=mix)
+    monkeypatch.setattr(colab_serve.colab_train, "MIX_FROZEN", "rp_000000000000")
+    with pytest.raises(SystemExit, match="only rp_000000000000 is approved"):
+        expect(runs, "M", 100000, stats, pair, mix_path=mix)
+    monkeypatch.setattr(colab_serve.colab_train, "MIX_FROZEN", None)
+    with pytest.raises(SystemExit, match="MIX_FROZEN is unset"):
+        expect(runs, "M", 100000, stats, pair, mix_path=mix)
+
+
+def test_expect_refuses_run_m_from_an_unfrozen_plan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stats = tmp_path / "stats_psi0.json"
+    stats.write_text(json.dumps(STATS))
+    mix = _mix(tmp_path, stats, monkeypatch)
+    (tmp_path / "mix.lock.json").unlink()
+    _m_run(tmp_path / "jig-m")
+    with pytest.raises(SystemExit, match="is not frozen"):
+        expect(tmp_path / "jig-m", "M", 100000, stats, _plan(tmp_path, stats), mix_path=mix)
+
+
+def test_real_mix_plan_is_the_frozen_one() -> None:
+    # the repo's plan holds as it is: frozen, id MIX_FROZEN, steps of rule 6
+    spec = colab_serve._mix(MIX)
+    assert spec.job == "da48-ft-m-s0" and spec.steps == (100000, 60000, 80000)
+    assert spec.drive_runs == "denso/da48/runs"
+
+
+def test_fetch_reads_m_from_the_drive_folder_its_expected_file_names(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stats = tmp_path / "stats_psi0.json"
+    stats.write_text(json.dumps(STATS))
+    mix = _mix(tmp_path, stats, monkeypatch)
+    runs = tmp_path / "laptop"
+    _m_run(runs, (100000,))
+    want = expect(runs, "M", 100000, stats, _plan(tmp_path, stats), mix_path=mix)
+    expected = runs / want["job"] / "expected-100000.json"
+    mydrive = tmp_path / "MyDrive"
+    _m_run(mydrive / "denso/da48/runs", (100000,))
+    _m_run(mydrive / "denso/da34", (100000,))  # same job name under DA-34's folder: not read
+    (mydrive / "denso/da34/da48-ft-m-s0/psi0/finetune" / M_RUN / "argv.txt").write_text("x")
+    monkeypatch.setattr(colab_serve, "MYDRIVE", mydrive)
+    work = tmp_path / "vm"
+    assert sorted(fetch(expected, work)) == sorted(want["files"])
+    old = json.loads(expected.read_text())
+    del old["drive_runs"]  # an expected file written before the field: DA-34's folder
+    expected.write_text(json.dumps(old))
+    with pytest.raises(SystemExit, match="differs from the laptop's"):
+        fetch(expected, tmp_path / "vm2")
