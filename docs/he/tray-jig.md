@@ -199,6 +199,51 @@ Run N giữ nguyên recipe, checkpoint cha, số bước (100 000), seed train v
 
 <!-- /jig-n-rules -->
 
+## 7. Run N: tập dữ liệu, plan và runbook train (27/11/2026)
+
+Plan: `configs/runplans/tray/he-tray-jig-n.yaml`, đóng băng thành `rp_23b25206d96e` (`he-tray-jig-n.lock.json`), ghim khối `jig-n-rules` (sha256 `7ba9df31…3992d`). Plan có hiệu lực khi Hiếu merge PR này. So với plan M chỉ khác tập dữ liệu, thư mục Drive và trần CU.
+
+| Mục | Run M | Run N |
+|---|---|---|
+| Các phần | 4 (356, 142, 377, 162) | 4 phần của M rồi 2 đoạn đặt lệch góc: `tray_s1place_e793fb05a9df` (mức 1, 227), `tray_s1place_6a7b780fb66b` (mức 2, 327) |
+| Episode, khung | 1 037; 948 639 | 1 591; 1 230 839 (thực đo) |
+| Số epoch ở 100 000 bước | 1,69 | 1,30 |
+| `stats_sha256` | `3c31da5e…cc85ce` | `3dae55d7…57bb6c` |
+| Job, thư mục VM | `da48-ft-m-s0`, `/content/da48` | `da50-ft-n-s0`, `/content/da50` |
+| Drive | `denso/da48/cuts`, `denso/da48/runs` | `denso/da50/cuts`, `denso/da50/runs` |
+| Trần CU | 60 | 70 **[Đề xuất]** |
+
+Dữ liệu thêm và bộ lọc: [place-data.md](../g0/tray/place-data.md) mục 9. 554 seed mới không trùng seed eval (1000100–1000129) và không trùng seed của tập M; kiểm bằng lệnh (commit của nhiệm vụ 4.1) và bằng test `test_n_seeds_are_new_unique_and_outside_the_eval_set`.
+
+**Chi phí (ước lượng, chưa đo).** Cùng recipe, số bước và GPU như M nên lấy số thực đo của M (mục 4): khoảng 52 CU và 21 giờ nếu không có VM chạy không tải (M tốn 56,15 CU, trong đó khoảng 4,3 CU là VM chờ sau khi train xong). Trần 70 CU vì M chỉ còn cách trần 60 có 3,85 CU; với sàn 14, account cần ít nhất 84 CU lúc mở phiên (số dư sau eval của M: 151,83 CU). Hiếu muốn giữ 60 thì đổi ba chỗ trong plan và đóng băng lại, id sẽ đổi.
+
+**Runbook.** Như mục 3, đổi theo bảng trên. Bước A và đóng tar đã làm ngày 27/11/2026:
+
+- `N.tar` (7 075 532 800 byte, sha256 `ae443c49efe63cb2b2962e95cb1db83f845eb870d182d27fdbee36d466a89f48`) và `N.tar.json` ở `rtx3060:~/fwdata/da50-n/` và trên laptop ở `fwdata/tray/jig-n/`; sha256 trên laptop đã so khớp.
+- **Chưa làm:** đưa hai file lên `MyDrive/denso/da50/cuts/` (Hiếu làm, hoặc cho phép).
+
+Sau khi PR merge (code trên VM phải có `--branch N`):
+
+```bash
+python3 scripts/colab/cu_watch.py session --gpu L4 --cap 70 --floor 14
+```
+
+```bash
+python3 -m flywheel_psi0.tray.colab_train setup --branch N --work /content/da50
+```
+
+```bash
+Psi0/.venv-psi/bin/python -m flywheel_psi0.tray.colab_train train --branch N --work /content/da50
+```
+
+```bash
+python3 fw/scripts/he/he1_colab.py persist --work /content/da50 --to /content/drive/MyDrive/denso/da50/runs --watch 600 --pid <pid của train>
+```
+
+Mất VM giữa chừng: `setup` lại rồi `colab_train restore --branch N --work /content/da50` trước `train`. Theo dõi bằng `he1_fetch.py follow --stop-when-done --total-steps 100000 --gpu L4`; bản sửa thứ tự checkpoint (PR 226) đã có nên vòng theo dõi phải thấy `ckpt_100000` và dừng VM. Nếu không thấy trong 15 phút sau bước 100 000 thì dừng VM bằng tay.
+
+Điều chưa kiểm: nhánh `N` của `colab_train` mới chạy trên bộ giả CPU, chưa chạy trên VM; `restore` sau bản sửa symlink chưa chạy trên job thật; tiến trình `guard` thoát sớm chưa sửa (kiểm nó còn sống sau khi phiên được cấp). Token CLI hết hạn sau khoảng 16 giờ, run khoảng 21 giờ nên cần đăng nhập lại một lần.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -207,3 +252,4 @@ Run N giữ nguyên recipe, checkpoint cha, số bước (100 000), seed train v
 | 25/11/2026 | Thêm đoạn bật wandb online qua `FW_WANDB_MODE` ở bước D (ngoài khối luật đọc) | Hiếu (soạn với Claude) |
 | 26/11/2026 | Mục 4 mới: số thực đo của lần train (100 000 bước, 56,15 CU, sha256 của `ckpt_100000`), ba lỗi vận hành; sửa câu cuối bước E | Hiếu (soạn với Claude) |
 | 26/11/2026 | Mục 5 mới: kết quả eval run M đọc theo mục 2 (thực đo). Mục 6 mới: đề xuất run N và khối luật đọc `jig-n-rules`. Khối `jig-m-rules` không đổi | Hiếu (soạn với Claude) |
+| 27/11/2026 | Mục 7 mới: tập dữ liệu, plan đóng băng và runbook train của run N. Hai khối luật không đổi | Hiếu (soạn với Claude) |

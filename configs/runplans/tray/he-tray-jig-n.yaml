@@ -1,0 +1,197 @@
+# DA-50: run N, one Psi0 stage 3 fine-tune on the fixed-jig tray scene (DA-41 jig2): a copy
+# of run M (he-tray-jig-m.yaml, frozen rp_a410d01efa62) with one change, the dataset.
+# Same recipe, parent, step count (100000), train seed 0, own_train_set stats, checkpoints
+# and GPU (L4) as M. Frozen 27/11/2026 (task 4.2), lock he-tray-jig-n.lock.json;
+# `colab_train --branch N` runs only the plan whose id is MIX_N_FROZEN. A change to any
+# pinned value needs a new freeze and a new MIX_N_FROZEN.
+#
+# Hiếu 26/11/2026 ("Chốt như đề xuất", story DA-50 task 2): add yaw-offset place cuts
+# (yaw jitter at CARRY), the new batch weighted towards level 2, no more lateral offsets
+# of the same kind. The data was chosen after reading M's failures on its eval set (dev,
+# not holdout): see the limits in the jig-n-rules block.
+#
+# Schema and checks: flywheel_psi0.tray.mixplan, as M.
+name: he-tray-psi0-jig-n
+purpose: mix_train
+story: DA-50
+site_id: local
+task:
+  id: g1_wholebody_tray_transfer_jig_teleop # JIG_TASK_UID of flywheel_simple.tray.jig_task
+  env_id: simple/G1WholebodyTrayTransferJigTeleop-v0
+  config: configs/sim/tray_jig.yaml
+embodiment: g1_sonic_dwbc@1
+
+code:
+  # SIMPLE b75c678 generated both stores (docs/g0/tray/jig.md 4.12); Psi0 as DA-34
+  simple: {repo: physical-superintelligence-lab/SIMPLE, commit: b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11}
+  psi0: {repo: physical-superintelligence-lab/Psi0, commit: cda3fdfafe47cb6fa75400d013de1bd36e3cea05}
+
+psi_model: {repo: USC-PSI-Lab/psi-model, revision: cb1480f50d9764ab2f6261bc2e651a67ad54da17}
+
+# The parent of run M, unchanged.
+parents:
+  psi0-baseline-egodex-he:
+    vlm:
+      path: psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k/model.safetensors
+      sha256: 6e63da17bdd22430bc07c40e4b14ebb96c9d124d014c532449142862c186d3f9
+    action_header:
+      path: psi0/postpre.1by1.pad36.2601131206.ckpt.he30k/action_header.safetensors
+      sha256: 238b4d95862b0eb44bffa75a2ae69e120aeda3d159fd6f29802dd9338019e14d
+    clean_for_main_task: true
+    note: >-
+      Pretrained on EgoDex 200k + HE 30k steps; no tray data in pretraining. The parent of
+      C, C+, C_ALL and C_70.
+
+# Six parts, joined in this order by cplus_cut: the four parts of M in M's order (same
+# releases, demo-set files and set hashes; the part folders M was joined from are reused),
+# then the two yaw-offset place cuts. Each part is the set Q of one release, Q = the seeds
+# of that release's keep file (`demo_sets --keep-seeds`, one file per release split from
+# the generation host's {release_id: [seeds]}).
+cut:
+  name: N
+  rule: >-
+    From each release, every episode whose final placement error is within 3 cm and
+    5 degrees of the jig target (Hiếu 25/11/2026), as listed in that release's keep file;
+    no ranking, no cap. First the four parts of run M in M's order (full episodes level 1,
+    level 2, then the place cuts), then the two new parts: the place cuts of the yaw-offset
+    batch (±15 degrees of yaw at CARRY, planner da41-planner-8+cfg.bee61399+cj.a000s000y150,
+    Hiếu 26/11/2026 "Chốt như đề xuất"), level 1 then level 2, same 3 cm / 5 degree keep
+    rule. Stats computed once on the joined set (own_train_set).
+  parts:
+    - release_id: tray_s1_bfbdcbcf719e # store tray-s1-jig2-20261122, level 1 full episodes
+      n: 356
+      release:
+        id: tray_s1_bfbdcbcf719e
+        release_hash: bfbdcbcf719e9a7f7363c73694647210b16f86d4d53a289beed2dc7c33f32bda
+        location: rtx3060:~/fwdata/datasets/tray-s1-jig2-20261122/releases/tray_s1_bfbdcbcf719e
+        data_class: public
+      demo_sets:
+        file: configs/runplans/tray/demo_sets-jig-m-tray_s1_bfbdcbcf719e.json
+        file_sha256: bf5287fd85ecf11bfdab10be0d756e53df18cd072968c8aa0a2c488185586a4a
+        salt: DA-34/demo-sets/v1
+        hashes:
+          Q: 012d5120f2a8cd3dc5d0c8e9a07ef94a94cc7e1c4e50edf53976f5dc2c491490
+      set_name: Q
+    - release_id: tray_s1_8631ace9b1b3 # store tray-s1-jig2-20261122, level 2 full episodes
+      n: 142
+      release:
+        id: tray_s1_8631ace9b1b3
+        release_hash: 8631ace9b1b31c2febe93d5fd6a974f0c4d87a853040f94bdcecb66558f0e7b1
+        location: rtx3060:~/fwdata/datasets/tray-s1-jig2-20261122/releases/tray_s1_8631ace9b1b3
+        data_class: public
+      demo_sets:
+        file: configs/runplans/tray/demo_sets-jig-m-tray_s1_8631ace9b1b3.json
+        file_sha256: db6d83db463a84c785efe6928f867fb671721d5688aa9cd1fc49255fac706a2f
+        salt: DA-34/demo-sets/v1
+        hashes:
+          Q: 6bed7561e34f3e17d39e6ccf5862705f0079307875347b6b3802ea253cc74e77
+      set_name: Q
+    - release_id: tray_s1place_a1797e480160 # store tray-s1place-jig2-20261124, place cut of the level 1 jittered parent
+      n: 377
+      release:
+        id: tray_s1place_a1797e480160
+        release_hash: a1797e480160e4fcbc3115de3e63a2b4e429bb6e07f40f059efde5a42e069c64
+        location: rtx3060:~/fwdata/datasets/tray-s1place-jig2-20261124/releases/tray_s1place_a1797e480160
+        data_class: public
+      demo_sets:
+        file: configs/runplans/tray/demo_sets-jig-m-tray_s1place_a1797e480160.json
+        file_sha256: 0ba11dc1faeb8ce2834fdecf10594e1abd83ec3fe745ce8f842b704f6feea276
+        salt: DA-34/demo-sets/v1
+        hashes:
+          Q: 07aa6707bd44a662a5717d0649dd038c2070870bbe76a53d0bcf4d6f3641de6f
+      set_name: Q
+    - release_id: tray_s1place_56e6d006d8d1 # store tray-s1place-jig2-20261124, place cut
+      n: 162
+      release:
+        id: tray_s1place_56e6d006d8d1
+        release_hash: 56e6d006d8d16fc7054a324a909fad3bedf9a5cadc5d21060923bf8be24a1c7c
+        location: rtx3060:~/fwdata/datasets/tray-s1place-jig2-20261124/releases/tray_s1place_56e6d006d8d1
+        data_class: public
+      demo_sets:
+        file: configs/runplans/tray/demo_sets-jig-m-tray_s1place_56e6d006d8d1.json
+        file_sha256: c2d16f02fa0b183c9f6eb0d397857e30f83a4c8b1d82ab33e95d2c614610769e
+        salt: DA-34/demo-sets/v1
+        hashes:
+          Q: d0ce06e8e14723905fdecd137d4746c56b943fe4429b7cf756de3f833eab3459
+      set_name: Q
+    - release_id: tray_s1place_e793fb05a9df # store tray-s1yaw-jig2-20261126, place cut of the level 1 yaw-offset parent
+      n: 227
+      release:
+        id: tray_s1place_e793fb05a9df
+        release_hash: e793fb05a9df503d4522bc411bd9339d1eff1f213aa898bb77b5bd6321b2874f
+        location: rtx3060:~/fwdata/datasets/tray-s1yaw-jig2-20261126/releases/tray_s1place_e793fb05a9df
+        data_class: public
+      demo_sets:
+        file: configs/runplans/tray/demo_sets-jig-n-tray_s1place_e793fb05a9df.json
+        file_sha256: 62d352853adf1652debbc5b18299c1012556cf96aa2e3b9edb30b6e59c4d55ee
+        salt: DA-34/demo-sets/v1
+        hashes:
+          Q: 2433a58de14ed31910b33860d948be8005516ebf3bed4c0048d1139b8aace825
+      set_name: Q
+    - release_id: tray_s1place_6a7b780fb66b # store tray-s1yaw-jig2-20261126, place cut of the level 2 yaw-offset parent
+      n: 327
+      release:
+        id: tray_s1place_6a7b780fb66b
+        release_hash: 6a7b780fb66b1e29ca3ce5a0c33955db9e7090f1ff0b9b30497e07ccf417ab84
+        location: rtx3060:~/fwdata/datasets/tray-s1yaw-jig2-20261126/releases/tray_s1place_6a7b780fb66b
+        data_class: public
+      demo_sets:
+        file: configs/runplans/tray/demo_sets-jig-n-tray_s1place_6a7b780fb66b.json
+        file_sha256: a29e77cfbead6b4ffc5f5231bb51d226b53265a43d3b90179bd3909fce3f44d5
+        salt: DA-34/demo-sets/v1
+        hashes:
+          Q: b252f9b8325ac871df2d4f0380ddb9b5f2c155a443f2181372921d56935ff059
+      set_name: Q
+  episodes: 1591 # 356 + 142 + 377 + 162 + 227 + 327
+  # Measured 27/11/2026 on the generation host: the sum of the kept episodes' lengths in
+  # their source releases (948639 of M's parts, 117217, 164983); the joined dataset's
+  # meta/info.json total_frames must equal it (mixplan.cut_problems).
+  frames: 1230839
+  stats_sha256: 3dae55d7e6d58c262aa38b4c7a6e5f4c201e26e63c2a1e53e25ec05e0f57bb6c # meta/stats_psi0.json of the joined set, task 4.1
+
+recipe:
+  file: configs/models/psi0-stage3.yaml # batch 16, lr 1e-4 cosine, warmup 1000, VLM frozen
+  sha256: 71ba5de8ef22a11432a829e86e93b7e662f5f38f453cca27f73d6fbe777a1dbd # recipe_sha256, no `estimate`
+  overrides:
+    train.validation_steps: 2000 # PO 4/11/2026 (S1-04 4.1), as the DA-34 plans
+    train.max_training_steps: 100000 # one L4; may change until the freeze (then the checkpoints too)
+  nproc_per_node: 1 # one Colab L4 (Hieu 25/11/2026): global batch 16
+  dataset_stats: own_train_set
+train_seeds: [0]
+
+branches:
+  N: {parent: psi0-baseline-egodex-he, role: "run N: the four parts of M and two yaw-offset place cuts joined"}
+
+# Psi0 saves every 10000 steps (checkpointing_steps); the VM keeps the last 5, persist
+# copies every complete one to drive.runs. 100000 is the checkpoint the eval reads.
+checkpoints:
+  primary: 100000
+  reads: [60000, 80000]
+
+interpretation:
+  doc: docs/he/tray-jig.md # section 6, written before the data of N
+  rules_marker: jig-n-rules
+  rules_sha256: 7ba9df310fa24e4e90c14ef8f3c08621a759d5b41aa828f59b68a6c41023992d
+pricebook: "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)"
+
+# Estimate, not measured on this data: from run M's measured train (docs/he/tray-jig.md
+# section 4: same recipe, batch, step count and GPU), 56.15 CU and about 21 h over two
+# sessions, about 4.3 CU of it a VM idle after the end; so about 52 CU and 21 h if one
+# session holds. More episodes change the epochs (about 1.3 instead of 1.7), not the steps.
+# [Đề xuất] cap 70 CU instead of M's 60: M's measured 56.15 CU came within 4 CU of the
+# 60 cap, and a lost VM costs a new setup. With the floor 14 the account must hold at
+# least 84 CU at launch (151.83 after M's eval).
+budget:
+  ceiling_cu: 70
+  cap_cu_per_run: 70
+  runs: [N]
+  watcher: "scripts/colab/cu_watch.py session --gpu L4 --cap 70 --floor 14, under one guard"
+
+schedule:
+  mode: sequential
+  floor_cu: 14
+  persist: "he1_colab.py persist --watch 600 --pid <train pid> --to /content/drive/MyDrive/denso/da50/runs: every complete ckpt_<step> (trainer/colab.py sync_job, no --delete); colab_train restore --branch N brings runs/da50-ft-n-s0 back on a new VM"
+
+drive:
+  cuts: denso/da50/cuts # N.tar and N.tar.json (mixplan pack)
+  runs: denso/da50/runs # runs/<job> copied by persist, read back by colab_train restore
