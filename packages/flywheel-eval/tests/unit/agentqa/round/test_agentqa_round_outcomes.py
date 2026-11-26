@@ -170,7 +170,7 @@ def test_the_fixture_round_without_outcomes_keeps_its_facts_byte_for_byte(
     table = (out / "tables" / "T5-signal_presence.json").read_bytes()
     assert hashlib.sha256(table).hexdigest() == GOLDEN_SIGNALS_TABLE
     calls = calls_of(out)
-    assert (calls[4].tool, calls[4].version) == ("signal_presence", 2)
+    assert (calls[4].tool, calls[4].version) == ("signal_presence", 3)
     assert (calls[12].tool, calls[12].status) == ("relaxed_sweep", "skipped")
     assert facts_of(out)["relaxed_sweep_not_judged"].value == (
         "no entry of kind outcomes in the pack")
@@ -329,3 +329,45 @@ def test_the_mechanism_rules_cite_their_facts(tmp_path: Path) -> None:
     check = next(c for c in load_checks(load_rules()) if c.id == "coverage_distance_check")
     assert ["place_rests_raised", "coverage_gap"] in check.separates
     assert ["place_yaw_miss", "out_of_domain"] in check.separates
+
+
+# --- the tilt_while_carried rule (signal_presence v3) --------------------------------------
+
+
+TILT_CLUSTER = ("C_70", "carry", "L-TRAY-TILT", 1)
+TKEY = "C_70_cluster_carry_L-TRAY-TILT_l1"
+
+
+def carried(value: bool | None) -> dict[str, Any]:
+    facts: dict[str, Any] = {"threshold_tilt_max_deg": 15.0, f"{TKEY}_carried_judged": 4,
+                             f"{TKEY}_both_hands_at_failure": 4,
+                             f"{TKEY}_off_table_at_failure": 4,
+                             f"{TKEY}_carried_at_failure": 4,
+                             f"{TKEY}_tilt_at_failure_median": 15.2,
+                             f"{TKEY}_failure_time_median": 20.0}
+    if value is not None:
+        facts[f"{TKEY}_tilted_while_carried"] = value
+    return facts
+
+
+@pytest.mark.parametrize("facts, expect", [
+    (carried(True), ["tilt_while_carried"]),
+    (carried(False), ["none"]),
+    (carried(None), ["none"]),
+])
+def test_tilt_while_carried(tmp_path: Path, facts: dict[str, Any], expect: list[str]) -> None:
+    hyps = run(tmp_path, facts, [TILT_CLUSTER])["C_70/carry/L-TRAY-TILT/l1"]
+    assert ids(hyps) == expect
+
+
+def test_tilt_while_carried_cites_its_facts(tmp_path: Path) -> None:
+    facts = carried(True)
+    fid = {name: f"F{k}" for k, name in enumerate(facts, start=1)}
+    (top,) = run(tmp_path, facts, [TILT_CLUSTER])["C_70/carry/L-TRAY-TILT/l1"]
+    assert top.support == [fid[f"{TKEY}_{n}"] for n in (
+        "tilted_while_carried", "carried_at_failure", "carried_judged",
+        "both_hands_at_failure", "off_table_at_failure", "tilt_at_failure_median",
+        "failure_time_median")] + [fid["threshold_tilt_max_deg"]]
+    assert (top.diagnosis, top.interventions) == ("weak_skill", ["teleop_correction"])
+    check = next(c for c in load_checks(load_rules()) if c.id == "coverage_distance_check")
+    assert ["tilt_while_carried", "coverage_gap"] in check.separates

@@ -78,6 +78,24 @@ class RelaxedSpec(_Frozen):
         return self
 
 
+class CarrySpec(_Frozen):
+    """How the tray was held when a carrying label was raised (`signal_presence` v3).
+
+    Each `*_signal` is a `signal_measures` entry that `labels.<label>.signals` lists:
+    `tilt_signal` one name in `_deg`; `contact_signal` the hands' contacts, every name a
+    boolean (both hands hold the tray when all are true); `table_signal` one name, the table
+    the tray is on, `off_table` the value that means on no table; `time_signal` one name,
+    the time of the failure in s (the verdict's `failure_t`, or a name in `_s`).
+    """
+
+    label: str
+    tilt_signal: str
+    contact_signal: str
+    table_signal: str
+    off_table: str
+    time_signal: str
+
+
 class Component(_Frozen):
     name: str
     scale: float = Field(gt=0)  # the unit the distance counts this component in
@@ -119,6 +137,7 @@ class TaskView(_Frozen):
     provides: dict[str, list[str]] = Field(default_factory=dict)
     signal_measures: dict[str, SignalMeasures] = Field(default_factory=dict)
     relaxed: RelaxedSpec | None = None
+    carry: CarrySpec | None = None
     coverage: CoverageSpec | None = None
     thresholds: dict[str, Any] = Field(default_factory=dict)  # filled from scorer_config
     source_ref: str = ""
@@ -140,6 +159,8 @@ class TaskView(_Frozen):
             self.relaxed_measures()
             if self.relaxed.rest_signal is not None:
                 self.rest_measures()
+        if self.carry is not None:
+            self.carry_measures()
         return self
 
     def relaxed_measures(self) -> tuple[str, str]:
@@ -184,6 +205,35 @@ class TaskView(_Frozen):
             raise ValueError(f"relaxed.rest_signal {name!r}: one name in _m and one in _quat "
                              f"are needed, got {spec.names}")
         return pos[0], quat[0]
+
+    def carry_measures(self) -> dict[str, tuple[str, list[str]]]:
+        """role (tilt, contact, table, time) -> (where, names) of the `carry` block's signals."""
+        if self.carry is None:
+            raise ValueError(f"{self.task_id} declares no carry block")
+        c = self.carry
+        label = self.labels.get(c.label)
+        if label is None:
+            raise ValueError(f"carry.label {c.label!r} is not a label of {self.task_id}")
+        out: dict[str, tuple[str, list[str]]] = {}
+        for role, name in (("tilt", c.tilt_signal), ("contact", c.contact_signal),
+                           ("table", c.table_signal), ("time", c.time_signal)):
+            spec = self.signal_measures.get(name)
+            if spec is None:
+                raise ValueError(f"carry.{role}_signal {name!r} is not in signal_measures")
+            if name not in label.signals:
+                raise ValueError(f"carry.{role}_signal {name!r} is not a signal of {c.label}")
+            out[role] = (spec.where, list(spec.names))
+        tilt, table, time = out["tilt"][1], out["table"][1], out["time"][1]
+        if len(tilt) != 1 or not tilt[0].endswith("_deg"):
+            raise ValueError(f"carry.tilt_signal {c.tilt_signal!r}: one name in _deg is "
+                             f"needed, got {tilt}")
+        if len(table) != 1:
+            raise ValueError(f"carry.table_signal {c.table_signal!r}: one name is needed, "
+                             f"got {table}")
+        if len(time) != 1 or not (time[0].endswith("_s") or time[0] == "failure_t"):
+            raise ValueError(f"carry.time_signal {c.time_signal!r}: one name in _s (or "
+                             f"failure_t) is needed, got {time}")
+        return out
 
     def index(self, step: str) -> int:
         return self.steps.index(step)

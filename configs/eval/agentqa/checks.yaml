@@ -53,6 +53,8 @@ checks:
       - [place_rests_raised, out_of_domain]
       - [place_yaw_miss, coverage_gap]
       - [place_yaw_miss, out_of_domain]
+      - [tilt_while_carried, coverage_gap]
+      - [tilt_while_carried, out_of_domain]
     needs: "the train and eval conditions of the run in the pack (CPU analysis)"
     cost_key: cpu_analysis
     cost_rank: 1

@@ -132,6 +132,19 @@ relaxed:
   rest_signal: final_tray_pose
   rest_margin_m: 0.01
 
+# How the tray was held when a carrying label was raised (`signal_presence` v3): per failure
+# cluster of `label`, from the K1 outcomes, the tilt, the hands' contacts, the table the
+# tray was on, and the time, each at the failure. Every signal is a `signal_measures` entry
+# the label lists; `off_table` is the value of the table measure that means on no table
+# (the tray export of DA-47 writes "A", "B" or "none").
+carry:
+  label: L-TRAY-TILT
+  tilt_signal: tray_tilt_at_failure        # one name in _deg
+  contact_signal: tray_contact_at_failure  # booleans; all true = both hands hold the tray
+  table_signal: tray_on_table_at_failure   # one name
+  off_table: "none"
+  time_signal: failure_t                   # the verdict's failure time, s
+
 # How `coverage_distance` reads `Condition.vector` (spec 6.8 step 8): d is the mean distance
 # to the k nearest TRAIN conditions of the same level, tau_cov the percentile of the same
 # quantity over the train conditions, leave-one-out. k and the percentile are the round

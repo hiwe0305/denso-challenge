@@ -86,7 +86,7 @@ def test_the_rule_set_and_the_group_order() -> None:
     assert set(rules) == {"scorer_latch_too_strict", "label_signal_missing",
                           "controller_tracking", "weak_skill", "coverage_gap",
                           "out_of_domain", "earlier_stage_train", "near_miss_placement",
-                          "place_rests_raised", "place_yaw_miss"}
+                          "place_rests_raised", "place_yaw_miss", "tilt_while_carried"}
     assert {k: (r.group, r.diagnosis, r.system) for k, r in rules.items()
             if k not in ("scorer_latch_too_strict", "label_signal_missing")} == {
         "controller_tracking": ("runtime", "controller", True),
@@ -96,7 +96,8 @@ def test_the_rule_set_and_the_group_order() -> None:
         "earlier_stage_train": ("train", "unknown", True),
         "near_miss_placement": ("data", "weak_skill", False),
         "place_rests_raised": ("data", "weak_skill", False),
-        "place_yaw_miss": ("data", "weak_skill", False)}
+        "place_yaw_miss": ("data", "weak_skill", False),
+        "tilt_while_carried": ("data", "weak_skill", False)}
     assert rules["coverage_gap"].interventions == ["sim_s1", "sim_s2", "sim_s3", "sim_s4"]
     from flywheel.eval.agentqa.round.hypotheses import GROUPS
     assert GROUPS == ("scorer", "runtime", "train", "data", "coverage")

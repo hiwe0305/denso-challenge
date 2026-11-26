@@ -18,6 +18,12 @@ failed (every run when it failed nowhere): judgeable only when it is judgeable i
 A run whose own answer differs gets the same two names with its scores file as source,
 which the hypothesis rules prefer for that run's clusters. Without an `outcomes` entry in
 the pack the tool reads `provides` only, as version 1 did.
+
+Version 3: with K1 outcomes, for the label of the task view's `carry` block (when it is one
+of the labels asked), the values of its signals per failure cluster: how the tray was held
+when the label was raised (`tools/carry.py`, which documents the facts). Whether a failure
+is real or a scorer artefact is what the values of a label's signals tell, so they are
+read where their presence is. Without outcomes nothing changes.
 """
 
 from __future__ import annotations
@@ -27,6 +33,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from flywheel.contracts.outcome import RolloutOutcome
 from flywheel.eval.agentqa.facts import FactBook
 from flywheel.eval.agentqa.tools.base import Row, RunOutcomes, RunScores, ToolResult
+from flywheel.eval.agentqa.tools.carry import carry_at_failure
 from flywheel.eval.agentqa.tools.task import SignalMeasures, TaskView
 
 TOOL = "signal_presence"
@@ -105,7 +112,8 @@ def signal_presence(book: FactBook, task: TaskView, kinds: Iterable[str],
         facts.append(book.add(f"{TOOL}_kinds_not_judged", reason, ref))
         reasons.append(reason)
     rows: list[Row] = []
-    for label in labels if labels is not None else sorted(task.labels):
+    asked = list(labels) if labels is not None else sorted(task.labels)
+    for label in asked:
         spec = task.labels.get(label)
         if spec is None:
             reason = f"label {label} is not in the task view of {task.task_id}"
@@ -150,4 +158,8 @@ def signal_presence(book: FactBook, task: TaskView, kinds: Iterable[str],
                               ref))
         rows.append({"check": f"latch {step}", "judgeable": not missing,
                      "missing": ", ".join(missing)})
+    if with_outcomes:
+        carry = carry_at_failure(book, task, asked, runs, outcomes or {})
+        facts += carry.facts
+        reasons += carry.not_judged
     return ToolResult(TOOL, tuple(facts), tuple(rows), tuple(reasons))
