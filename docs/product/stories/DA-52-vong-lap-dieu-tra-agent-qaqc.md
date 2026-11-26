@@ -49,6 +49,8 @@ Giao thức là JSON qua cổng model sẵn có, không dùng API gọi công c�
 | `measure_compare` | cụm; một số đo dạng số có trong outcome (tên, thành phần nếu là vectơ; góc nghiêng suy từ quaternion do code tính); nhóm đối chiếu: lượt thành công của run, hoặc một cụm khác | trung vị của cụm và của nhóm đối chiếu; số lượt của cụm nằm ngoài khoảng phân vị 5–95 của nhóm đối chiếu; nếu số đo có ngưỡng trong cấu hình bộ chấm thì số lượt vượt ngưỡng; một cờ "tách biệt" do code tính |
 | `measure_tally` | cụm; một số đo dạng cờ hoặc chuỗi (ví dụ tay chạm khay, khay ở bàn nào) | số lượt theo từng giá trị, trong cụm và trong nhóm đối chiếu |
 
+Bổ sung 27/11/2026 (review của phiên điều phối): khi gói có artifact điều kiện (`Condition`, thứ `coverage_distance` đã đọc), hai công cụ nhận cả tham số điều kiện của lượt (ví dụ khoảng cách hai bàn, vị trí đứng ban đầu, khối lượng linh kiện) như một số đo, cùng luật miền đóng. Câu hỏi "tham số nào của mức 2 gây lỗi" chưa ai có đáp án, nên đây là phần mù của phép thử trên run M. Gói run M chưa có artifact điều kiện; xem ghi chú.
+
 Model không bao giờ truyền con số: ngưỡng lấy từ dữ liệu (phân vị của lượt thành công) hoặc từ cấu hình bộ chấm. Hai phân vị 5 và 95 là **giả định**, ghi trong cấu hình.
 
 ### Các chốt giữ nguyên
@@ -112,7 +114,7 @@ Theo 07 mục 3.1. File story luôn được sửa.
 
 - `packages/flywheel-eval/src/flywheel/eval/agentqa/round/` (bước mới `investigate.py`; `pipeline.py`, `records.py`, `hypotheses.py`, `verify.py`, `assemble.py`, `render.py` chỉ ở chỗ nối bước mới)
 - `packages/flywheel-eval/src/flywheel/eval/agentqa/tools/` (hai công cụ mới, `registry.py`)
-- `packages/flywheel-eval/src/flywheel/eval/agentqa/cli.py` (chỉ cờ `--investigate`)
+- `packages/flywheel-eval/src/flywheel/eval/agentqa/cli.py` (chỉ cờ `--investigate` và `--disable-rule`)
 - `configs/eval/agentqa/` (`roles.yaml`, `agent.yaml`, `prompts/investigate.md`, `tasks/tray.yaml`)
 - `packages/flywheel-eval/tests/unit/agentqa/round/`, `packages/flywheel-eval/tests/unit/agentqa/tools/`
 - `docs/g0/agent-qa.md` (chỉ thêm mục kết quả)
@@ -126,6 +128,10 @@ Theo 07 mục 3.1. File story luôn được sửa.
 - Lỗi đã thấy ở run M: model đọc sai nghĩa một tên fact và câu đó qua được phép kiểm vì không mang số. Vì vậy mỗi fact đưa cho model phải kèm một dòng nghĩa do công cụ viết, và báo cáo phép thử phải đếm các câu đọc sai.
 - Kết quả thi lại của `C70_R1` không trình bày (Hiếu, 16/11/2026): không dùng gói chứa kết quả này.
 - Lời gọi model hosted chỉ chạy khi Hiếu đồng ý; khóa API đọc từ biến môi trường, không ghi vào file hay log.
+- Trần 1 USD cho 400 000 token vào là ước lượng và có thể thấp với `claude-opus-5-5`: đo ở lần chạy đầu trên run M, báo Hiếu số thật trước khi lặp ba lần.
+- Hai việc ngoài phạm vi file hiện nay, **chờ Hiếu quyết** (27/11/2026), chưa làm:
+  - `packages/flywheel-psi0/src/flywheel_psi0/tray/export_conditions.py` chưa xử lý cảnh đồ gá, nên chưa xuất được `Condition` cho run M (tập eval ở `fwdata/tray/eval-sets/jig-m-rp_a410d01efa62`).
+  - `agentqa/mcp/bridge.py` của DA-49 giữ mô tả và schema theo miền tham số; hai công cụ mới có miền mới nên cần thêm vài dòng ở đó.
 - Số chưa đo ghi là ước lượng.
 
 ## Kiểm thử
