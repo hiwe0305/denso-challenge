@@ -49,7 +49,7 @@ _FACT_NUMBER = re.compile(r"^F([0-9]+)$")
 
 COMPARISON_MARKERS = ("_above_tau", "_exceeds_tau", "_separates_", "_in_domain", "_near_miss",
                       "_within_", "_matches_", "_judgeable", "_largest_drop",
-                      "_over_tolerance", "_raised")
+                      "_over_tolerance", "_raised", "_outside_", "_beyond_")
 
 
 def is_comparison_fact(name: str, value: object, markers: tuple[str, ...]) -> bool:

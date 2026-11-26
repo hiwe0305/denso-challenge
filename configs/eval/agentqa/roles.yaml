@@ -20,3 +20,5 @@ rank:
     - _largest_drop
     - _over_tolerance   # relaxed_sweep v2: members above the yaw tolerance
     - _raised           # relaxed_sweep v2: members above the rest height plus the margin
+    - _outside_         # measure_compare (DA-52): members outside the reference's bounds
+    - _beyond_          # measure_compare (DA-52): rollouts beyond a scorer threshold
