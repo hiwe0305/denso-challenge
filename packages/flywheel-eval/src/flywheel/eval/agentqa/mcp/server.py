@@ -13,7 +13,14 @@ pinned to revision 2025-11-25, the last one that has `initialize` and `ping`:
 
 Stdout carries protocol messages and nothing else; the server never prints. A message
 without `id` is a notification and gets no answer, whatever it says. Parameters outside
-their closed domain are a tool execution error (`isError: true`) and run nothing.
+their closed domain are a tool execution error (`isError: true`) and run nothing; so is a
+tool that raises (the tools page, Error Handling: such errors go in the result so the
+model can correct its call), while -32603 is kept for a failure outside a tool.
+
+Every line written, to stdout and to the call log, is pure ASCII (`ensure_ascii`): a lone
+surrogate a client sent (`"\\ud800"`) is echoed escaped and can never fail an encoder.
+Input is read as bytes and decoded line by line, so a line that is not UTF-8 is a parse
+error (-32700) and the lines around it are served as usual.
 
 The server only opens a pack that `admit` confirms `public`, with the same check the
 model gateway applies before a hosted model (`hosted_refusal`): the server cannot know
@@ -24,13 +31,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, TextIO
+from typing import IO, Any, TextIO
 
 import yaml
 from flywheel.eval.agentqa.mcp.bridge import CallOutcome, ToolSession, UnknownTool
@@ -60,6 +68,7 @@ INVALID_PARAMS = -32602
 INTERNAL_ERROR = -32603
 
 Id = str | int | None
+BOM = "\ufeff"
 
 
 class PackNotPublic(ValueError):
@@ -114,7 +123,7 @@ class McpServer:
 
     @staticmethod
     def _line(message: dict[str, Any]) -> str:
-        text = json.dumps(message, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+        text = json.dumps(message, ensure_ascii=True, separators=(",", ":"), allow_nan=False)
         if "\n" in text:  # json.dumps escapes newlines in strings; this cannot happen
             raise ValueError("a message would hold a newline")
         return text
@@ -123,13 +132,23 @@ class McpServer:
         return self._line({"jsonrpc": "2.0", "id": id_,
                            "error": {"code": code, "message": message}})
 
-    def handle_line(self, line: str) -> str | None:
-        """One input line -> one output line (no trailing newline), or None. Never raises."""
-        if not line.strip():
+    def handle_line(self, line: str | bytes) -> str | None:
+        """One input line -> one output line (no trailing newline), or None. Never raises.
+
+        `line` may be the raw bytes of the stream: they are decoded as strict UTF-8 here,
+        so a line that is not UTF-8 is answered with a parse error like any other garbage.
+        A byte order mark before the message is skipped; a trailing CR LF is whitespace.
+        """
+        try:
+            text = line.decode("utf-8") if isinstance(line, bytes) else line
+        except UnicodeDecodeError:
+            return self._error(None, PARSE_ERROR, "Parse error")
+        text = text.removeprefix(BOM)
+        if not text.strip():
             return None
         try:
-            message = json.loads(line, parse_constant=_reject_constant)
-        except ValueError:  # JSONDecodeError, a NaN or Infinity token, bad UTF-8
+            message = json.loads(text, parse_constant=_reject_constant)
+        except ValueError:  # JSONDecodeError, a NaN or Infinity token
             return self._error(None, PARSE_ERROR, "Parse error")
         if not isinstance(message, dict):  # an array is a batch: not in this revision
             return self._error(None, INVALID_REQUEST, "Invalid Request")
@@ -155,8 +174,8 @@ class McpServer:
         except Exception as error:  # noqa: BLE001  (the server answers and goes on)
             return self._error(id_, INTERNAL_ERROR, f"Internal error: {type(error).__name__}")
 
-    def serve(self, lines: Iterable[str], out: TextIO) -> None:
-        """Answer every line until EOF; a closed reader ends the loop quietly."""
+    def serve(self, lines: Iterable[str] | Iterable[bytes], out: TextIO) -> bool:
+        """Answer every line until EOF; False when the reader closed `out` (loop ended)."""
         for line in lines:
             reply = self.handle_line(line)
             if reply is None:
@@ -165,7 +184,8 @@ class McpServer:
                 out.write(reply + "\n")
                 out.flush()
             except BrokenPipeError:
-                return
+                return False
+        return True
 
     # -- methods ---------------------------------------------------------------------
 
@@ -206,11 +226,16 @@ class McpServer:
             outcome = self._session.call(name, arguments)
         except UnknownTool:
             raise _Reply(INVALID_PARAMS, f"Unknown tool: {name}") from None
-        except Exception as error:  # noqa: BLE001  (a tool that raises is a programming error)
+        except Exception as error:  # noqa: BLE001  (the server answers and goes on)
+            # A tool execution error, not a protocol error: the 2025-11-25 tools page (Error
+            # Handling, server/tools) puts those in the result with isError so the model can
+            # correct its call, and a tool can raise for a combination of parameters the
+            # model may change (`FactClash`). Only the type is said: no message, no path.
             self._record(name, arguments, "failed", (), start,
                          f"{type(error).__name__}: {_first_line(error)}")
-            raise _Reply(INTERNAL_ERROR,
-                         f"Internal error: tool {name} failed: {type(error).__name__}") from None
+            return {"content": [{"type": "text",
+                                 "text": f"tool {name} failed: {type(error).__name__}"}],
+                    "isError": True}
         self._record(name, arguments, outcome.status, outcome.fact_ids, start)
         return self._result(outcome)
 
@@ -218,7 +243,7 @@ class McpServer:
     def _result(outcome: CallOutcome) -> dict[str, Any]:
         payload = outcome.payload()
         text = ("\n".join(outcome.problems) if outcome.is_error else
-                json.dumps(payload, ensure_ascii=False, allow_nan=False))
+                json.dumps(payload, ensure_ascii=True, allow_nan=False))
         return {"content": [{"type": "text", "text": text}], "structuredContent": payload,
                 "isError": outcome.is_error}
 
@@ -281,10 +306,23 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _writer(stream: TextIO) -> CallLog:
     def write(record: dict[str, Any]) -> None:
-        stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+        stream.write(json.dumps(record, ensure_ascii=True) + "\n")
         stream.flush()
 
     return write
+
+
+def _drop_stdout() -> None:
+    """The reader closed stdout: point it at devnull so the exit flush cannot fail.
+
+    Without this, the reply still buffered makes the interpreter's final flush raise and
+    exit 120 (the idiom of the Python docs, signal module, "Note on SIGPIPE").
+    """
+    try:
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+    except (OSError, ValueError):  # no real file descriptor (an in-process runner)
+        pass
 
 
 def run(pack: Path, log: Path | None = None) -> int:
@@ -293,9 +331,10 @@ def run(pack: Path, log: Path | None = None) -> int:
     Shared by `python -m flywheel.eval.agentqa.mcp` and `fw agentqa mcp`. The log (the
     started record, then one record per tool call) goes to `log`, appended, or to stderr.
     """
-    for stream in (sys.stdin, sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8")
+    if hasattr(sys.stdout, "reconfigure"):  # replies are ASCII; UTF-8 is the transport's
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):  # an `error:` line may hold any path: never fail
+        sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
     try:
         opened = open_public_session(pack)
     except (PackRefused, PackNotPublic, PlanRefused, OSError) as error:
@@ -307,7 +346,10 @@ def run(pack: Path, log: Path | None = None) -> int:
     try:
         write = _writer(sys.stderr if log_file is None else log_file)
         write(started_record(opened))
-        McpServer(opened.session, log=write).serve(sys.stdin, sys.stdout)
+        # bytes, decoded line by line in handle_line: a line that is not UTF-8 is -32700
+        lines: IO[bytes] | TextIO = getattr(sys.stdin, "buffer", sys.stdin)
+        if not McpServer(opened.session, log=write).serve(lines, sys.stdout):
+            _drop_stdout()
     finally:
         if log_file is not None:
             log_file.close()
