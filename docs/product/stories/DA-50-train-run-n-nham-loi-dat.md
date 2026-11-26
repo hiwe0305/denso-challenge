@@ -109,7 +109,18 @@ Theo 07 mục 3.1. File story luôn được sửa.
 - `packages/flywheel-psi0/tests/tray/`
 - `scripts/g0/tray/` (chỉ script đo của nhiệm vụ 1)
 - `packages/flywheel-simple/src/flywheel_simple/tray/planner.py` và test của nó (chỉ thêm trục xoay vào độ lệch CARRY, nếu Hiếu chọn dữ liệu lệch góc)
-- `packages/flywheel-simple/src/flywheel_simple/tray/agent.py`, `generate.py`, `cut.py`, `scripts/g0/tray/generate.py` và test của chúng (chỉ đưa `carry_yaw` từ seed tới planner, nhật ký sinh và bản cắt; thêm 26/11/2026, cần Hiếu duyệt trong PR)
+- `packages/flywheel-simple/src/flywheel_simple/tray/agent.py`
+- `packages/flywheel-simple/src/flywheel_simple/tray/generate.py`
+- `packages/flywheel-simple/src/flywheel_simple/tray/cut.py`
+- `scripts/g0/tray/generate.py`
+- `packages/flywheel-simple/tests/tray/test_planner.py`
+- `packages/flywheel-simple/tests/tray/test_agent.py`
+- `packages/flywheel-simple/tests/tray/test_generate.py`
+- `packages/flywheel-simple/tests/tray/test_cut.py`
+- `packages/flywheel-simple/tests/tray/test_recorder_meta.py`
+
+Chín dòng trên (từ `agent.py`) thêm ngày 26/11/2026, **cần Hiếu duyệt trong PR**: chỉ đưa `carry_yaw` từ seed tới planner, nhật ký sinh và bản cắt, cùng test của chúng.
+
 - `configs/runplans/tray/` (chỉ file mới của run N)
 - `docs/g0/ledger/DA-50.csv`
 - `docs/he/tray-jig.md` (mục 6 trở đi; không sửa khối `jig-m-rules` và, sau khi đóng băng, khối `jig-n-rules`)
@@ -143,3 +154,4 @@ Hiếu (làm cùng Claude), duyệt cuối: Hiếu.
 | 26/11/2026 | Nhiệm vụ 2: ghi quyết định của Hiếu về thành phần dữ liệu; thêm bốn file vào Phạm vi file cho trục xoay của độ lệch CARRY; lô mẫu laptop ở place-data.md mục 8 | Hiếu (soạn với Claude) |
 | 27/11/2026 | 6.1 xong: hiệu ghép cặp trên mọi lượt và `--bootstrap-seed` trong `eval_results` | Hiếu (soạn với Claude) |
 | 27/11/2026 | Thêm và làm xong 6.4 (hai điểm review sau merge của PR 228); chờ Hiếu xác nhận việc này thuộc DA-50 | Hiếu (soạn với Claude) |
+| 27/11/2026 | 3.1, 3.2, 4.1, 4.2 xong: lô lệch góc (554 đoạn đặt giữ lại), tập N và plan `rp_23b25206d96e`; Phạm vi file ghi từng đường dẫn để `pr_guard` đọc được | Hiếu (soạn với Claude) |
