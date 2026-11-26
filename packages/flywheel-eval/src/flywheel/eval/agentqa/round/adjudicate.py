@@ -16,7 +16,9 @@ sources, and of which subject (`run.subjects` builds them, in its order):
                      else the entry's directory) are put beside it under the file names
                      DA-08 reads, and only those: no file the pack did not admit is read
     rtc_log          one `inference` subject per entry
-    qa_reports, dataset_report, episodes, replay_reports   one `dataset` subject
+    qa_reports, dataset_report, episodes, episode_index, replay_reports
+                     one `dataset` subject (when qa_reports or dataset_report is there);
+                     episode_index names its episodes `episode_000012`, as in version 3
     probe_p1, probe_p3   one `stage1` or `stage3` subject each
 
 `scores` and `clusters` (version 3's `eval` subject) are left out: the round's own steps
@@ -66,6 +68,7 @@ from flywheel.eval.diagnosis.train.artifact import (
     PROBE_P4_NAME,
     PROBE_P4_PARENT_NAME,
 )
+from pydantic import RootModel
 
 ROLE = "adjudicate"
 REPORTS_FILE = "reports.jsonl"
@@ -79,7 +82,8 @@ HOSTED_TEMPERATURE = 1.0
 V3_KIND: dict[str, str] = {
     "metrics": "metrics", "rtc_log": "rtc_log", "qa_reports": "qa_reports",
     "dataset_report": "dataset_report", "episodes": "episodes",
-    "replay_reports": "replay_reports", "probe_p1": "probe", "probe_p3": "probe",
+    "replay_reports": "replay_reports", "episode_index": "episode_index",
+    "probe_p1": "probe", "probe_p3": "probe",
 }
 # pack kind -> the file name DA-08's `load_job` looks for beside metrics.jsonl
 TRAIN_COMPANIONS: dict[str, str] = {
@@ -202,7 +206,9 @@ def _loaded(root: Path, staging: Path, entries: Sequence[PackEntry],
             _stage(root, entry, path)
             for c in companions.get(_job_key(entry), []):
                 _stage(root, c, job_dir / TRAIN_COMPANIONS[c.kind])
-        records = tuple(admitted.records[entry.ref])  # checks the sha256 the pack records
+        # checks the sha256 the pack records; a root model is handed on as its value
+        records = tuple(r.root if isinstance(r, RootModel) else r
+                        for r in admitted.records[entry.ref])
         out.append(Loaded(path, entry.ref, V3_KIND[entry.kind], entry.sha256, records))
     return sorted(out, key=lambda x: x.ref)
 

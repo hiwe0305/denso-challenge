@@ -8,13 +8,14 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from datetime import datetime, timezone
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
 from flywheel.contracts.agentqa import AgentReport
-from flywheel.contracts.artifacts import RTCInferenceRecord
+from flywheel.contracts.artifacts import Episode, QACheck, QAReport, RTCInferenceRecord
 from flywheel.contracts.entities import Source
 from flywheel.contracts.training import TrainingMetric
 from flywheel.eval.agentqa.agent import load_agent_config
@@ -25,6 +26,7 @@ from flywheel.eval.agentqa.round.adjudicate import (
     REPORTS_FILE,
     CodeFloorModel,
 )
+from flywheel.eval.agentqa.round.admit import admit
 from flywheel.eval.agentqa.round.declare import declare_jobs, main, write_declaration
 from flywheel.eval.agentqa.round.gateway import MODEL_CALLS_FILE
 from flywheel.eval.agentqa.round.gateway_config import CONFIG_ROOT, GatewayRefused, Profile
@@ -67,6 +69,34 @@ def logs(root: Path) -> Path:
     _rtc(root / "rtc" / "job-slow", latency=0.3)
     (root / "meta").mkdir()
     (root / "meta" / "benchmark_copy.json").write_text('{"benchmark_copy_id": "bench-x"}')
+    return root
+
+
+def qa_work(root: Path, n: int, reasons: dict[int, list[str]]) -> Path:
+    """A `fw data qa` work dir of `n` episodes; `reasons` maps an index to its QA reasons.
+
+    Episodes 3 and 4 carry the same check values, so version 3 raises its duplicate hint.
+    """
+    text = (files("flywheel.testkit") / "fixtures/artifacts/Episode.json").read_text()
+    base = Episode.model_validate_json(text)
+    episodes, index, rows = [], {}, []
+    for i in range(n):
+        eid = f"ep_{i:016x}"
+        episodes.append(base.model_copy(update={"episode_id": eid}))
+        index[eid] = i + 10  # an index that is not the line number
+        why = reasons.get(i, [])
+        value = 0.25 if i in (3, 4) else 0.001 * (i + 1)
+        checks = [QACheck(name="finite_values", value=1.0 if why else 0.0, threshold=0.0,
+                          passed=not why),
+                  QACheck(name="action_jump", value=value, threshold=0.5, passed=True),
+                  QACheck(name="timestamp_step", value=value / 2, threshold=1.0, passed=True)]
+        rows.append(QAReport(report_id=f"qa_{i}", episode_id=eid, threshold_version="v1",
+                             decision="reject" if why else "pass", reasons=why, checks=checks))
+    _lines(root / "episodes.jsonl", episodes)
+    (root / "episode_index.json").write_text(json.dumps(index))
+    _lines(root / "qa" / "reports.jsonl", rows)
+    (root / "qa" / "summary.json").write_text("{}")
+    (root / "source.json").write_text("{}")
     return root
 
 
@@ -152,6 +182,46 @@ def test_the_declaration_lists_each_job_file_with_its_kind_and_job(tmp_path: Pat
         declare_jobs(tmp_path, "tray", "test", "public")
 
 
+def test_a_qa_work_dir_is_declared_alone_or_beside_jobs(tmp_path: Path) -> None:
+    root = qa_work(tmp_path / "work", 3, {})
+    (root / "report").mkdir()
+    (root / "report" / "dataset_report.json").write_text("{}")
+    (root / "replay_kinematic.jsonl").write_text("")
+    (root / "replay_outcomes.jsonl").write_text("")  # DA-17 outcome rows, no ReplayReport
+    got = [(e["path"], e["kind"], e["subject"])
+           for e in declare_jobs(root, "tray", "test", "public")["entries"]]
+    assert got == [("qa/reports.jsonl", "qa_reports", {}), ("episodes.jsonl", "episodes", {}),
+                   ("episode_index.json", "episode_index", {}),
+                   ("report/dataset_report.json", "dataset_report", {}),
+                   ("replay_kinematic.jsonl", "replay_reports", {})]
+    _train(root / "train" / "job-ok")
+    paths = [e["path"] for e in declare_jobs(root, "tray", "test", "public")["entries"]]
+    assert paths[0] == "train/job-ok/metrics.jsonl" and len(paths) == 6
+
+
+# the episode index -----------------------------------------------------------------------
+
+@pytest.mark.parametrize(("text", "accepted"), [
+    ('{"ep_a": 0, "ep_b": 12}', True), ("{}", True), ('[0, 1]', False),
+    ('{"ep_a": "3"}', False), ('{"ep_a": 1.5}', False), ('{"ep_a": true}', False),
+    ("not json", False)])
+def test_admit_reads_an_episode_index_as_ids_to_ints(tmp_path: Path, text: str,
+                                                     accepted: bool) -> None:
+    root = tmp_path / "work"
+    root.mkdir()
+    (root / "episode_index.json").write_text(text)
+    _lines(root / "episodes.jsonl", [Episode.model_validate_json(
+        (files("flywheel.testkit") / "fixtures/artifacts/Episode.json").read_text())])
+    decl = write_declaration(root, "tray", "test", "public")
+    got = admit(write_pack(build_pack(decl, now=NOW), root))
+    assert ("episode_index.json" in got.admission.accepted) is accepted
+    if accepted:
+        assert got.records["episode_index.json"][0].root == json.loads(text)
+    else:
+        reason = next(r.reason for r in got.admission.rejected)
+        assert reason.startswith("does not parse as episode_index")
+
+
 # the code floor --------------------------------------------------------------------------
 
 def test_a_no_model_round_writes_the_reports_version_3_writes(tmp_path: Path) -> None:
@@ -175,6 +245,30 @@ def test_a_no_model_round_writes_the_reports_version_3_writes(tmp_path: Path) ->
     assert new[0].subject_ref == "train/job-nan/metrics.jsonl"  # the pack ref
     assert (out / DROPPED_FILE).read_text() == "" and list((out / "figures").glob("*.svg"))
     assert not (out / MODEL_CALLS_FILE).exists()
+
+
+def test_a_dataset_subject_gets_the_findings_version_3_gives(tmp_path: Path) -> None:
+    root = qa_work(tmp_path / "work", 6, {2: ["finite_values (D1): NaN in action"],
+                                          5: ["min_frames: too short"]})
+    write_declaration(root, "tray", "test", "public")
+    pack = write_pack(build_pack(root / "round.yaml", now=NOW), root)
+    out = tmp_path / "out"
+    record = run_round(pack, out, now=NOW, store=tmp_path / "store")
+    step = next(s for s in record.steps if s.name == "adjudicate")
+    assert step.status == "ok" and step.rows == 1
+    new = reports(out / REPORTS_FILE)
+    old = run([root], tmp_path / "v3", CodeFloorModel(), load_agent_config(),
+              store=tmp_path / "store", now=NOW).reports
+    assert findings(new) == findings(old)
+    assert ("episode_000012", "D1") in {(f.target_ref, f.code) for f in new[0].findings}
+    (a,), (b,) = new, old
+    assert (a.stage, a.status, a.problems) == ("dataset", b.status, [])
+    assert a.subject_ref == "qa/reports.jsonl"
+    assert sorted((i.kind, i.sha256) for i in a.inputs) == sorted(
+        (i.kind, i.sha256) for i in b.inputs)
+    assert {i.kind for i in a.inputs} == {"qa_reports", "episodes", "episode_index"}
+    assert [(f.name, f.value) for f in a.facts] == [(f.name, f.value) for f in b.facts]
+    assert any("same_qa_fingerprint:episode_000013+episode_000014" in f.name for f in a.facts)
 
 
 def test_a_train_job_is_judged_on_the_admitted_files_only(tmp_path: Path) -> None:
