@@ -550,5 +550,20 @@ Kết quả lớp code (`--no-model`), chấm bằng DA-31 (`da31-3`, hash kết
 - Precision trên bản cấy: 18 trúng, 4 phát hiện D3 là lỗi có sẵn của psi-data (episode 35, 68, 80, 84; bốn `flag` đã ghi ở [data-pipeline.md](data-pipeline.md)), không phát hiện sai nào khác.
 - Bản sạch: 4/99, chính là bốn episode trên. Đây là cận trên theo định nghĩa của DA-31.
 - 15 lỗi sót là giới hạn của QA tầng 4, không phải của agent: lớp code của agent chỉ diễn giải fact của QA. Riêng `duplicate_episode` có hint "cùng dấu vân tay QA" (bản 3), nhưng hint chỉ thành phát hiện khi model giữ nó; `--no-model` bỏ mọi hint. Đây là chỗ đầu tiên model có thể thêm so với code.
-- Chưa đo: có model. Gói dataset chưa có bản ghi `Source` trong khai báo nên cổng chặn đường hosted; `source.json` của `fw data ingest` (lớp `public`) có sẵn trong thư mục làm việc nhưng `round.declare` chưa khai báo nó.
+- Lần chạy có model ở bảng dưới. Gói dataset cần bản ghi `Source` trong khai báo thì cổng mới mở đường hosted; `round.declare` chưa tự viết bản ghi này, lần này viết tay (lớp `public`, psi-data công bố, Hiếu cho chạy 26/11/2026).
 - Hai lượt chạy mang trạng thái `degraded` như gói log (không có điểm số, trace).
+
+**Có model (`claude-opus-5-5` qua ckey, vai `adjudicate`), 26/11/2026.** Hash kết quả `3e7f31d0…ef91c870`. 5 lời gọi (1 cho bản sạch, 4 cho bản cấy), đều `ok`, không gửi lại; 21 và 147 giây.
+
+| Đại lượng | Lớp code | Có Opus 5.5 |
+|---|---|---|
+| Recall | 18/33 | **21/33** |
+| `duplicate_episode` | 0/3 | 3/3 (`agent_adds` 3) |
+| Precision D5 trên bản cấy | 3/3 | 6/8 |
+| Precision D1, D2, D3 | 3/3, 3/3, 9/9 | không đổi |
+| Bản sạch | 4/99 | 4/99 |
+| Ứng viên của code bị model bỏ | | 0 |
+
+- Đây là lần đầu trên cả hai nửa của bộ lỗi cấy model bắt thêm được lỗi mà lớp code không bắt: nó giữ hint "cùng dấu vân tay QA" thành phát hiện D5 cho cả ba episode trùng.
+- Cái giá là hai phát hiện D5 sai, ở `episode_000072` và `episode_000090`. Cả hai là episode đã bị cấy NaN (D1 trúng), nên nhiều khả năng chúng có cùng dấu vân tay QA vì cùng hỏng một kiểu chứ không trùng nhau; chưa mở báo cáo để xác nhận lý do model nêu.
+- Một lần chạy, một model, 33 lỗi cấy: chưa đo độ ổn định giữa các lần chạy. Cổng ckey là bên bán lại, không xác minh được model đứng sau tên.
