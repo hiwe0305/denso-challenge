@@ -62,7 +62,7 @@ Tên số đo K1 đề xuất (hợp đồng yêu cầu hậu tố đơn vị):
 - [x] 4. `export_outcomes` xuất tín hiệu của DA-42 và `repeat` (AC 4)
 - [x] 5. Tập điều kiện `jig2` (AC 5)
 - [ ] 6. Thử trên laptop và runbook (AC 6, 7)
-  - [ ] 6.1 Cổng phát lại trên `jig2`, xuất K1, ghi kết quả
+  - [x] 6.1 Cổng phát lại trên `jig2`, xuất K1, ghi kết quả
   - [ ] 6.2 Runbook eval checkpoint trên `jig2`
 - [x] 8. Sửa theo review PR 221: Wilson mô tả dùng n_eff = số điều kiện; `missing` ghi lượt; `--stage1` chỉ kiểm lượt 0; báo khi thư mục có nhiều lượt hơn số đọc; `evidence` từ chối lô có `.rN`
 - [ ] 7. Kiểm tra đủ, `pr_guard`, mở PR (AC 8)
