@@ -87,9 +87,9 @@ Luật đọc: khối `jig-n-rules` ở [tray-jig.md](../../he/tray-jig.md) mụ
   - [ ] 1.1 Độ lệch vị trí và góc lúc bắt đầu hạ khay, theo từng phần
   - [ ] 1.2 Đỉnh nghiêng của khay khi mang, theo từng phần
 - [x] 2. Hiếu chốt thành phần dữ liệu của run N từ số đo của nhiệm vụ 1. **[Đã chốt]** (Hiếu, 26/11/2026, "Chốt như đề xuất"): (1) thêm lệch góc ở bước CARRY của planner, sinh episode đầy đủ rồi cắt đoạn đặt; (2) lô mới nghiêng về mức 2, khoảng 60 %; (3) không thêm lệch ngang cùng loại. Cổng dừng: planner dưới khoảng 85 % khi tới lệch góc thì giảm biên độ, vẫn không được thì bỏ mục 1 và báo Hiếu
-- [ ] 3. Sinh dữ liệu thêm trên `rtx3060` (Hiếu chạy hoặc cho phép; tối đa 14 worker)
-  - [ ] 3.1 Lô mẫu nhỏ, xem trước khi sinh cả lô
-  - [ ] 3.2 Sinh cả lô, lọc theo ngưỡng đặt ≤ 3 cm và ≤ 5° như run M
+- [x] 3. Sinh dữ liệu thêm trên `rtx3060` (Hiếu chạy hoặc cho phép; tối đa 14 worker)
+  - [x] 3.1 Lô mẫu nhỏ, xem trước khi sinh cả lô. Bằng chứng: place-data.md mục 8 (commit `713dd05a`); Hiếu xem mẫu và cho sinh cả lô ngày 26/11/2026
+  - [x] 3.2 Sinh cả lô, lọc theo ngưỡng đặt ≤ 3 cm và ≤ 5° như run M. Bằng chứng: [place-data.md mục 9](../../g0/tray/place-data.md#9-lô-lệch-góc-trên-rtx3060-da-50-nhiệm-vụ-32-thực-đo-2627112026): 700 lượt, 649 ghi, 608 trong `ALL`, giữ 554 (91,1 %), mức 2 chiếm 59,0 %
 - [ ] 4. Plan của run N
   - [ ] 4.1 Dựng tập ghép, kiểm seed (tiêu chí 3)
   - [ ] 4.2 Viết và đóng băng `he-tray-jig-n.yaml`; dòng ledger ước tính
