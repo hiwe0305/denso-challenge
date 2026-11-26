@@ -54,11 +54,17 @@ Dữ liệu thêm, theo thứ tự ưu tiên, **đã sửa theo số đo trên**
 
 | Ưu tiên | Dữ liệu | Lý do | Điều chưa chắc |
 |---|---|---|---|
-| 1 | Thêm episode mức 2 (đầy đủ và đoạn đặt cắt) | Tập của M có 304/1 037 episode mức 2 (29 %); mức 2 hỏng nhiều nhất (31/44 lượt hỏng) | Không biết tham số nào của mức 2 gây lỗi |
-| 2 | Đoạn đặt có lệch **góc** lúc tới bàn B (thêm trục xoay vào độ lệch của planner) | Chưa có demo nào sửa lệch góc; 10/28 lượt đặt lệch có lệch góc trên 10° | Cần sửa planner (`flywheel_simple/tray/planner.py`, lớp độ lệch CARRY) và đo tỉ lệ thành công của planner khi tới lệch góc |
+| 2 | Thêm episode mức 2 (đầy đủ và đoạn đặt cắt) | Tập của M có 304/1 037 episode mức 2 (29 %); mức 2 hỏng nhiều nhất (31/44 lượt hỏng) | Không biết tham số nào của mức 2 gây lỗi |
+| 1 | Đoạn đặt có lệch **góc** lúc tới bàn B (thêm trục xoay vào độ lệch của planner) | Chưa có demo nào sửa lệch góc; 10/28 lượt đặt lệch có lệch góc trên 10° | Cần sửa planner (`flywheel_simple/tray/planner.py`, lớp độ lệch CARRY) và đo tỉ lệ thành công của planner khi tới lệch góc |
 | 3 | Thêm đoạn đặt lệch ngang cùng loại | Lỗi lệch ngang là nhiều nhất | Số đo trên cho thấy khoảng lệch đã được phủ; lợi ích là giả thuyết yếu |
 
-**Rủi ro của run N.** Lỗi đặt lệch ngang xảy ra dù dữ liệu đã phủ khoảng lệch đó, nên nguyên nhân có thể nằm ngoài dữ liệu: đồ gá bị khay che trong ảnh camera đầu khi tới gần (design 28/10 mục 3.5, ghi chú 19/11), hoặc policy trôi dần khi đi. Run N có thể không cải thiện bước đặt. Phép thử rẻ trước khi tốn 56 CU: xem video camera đầu của vài lượt gác thành ở run M để biết đồ gá có còn thấy được lúc hạ khay không.
+**Video camera đầu của 28 lượt `L-PLACE-POSE` (xem 26/11/2026, một khung 5 giây trước lỗi và một khung lúc lỗi cho mỗi lượt; đếm bằng mắt, số gần đúng):**
+
+- Tấm đồ gá màu cam còn thấy được dưới mép gần của khay ở khoảng 24/28 lượt, 5 giây trước lỗi. Giả thuyết "khay che mất đồ gá" **không** được ủng hộ.
+- Khoảng 9–10 lượt robot tới bàn B lệch hướng rõ (mép bàn chéo trong ảnh), khớp với 10 lượt có lệch góc trên 10°. Policy đặt khay thẳng theo thân robot, không theo đồ gá.
+- Các lượt còn lại robot đứng gần vuông với bàn nhưng khay lệch ngang vài cm; policy vẫn hạ dù đồ gá còn trong ảnh.
+
+**Rủi ro của run N.** Lỗi đặt lệch ngang xảy ra dù dữ liệu đã phủ khoảng lệch đó và đồ gá còn thấy được, nên chưa biết thêm dữ liệu có sửa được phần này không. Lệch góc là phần có căn cứ rõ nhất (khoảng 10 lượt), nhưng để cận dưới chạm 80 % cần sửa khoảng 18 lượt (ước lượng): run N có thể cải thiện mà vẫn chưa đạt mốc.
 
 Ngoài phạm vi: demo "gác lên thành rồi nhấc lên đặt lại" (planner chưa có hành vi này); đổi điều kiện thành công thành "khay nằm phẳng trong đồ gá" (cần Decision riêng của Hiếu, xem tray-jig.md mục 5); run K.
 
@@ -101,7 +107,7 @@ Theo 07 mục 3.1. File story luôn được sửa.
 - `packages/flywheel-psi0/src/flywheel_psi0/tray/`
 - `packages/flywheel-psi0/tests/tray/`
 - `scripts/g0/tray/` (chỉ script đo của nhiệm vụ 1)
-- `packages/flywheel-simple/src/flywheel_simple/tray/planner.py` và test của nó (chỉ thêm trục xoay vào độ lệch CARRY, nếu Hiếu chọn ưu tiên 2)
+- `packages/flywheel-simple/src/flywheel_simple/tray/planner.py` và test của nó (chỉ thêm trục xoay vào độ lệch CARRY, nếu Hiếu chọn dữ liệu lệch góc)
 - `configs/runplans/tray/` (chỉ file mới của run N)
 - `docs/g0/ledger/DA-50.csv`
 - `docs/he/tray-jig.md` (mục 6 trở đi; không sửa khối `jig-m-rules` và, sau khi đóng băng, khối `jig-n-rules`)
@@ -131,3 +137,4 @@ Hiếu (làm cùng Claude), duyệt cuối: Hiếu.
 |---|---|---|
 | 26/11/2026 | Tạo từ kết quả eval run M | Hiếu (soạn với Claude) |
 | 26/11/2026 | Thêm số đo ban đầu của tập train run M; sửa bảng dữ liệu thêm (bỏ lọc theo độ nghiêng, thêm lệch góc), thêm mục rủi ro | Hiếu (soạn với Claude) |
+| 26/11/2026 | Thêm nhận xét từ video camera đầu của 28 lượt đặt lệch; đưa dữ liệu lệch góc lên ưu tiên 1 | Hiếu (soạn với Claude) |
