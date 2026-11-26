@@ -7,6 +7,7 @@ as `tests/contract/agentqa/test_agentqa_cases.py` does for `agentqa_build`.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import sys
 from collections.abc import Iterator
@@ -21,6 +22,7 @@ sys.path.insert(0, str(_HERE.parent / "round"))
 sys.path.insert(0, str(_HERE.parent / "tools"))
 from flywheel.contracts.agentqa import AgentFact  # noqa: E402
 from flywheel.contracts.evidence import InterventionKind  # noqa: E402
+from flywheel.eval.agentqa.mcp import bridge  # noqa: E402
 from flywheel.eval.agentqa.mcp.bridge import (  # noqa: E402
     DESCRIPTIONS,
     MAX_STEP_ENUM,
@@ -79,7 +81,7 @@ def _props(session: ToolSession) -> dict[str, dict[str, Any]]:
 def test_tools_are_the_registry_in_its_order(session: ToolSession) -> None:
     tools = session.tools()
     assert [t.name for t in tools] == list(REGISTRY)
-    assert len(tools) == 13
+    assert len(tools) == len(REGISTRY)
     assert set(DESCRIPTIONS) == set(REGISTRY)
     assert [t.version for t in tools] == [s.version for s in REGISTRY.values()]
     assert session.tools() == tools  # computed once, the same each time
@@ -263,3 +265,17 @@ def test_window_bounds_many_steps() -> None:
     assert integer["type"] == "integer" and "enum" not in integer
     assert (integer["minimum"], integer["maximum"]) == (1, MAX_STEP_ENUM + 1)
     assert "logged step" in integer["description"]
+
+
+def test_every_registered_tool_and_domain_is_written_up() -> None:
+    """A tool or a domain added to the registry fails here, not when a server starts."""
+    assert set(DESCRIPTIONS) == set(REGISTRY)
+    domains = {d for spec in REGISTRY.values() for d in spec.params.values()}
+    assert domains <= set(bridge.DOMAIN_SCHEMAS)
+    assert set(bridge.DOMAIN_SCHEMAS) == set(bridge._PARAM_HELP)
+
+
+def test_a_tool_without_a_text_is_still_described() -> None:
+    spec = dataclasses.replace(REGISTRY["lineage"], name="new_tool", version=4)
+    assert bridge.describe(spec) == "new_tool (version 4)."
+    assert bridge.describe(REGISTRY["lineage"]) == DESCRIPTIONS["lineage"]
