@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, replace
 
 import numpy as np
@@ -50,6 +51,10 @@ def test_carry_jitter_tags_the_planner_version_and_leaves_plain_ones_alone() -> 
     assert planner_version(cfg, CarryJitter(0.05, 0.03)) != planner_version(
         cfg, CarryJitter(0.03, 0.05)
     )
+    # DA-50: a yaw range appends to the tag; a zero one leaves the DA-46 tag as it was.
+    assert planner_version(cfg, CarryJitter(0.05, 0.05, 0.0)) == plain + "+cj.a050s050"
+    yawed = CarryJitter(0.1, 0.1, math.radians(15))
+    assert planner_version(cfg, yawed) == plain + "+cj.a100s100y150"
 
 
 def test_visuals_revision_reads_the_manifest_and_names_the_target_zone(tmp_path) -> None:  # type: ignore[no-untyped-def]

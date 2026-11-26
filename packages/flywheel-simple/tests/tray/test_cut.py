@@ -368,8 +368,18 @@ def test_cut_marker_records_parent_and_ranges(world: dict[str, Any]) -> None:
             "episode_index": i, "seed": seed, "parent_episode_index": i, "parent_length": n,
             "source_from_frame": STARTS[i], "source_to_frame": n, "length": lengths[i],
             "phase_frame": phase_frames[i][0], "from_phase": phase_frames[i][1],
-            "carry_offset": [0.01, -0.02], "phases": phases,
-        }
+            "carry_offset": [0.01, -0.02], "carry_yaw": None, "phases": phases,
+        }  # a batch logged before DA-50 has no carry_yaw: still cut, marked None
+
+
+def test_cut_marker_copies_the_carry_yaw(tmp_path: Path) -> None:
+    # DA-50: rows of a yaw-jittered batch carry their heading turn into the marker.
+    parent = make_parent(tmp_path / "releases" / "tray_s1_0123456789ab")
+    yaws = {str(seed): {"carry_yaw": 0.01 * k} for k, (seed, *_) in enumerate(EPISODES)}
+    batch = make_batch(tmp_path / "gen-l2", **yaws)
+    out = cut_release(parent, batch, tmp_path / "releases", trim=StubTrim())
+    episodes = _meta(out, CUT_META)["episodes"]
+    assert [e["carry_yaw"] for e in episodes] == [0.01 * k for k in range(len(EPISODES))]
 
 
 def test_export_meta_lists_the_kept_episodes(world: dict[str, Any]) -> None:

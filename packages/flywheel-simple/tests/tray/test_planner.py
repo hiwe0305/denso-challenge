@@ -7,6 +7,7 @@ import math
 import numpy as np
 import pytest
 from flywheel_simple.tray.planner import (
+    ARRIVE_YAW_TOL,
     CarryJitter,
     Phase,
     PlannerCommand,
@@ -451,6 +452,53 @@ def test_carry_jitter_off_gives_no_shift_and_no_tag() -> None:
         CarryJitter(-0.01, 0.0)
 
 
+# -- carry yaw jitter (DA-50) --------------------------------------------------
+
+
+def test_carry_jitter_offsets_are_those_of_da46() -> None:
+    # Drawn before DA-50: adding the yaw axis must leave every DA-46 batch's shifts as they were.
+    before = {
+        0: (0.0406, -0.0254),
+        1: (-0.0301, -0.0193),
+        7: (-0.0163, -0.0056),
+        123: (-0.0495, -0.0289),
+        100046: (0.0235, -0.0027),
+    }
+    for seed, offset in before.items():
+        assert CarryJitter(0.05, 0.03).offset(seed) == offset
+        assert CarryJitter(0.05, 0.03, math.radians(15)).offset(seed) == offset
+
+
+def test_the_yaw_draw_extends_the_offset_draw() -> None:
+    # yaw_offset takes the third number of a size-3 draw; offset the size-2 draw.
+    for seed in range(200):
+        two = np.random.default_rng([46, seed]).uniform(-1.0, 1.0, 2)
+        three = np.random.default_rng([46, seed]).uniform(-1.0, 1.0, 3)
+        assert three[:2].tolist() == two.tolist()
+
+
+def test_carry_yaw_offset_is_seeded_and_within_its_half_range() -> None:
+    jitter = CarryJitter(yaw=math.radians(15))
+    yaws = [jitter.yaw_offset(seed) for seed in range(50)]
+    assert yaws == [jitter.yaw_offset(seed) for seed in range(50)]
+    assert all(abs(y) <= jitter.yaw for y in yaws) and len(set(yaws)) >= 45
+    assert all(round(y, 4) == y for y in yaws)  # logged = applied
+    assert min(yaws) < 0 < max(yaws)
+    assert jitter.enabled and jitter.offset(3) == (0.0, 0.0)
+    assert CarryJitter(0.05, 0.05).yaw_offset(3) == 0.0
+    # The yaw draw ignores the other ranges.
+    assert CarryJitter(0.05, 0.02, jitter.yaw).yaw_offset(3) == jitter.yaw_offset(3)
+
+
+def test_carry_yaw_tag() -> None:
+    assert CarryJitter(0.1, 0.1).tag() == "+cj.a100s100"
+    assert CarryJitter(0.1, 0.1, math.radians(15)).tag() == "+cj.a100s100y150"
+    assert CarryJitter(yaw=math.radians(15)).tag() == "+cj.a000s000y150"
+    assert CarryJitter(yaw=math.radians(2.5)).tag() == "+cj.a000s000y025"
+    with pytest.raises(ValueError, match=">= 0"):
+        CarryJitter(yaw=-0.1)
+
+
 def numbers(cmd: PlannerCommand) -> list[object]:
     return [
         cmd.phase,
@@ -503,7 +551,113 @@ def test_carry_offset_shifts_the_goal_and_arrive_b_corrects_it() -> None:
 
 def test_reset_keeps_the_carry_offset() -> None:
     world = ToyWorld()
-    planner = TrayPlanner(world.planner_cfg, world.cfg, world.sample, carry_offset=(0.01, -0.02))
+    planner = TrayPlanner(
+        world.planner_cfg, world.cfg, world.sample, carry_offset=(0.01, -0.02), carry_yaw=0.2
+    )
     planner.phase = Phase.CARRY
     planner.reset()
     assert planner.carry_offset == (0.01, -0.02) and planner.phase is Phase.APPROACH_A
+    assert planner.carry_yaw == 0.2
+
+
+def yawed_run(
+    yaw: float, offset: tuple[float, float] = (0.0, 0.0)
+) -> tuple[ToyWorld, list[Record]]:
+    world = ToyWorld(level=1, seed=2)
+    planner = TrayPlanner(
+        world.planner_cfg, world.cfg, world.sample, carry_offset=offset, carry_yaw=yaw
+    )
+    return world, world.run(planner=planner)
+
+
+def test_a_zero_carry_yaw_changes_no_command() -> None:
+    _, plain = jittered_run(None)
+    _, zero = yawed_run(0.0)
+    assert [numbers(r.cmd) for r in zero] == [numbers(r.cmd) for r in plain]
+
+
+@pytest.mark.parametrize("offset", [(0.0, 0.0), (-0.02, 0.03)])
+@pytest.mark.parametrize("yaw", [math.radians(12), math.radians(-15)])
+def test_carry_yaw_turns_the_heading_about_the_target(
+    yaw: float, offset: tuple[float, float]
+) -> None:
+    plain_world, plain = jittered_run(None)
+    world, records = yawed_run(yaw, offset)
+    before = [r for r in plain if r.cmd.phase.value <= Phase.LIFT.value]
+    assert [numbers(r.cmd) for r in records[: len(before)]] == [numbers(r.cmd) for r in before]
+    carry, plain_carry = world.planner._carry, plain_world.planner._carry
+    assert carry is not None and plain_carry is not None
+    h = plain_carry.heading
+    assert math.remainder(carry.heading - h - yaw, 2 * math.pi) == pytest.approx(0.0, abs=1e-12)
+
+    def rot(a: float, v: np.ndarray) -> np.ndarray:
+        return np.array(
+            [math.cos(a) * v[0] - math.sin(a) * v[1], math.sin(a) * v[0] + math.cos(a) * v[1]]
+        )
+
+    target = world.sample.target_pose
+    xy = np.array([target.x, target.y])
+    tray = rot(-h, xy - plain_carry.goal)  # tray centre held at LIFT, base frame
+    # The yawed goal and heading put the held tray on the target, plus the shift.
+    tray_at_goal = carry.goal + rot(carry.heading, tray)
+    assert tray_at_goal == pytest.approx(xy + rot(carry.heading, np.array(offset)), abs=1e-9)
+    # ARRIVE_B plans a turn back toward the plain heading, steps on it, and the tray lands.
+    heading = world.planner._arrive_heading
+    assert heading is not None
+    assert abs(math.remainder(heading - h, 2 * math.pi)) < abs(yaw) / 3
+    turning = [r for r in records if r.cmd.phase is Phase.ARRIVE_B and abs(r.cmd.nav[2]) >= 0.1]
+    assert turning and all(r.cmd.heading == heading for r in turning)
+    assert records[-1].cmd.phase is Phase.DONE and records[-1].report.success
+
+
+def lower_entry(records: list[Record]) -> Record:
+    return next(r for r in records if r.cmd.phase is Phase.LOWER)
+
+
+def test_a_yawed_arrival_without_an_xy_step_still_turns_back() -> None:
+    # Before DA-50's in-place turn this arrival made no step, so no turn: LOWER started
+    # 12 deg off and the hands' turn (capped at 8 deg) left the tray 4 deg off.
+    world, records = yawed_run(math.radians(12), (0.03, -0.02))
+    arrive = [r for r in records if r.cmd.phase is Phase.ARRIVE_B]
+    assert all(r.cmd.nav[:2] == (0.0, 0.0) for r in arrive)
+    assert any(r.cmd.nav[2] == world.planner_cfg.turn_rate for r in arrive)
+    heading = world.planner._arrive_heading
+    assert heading is not None
+    assert abs(math.remainder(lower_entry(records).base.yaw - heading, 2 * math.pi)) <= (
+        ARRIVE_YAW_TOL
+    )
+    target = world.sample.target_pose
+    error = math.remainder(target.yaw - world.tray_yaw, math.pi)
+    assert abs(error) < math.radians(1.0) and records[-1].report.success
+
+
+@pytest.mark.parametrize("deg", [12, -12, 15, -15])
+def test_arrive_b_turns_in_place_when_no_step_is_needed(deg: float) -> None:
+    # Force "no xy step" for both signs: ARRIVE_B's goal is wherever the base stands.
+    world = ToyWorld(level=1, seed=2)
+    planner = TrayPlanner(world.planner_cfg, world.cfg, world.sample, carry_yaw=math.radians(deg))
+    plan = planner._arrive_plan
+
+    def standing_goal(state, base):  # type: ignore[no-untyped-def]
+        return np.array([base.x, base.y]), plan(state, base)[1]
+
+    planner._arrive_plan = standing_goal  # type: ignore[method-assign]
+    records = world.run(planner=planner)
+    arrive = [r for r in records if r.cmd.phase is Phase.ARRIVE_B]
+    heading = planner._arrive_heading
+    assert heading is not None
+    start = math.remainder(arrive[0].base.yaw - heading, 2 * math.pi)
+    assert abs(start) > math.radians(10) and math.copysign(1.0, start) == math.copysign(1.0, deg)
+    assert all(r.cmd.nav[:2] == (0.0, 0.0) for r in arrive)
+    turns = [r for r in arrive if r.cmd.nav[2] != 0.0]
+    assert turns and all(r.cmd.heading == heading for r in turns)
+    end = math.remainder(lower_entry(records).base.yaw - heading, 2 * math.pi)
+    assert abs(end) <= ARRIVE_YAW_TOL / 2 + 1e-9
+
+
+def test_a_yawed_arrival_within_the_tolerance_does_not_turn_in_place() -> None:
+    world, records = yawed_run(math.radians(1.0))
+    arrive = [r for r in records if r.cmd.phase is Phase.ARRIVE_B]
+    turn_rate = world.planner_cfg.turn_rate
+    assert not any(r.cmd.nav == (0.0, 0.0, turn_rate) for r in arrive)
+    assert world.planner._arrive_turning is False

@@ -407,6 +407,7 @@ def _write_cut(
                 "phase_frame": frame,
                 "from_phase": from_phase,
                 "carry_offset": gen_row.get("carry_offset"),
+                "carry_yaw": gen_row.get("carry_yaw"),
                 "phases": gen_row["phases"],
             }
         )

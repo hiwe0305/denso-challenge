@@ -51,6 +51,7 @@ class EpisodeResult:
     sim_s: float = 0.0
     wall_s: float = 0.0
     carry_offset: tuple[float, float] = (0.0, 0.0)  # carry goal shift (m): ahead, sideways
+    carry_yaw: float = 0.0  # carry heading turn (rad), counterclockwise (DA-50)
 
 
 class TrayAgent:
@@ -72,15 +73,17 @@ class TrayAgent:
     def reset(self, seed: int | None = None) -> None:
         """New planner for the task's current episode sample; fresh WBC pipeline.
 
-        With carry jitter the episode's seed picks the CARRY goal shift (DA-46).
+        With carry jitter the episode's seed picks the CARRY goal shift (DA-46) and
+        heading turn (DA-50).
         """
         task = self.env.unwrapped.task
-        offset = (0.0, 0.0)
+        offset, yaw = (0.0, 0.0), 0.0
         if self.carry_jitter is not None and self.carry_jitter.enabled:
             if seed is None:
                 raise ValueError("carry jitter needs the episode seed: reset(seed=...)")
             offset = self.carry_jitter.offset(seed)
-        self.planner = TrayPlanner(self.planner_cfg, task.cfg, task.sample, offset)
+            yaw = self.carry_jitter.yaw_offset(seed)
+        self.planner = TrayPlanner(self.planner_cfg, task.cfg, task.sample, offset, yaw)
         self.ctrl.reset()
         self.last_command = None
 
@@ -184,4 +187,5 @@ def run_episode(
         sim_s=round(float(sim.mjData.time) - t0, 2),
         wall_s=round(time.perf_counter() - wall0, 1),
         carry_offset=agent.planner.carry_offset,
+        carry_yaw=agent.planner.carry_yaw,
     )

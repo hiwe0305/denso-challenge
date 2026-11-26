@@ -227,6 +227,13 @@ class PlannerConfig:
 # First entropy word of the carry-jitter draw: keeps it apart from other per-seed draws.
 CARRY_JITTER_STREAM = 46
 
+# DA-50: with a carry yaw, ARRIVE_B also turns the base in place when it is more than this
+# off its heading (rad), until it is within half of it. DA-41: stepping on the heading
+# hunted at 1-2 deg, and past ~2.3 deg a tray corner lands on a jig end wall; LOWER's hand
+# turn (place_yaw_max_deg) takes the rest. A module constant, not a PlannerConfig field,
+# so the config hash stays as it is.
+ARRIVE_YAW_TOL = math.radians(2.0)
+
 
 @dataclass(frozen=True)
 class CarryJitter:
@@ -236,18 +243,22 @@ class CarryJitter:
     The robot then arrives off the target and ARRIVE_B corrects it: the recoveries the
     training data lacks. Not a PlannerConfig field, so the config hash and the yaml stay
     as they are; recorder.planner_version appends `tag()` instead.
+
+    DA-50: `yaw` (rad) turns the carry heading too, so the robot arrives with the tray
+    yawed off the target and ARRIVE_B turns it back.
     """
 
     ahead: float = 0.0
     side: float = 0.0
+    yaw: float = 0.0
 
     def __post_init__(self) -> None:
-        if self.ahead < 0 or self.side < 0:
+        if self.ahead < 0 or self.side < 0 or self.yaw < 0:
             raise ValueError(f"carry jitter half-ranges must be >= 0, got {self}")
 
     @property
     def enabled(self) -> bool:
-        return self.ahead > 0 or self.side > 0
+        return self.ahead > 0 or self.side > 0 or self.yaw > 0
 
     def offset(self, seed: int) -> tuple[float, float]:
         """The episode's shift (ahead, side), from the seed alone; rounded to 0.1 mm so the
@@ -258,11 +269,22 @@ class CarryJitter:
         u = np.random.default_rng([CARRY_JITTER_STREAM, seed]).uniform(-1.0, 1.0, 2)
         return (round(float(u[0]) * self.ahead, 4), round(float(u[1]) * self.side, 4))
 
+    def yaw_offset(self, seed: int) -> float:
+        """The episode's turn of the carry heading (rad): the third number of the same
+        per-seed draw, whose first two are `offset`'s; rounded to 1e-4 rad."""
+        if self.yaw == 0.0:
+            return 0.0
+        u = np.random.default_rng([CARRY_JITTER_STREAM, seed]).uniform(-1.0, 1.0, 3)
+        return round(float(u[2]) * self.yaw, 4)
+
     def tag(self) -> str:
         """Suffix of the planner version: jittered batches never mix with plain ones."""
         if not self.enabled:
             return ""
-        return f"+cj.a{round(self.ahead * 1000):03d}s{round(self.side * 1000):03d}"
+        tag = f"+cj.a{round(self.ahead * 1000):03d}s{round(self.side * 1000):03d}"
+        if self.yaw > 0:  # tenths of a degree; tags without yaw stay as before DA-50
+            tag += f"y{round(math.degrees(self.yaw) * 10):03d}"
+        return tag
 
 
 @dataclass(frozen=True)
@@ -417,6 +439,7 @@ class TrayPlanner:
     tray_cfg: TrayConfig
     sample: EpisodeSample
     carry_offset: tuple[float, float] = (0.0, 0.0)  # CARRY goal shift (m): ahead, left (DA-46)
+    carry_yaw: float = 0.0  # CARRY heading turn (rad), counterclockwise (DA-50)
     phase: Phase = Phase.APPROACH_A
     _entered_t: float | None = None
     _entry_base: Pose2D | None = None
@@ -434,6 +457,7 @@ class TrayPlanner:
     _arrive_mean: NDArray[np.float64] | None = None  # ARRIVE_B low-passed base xy (DA-41)
     _arrive_axes: tuple[float, float] | None = None  # ARRIVE_B step under way: signs ahead, side
     _arrive_rest_t: float | None = None  # ARRIVE_B: end of the last step
+    _arrive_turning: bool | None = None  # ARRIVE_B turn in place: undecided, on, done (DA-50)
     _place_shift: NDArray[np.float64] | None = None  # hands' shift while lowering, base frame
     _place_yaw: float | None = None  # hands' turn while lowering, rad (DA-41)
     _carry: _Carry | None = None
@@ -462,7 +486,7 @@ class TrayPlanner:
         self._edge_a = float(geo.table_a_center[0]) - self.tray_cfg.table_depth / 2
 
     def reset(self) -> None:
-        fresh = TrayPlanner(self.cfg, self.tray_cfg, self.sample, self.carry_offset)
+        fresh = TrayPlanner(self.cfg, self.tray_cfg, self.sample, self.carry_offset, self.carry_yaw)
         for f in fields(self):
             setattr(self, f.name, getattr(fresh, f.name))
 
@@ -714,6 +738,21 @@ class TrayPlanner:
                 )
                 if any(axes):
                     return step(axes)
+            if self.carry_yaw != 0.0 and budget and self._arrive_turning is not False:
+                # DA-50: steps turn the base only while they last, at heading_hold (the WBC's
+                # target yaw moves 0.1 rad/s), so a yawed arrival that needs no xy step was
+                # never turned back. Turn in place at turn_rate as TURN does, like a step:
+                # started past the tolerance, stopped for good at half of it (the pelvis
+                # sways +-1 deg); the low-pass then catches up before the next step.
+                off = yaw_error(base.yaw, heading)
+                if self._arrive_turning is None:
+                    self._arrive_turning = off > ARRIVE_YAW_TOL
+                if self._arrive_turning and off > ARRIVE_YAW_TOL / 2:
+                    self._since = None
+                    self._arrive_rest_t = state.t
+                    nav = (0.0, 0.0, cfg.turn_rate)
+                    return self._emit(state, base, carry.palms, nav, closure=True, heading=heading)
+                self._arrive_turning = False
             if self._held(settled and speed < cfg.arrive_speed, state.t, cfg.arrive_hold):
                 self._enter(Phase.LOWER, state, base)
                 return self._command(state, base)
@@ -834,6 +873,8 @@ class TrayPlanner:
         rel_yaw = tray_yaw_of(state.tray_quat) - base.yaw
         # The tray is the same after a half turn (D-14): face B, i.e. turn by about pi.
         heading = _wrap(target.yaw - rel_yaw + math.pi)
+        if self.carry_yaw != 0.0:  # branch: unjittered headings stay bit-identical
+            heading = _wrap(heading + self.carry_yaw)
         c, s = math.cos(base.yaw), math.sin(base.yaw)
         d = state.tray_pos[:2] - np.array([base.x, base.y])
         offset = np.array([c * d[0] + s * d[1], -s * d[0] + c * d[1]])  # tray xy, base frame

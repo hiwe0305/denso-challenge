@@ -67,6 +67,7 @@ class AttemptRow:
     # (phase, sim s since the planner started) as entered; absent in rows before DA-46
     phases: list[tuple[str, float]] = field(default_factory=list)
     carry_offset: tuple[float, float] = (0.0, 0.0)  # carry goal shift (m): ahead, sideways
+    carry_yaw: float = 0.0  # carry heading turn (rad); absent in rows before DA-50
 
 
 @dataclass(frozen=True)
@@ -359,6 +360,7 @@ def generate(
                     cluster_id=cluster_id,
                     phases=list(result.phases),
                     carry_offset=result.carry_offset,
+                    carry_yaw=result.carry_yaw,
                 ),
             )
     finally:

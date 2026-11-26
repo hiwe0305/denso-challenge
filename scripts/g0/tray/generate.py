@@ -18,6 +18,8 @@ episode, and 5 of 22 started at once failed in eglMakeCurrent (EGL_NOT_INITIALIZ
 With --carry-jitter-ahead/--carry-jitter-side (DA-46), e.g. `--scene jig
 --carry-jitter-ahead 0.05 --carry-jitter-side 0.05`, each episode's CARRY goal is
 shifted by seed so the robot arrives off the target and ARRIVE_B corrects it.
+--carry-jitter-yaw-deg (DA-50) turns the carry heading by seed too, so the robot arrives
+with the tray yawed off the target and ARRIVE_B turns it back.
 
 With --conditions <file.jsonl> (Task 10, a Failure -> Data round), the batch
 records the train seeds nearest to each failure condition instead
@@ -31,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import subprocess
 import sys
@@ -74,8 +77,16 @@ def main() -> int:
             f"--carry-jitter-{axis}", type=float, default=0.0,
             help=f"m: half-range of the uniform CARRY goal shift {where} (DA-46)",
         )
+    ap.add_argument(
+        "--carry-jitter-yaw-deg",
+        type=float,
+        default=0.0,
+        help="deg: half-range of the uniform turn of the CARRY heading (DA-50)",
+    )
     args = ap.parse_args()
-    jitter = CarryJitter(args.carry_jitter_ahead, args.carry_jitter_side)
+    jitter = CarryJitter(
+        args.carry_jitter_ahead, args.carry_jitter_side, math.radians(args.carry_jitter_yaw_deg)
+    )
     if args.n is None and args.conditions is None and not args.targeted:
         ap.error("give --n or --conditions")
 
@@ -113,6 +124,7 @@ def main() -> int:
         cmd += ["--allow-plain"] if args.allow_plain else []
         cmd += ["--scene", args.scene]
         cmd += ["--carry-jitter-ahead", repr(jitter.ahead), "--carry-jitter-side", repr(jitter.side)]
+        cmd += ["--carry-jitter-yaw-deg", repr(args.carry_jitter_yaw_deg)]
         cmd += ["--targeted"] if args.conditions is not None else []
         with (work / "worker.log").open("a") as log:
             return subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env)

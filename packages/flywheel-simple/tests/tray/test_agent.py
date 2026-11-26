@@ -82,3 +82,18 @@ def test_carry_jitter_shifts_the_episode_by_its_seed(env: Any) -> None:
     assert agent.planner is not None and agent.planner.carry_offset == jitter.offset(1)
     with pytest.raises(ValueError, match="seed"):
         agent.reset()
+
+
+def test_carry_jitter_turns_the_carry_heading_by_its_seed(env: Any) -> None:
+    # DA-50: the seed's yaw draw reaches the planner and the result (and so the log).
+    import math
+
+    from flywheel_simple.tray.agent import TrayAgent
+    from flywheel_simple.tray.planner import CarryJitter, PlannerConfig
+
+    jitter = CarryJitter(0.05, 0.05, math.radians(15))
+    agent = TrayAgent(env, PlannerConfig.load(), jitter)
+    agent.reset(seed=1)
+    assert agent.planner is not None
+    assert agent.planner.carry_offset == jitter.offset(1)
+    assert agent.planner.carry_yaw == jitter.yaw_offset(1) != 0.0
