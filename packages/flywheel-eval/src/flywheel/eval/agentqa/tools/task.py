@@ -8,6 +8,7 @@ scorer's own config the view names, each with the unit the view gives it.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -122,6 +123,63 @@ class CoverageSpec(_Frozen):
         return self
 
 
+# A measure reference of `measure_compare` and `measure_tally` (DA-52): where it sits, the
+# measure name, then optionally `[k]` (one component of a list) or `.tilt` (the tilt of a
+# `_quat`). `condition` reads the rollout's `Condition.values`.
+MEASURE_WHERE = ("final", "extrema", "at_failure", "verdict", "condition")
+MEASURE_REF = (r"^(?P<where>final|extrema|at_failure|verdict|condition)\."
+               r"(?P<name>[a-z][a-z0-9]*(?:_[a-z0-9]+)*)"
+               r"(?:\[(?P<index>0|[1-9][0-9]*)\]|\.(?P<derived>tilt))?$")
+# The unit of a number, read off its name (contract `flywheel.contracts.outcome`).
+SUFFIX_UNITS = {"_m": "m", "_deg": "deg", "_rad": "rad", "_s": "s", "_frac": "frac"}
+
+
+def measure_unit(ref: str) -> str:
+    """The unit of the number a measure reference gives; "" when its name says none.
+
+    A `.tilt` is in deg; a verdict field ending in `_t` is a sim time (contract
+    `ScorerVerdict`: `failure_t`, `step_latch_t`), in s; otherwise the name's suffix.
+    """
+    hit = re.match(MEASURE_REF, ref)
+    if hit is None:
+        return ""
+    if hit["derived"] == "tilt":
+        return "deg"
+    name = hit["name"]
+    if hit["where"] == "verdict" and name.endswith("_t"):
+        return "s"
+    return next((u for s, u in SUFFIX_UNITS.items() if name.endswith(s)), "")
+
+
+class ThresholdRef(_Frozen):
+    """A scorer threshold a measure is compared with: its key, and which side is beyond it.
+
+    `beyond: above` counts a value greater than the threshold, `below` a smaller one;
+    `absolute` compares the absolute value (a signed error).
+    """
+
+    threshold: str
+    beyond: Literal["above", "below"]
+    absolute: bool = False
+
+
+class MeasuresSpec(_Frozen):
+    """How `measure_compare` and `measure_tally` compare a cluster with a reference (DA-52)."""
+
+    low_percentile: float = Field(ge=0, lt=100)
+    high_percentile: float = Field(gt=0, le=100)
+    min_reference: int = Field(gt=0)  # judged rollouts the reference needs for bounds
+    max_values: int = Field(gt=0)  # distinct values of a tally given their own facts
+    thresholds: dict[Annotated[str, Field(pattern=MEASURE_REF)], ThresholdRef] = Field(
+        default_factory=dict)
+
+    @model_validator(mode="after")
+    def ordered(self) -> Self:
+        if self.low_percentile >= self.high_percentile:
+            raise ValueError("measures: low_percentile must be below high_percentile")
+        return self
+
+
 class TaskView(_Frozen):
     task_id: str
     scorer_config: str
@@ -139,6 +197,7 @@ class TaskView(_Frozen):
     relaxed: RelaxedSpec | None = None
     carry: CarrySpec | None = None
     coverage: CoverageSpec | None = None
+    measures: MeasuresSpec | None = None
     thresholds: dict[str, Any] = Field(default_factory=dict)  # filled from scorer_config
     source_ref: str = ""
 
@@ -161,7 +220,21 @@ class TaskView(_Frozen):
                 self.rest_measures()
         if self.carry is not None:
             self.carry_measures()
+        if self.measures is not None:
+            self.measure_thresholds()
         return self
+
+    def measure_thresholds(self) -> None:
+        """Check the `measures.thresholds` map: known keys, and units that agree."""
+        assert self.measures is not None
+        for ref, spec in self.measures.thresholds.items():
+            if spec.threshold not in self.thresholds:
+                raise ValueError(f"measures.thresholds.{ref}: {spec.threshold!r} is not a "
+                                 f"threshold of {self.scorer_config}")
+            want = self.threshold_units.get(spec.threshold, "")
+            if measure_unit(ref) != want:
+                raise ValueError(f"measures.thresholds.{ref}: the measure is in "
+                                 f"{measure_unit(ref) or 'no unit'}, {spec.threshold} in {want}")
 
     def relaxed_measures(self) -> tuple[str, str]:
         """(distance, yaw) measure names of `final` the relaxed sweep reads.

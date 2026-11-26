@@ -29,6 +29,9 @@ PARAMS: dict[str, dict[str, Any]] = {
     "history_lookup": {"interventions": "all"},
     "relaxed_sweep": {"runs": "all"},
 }
+# Tools whose domains need K1 outcomes, which this file's pack has none of: their domains,
+# runs and repeat calls are tested in test_agentqa_tool_measures.py (DA-52).
+OUTCOME_DOMAIN_TOOLS = ("measure_compare", "measure_tally")
 
 
 @pytest.fixture
@@ -38,7 +41,7 @@ def ctx(runs: dict[str, RunScores], tray: TaskView) -> MeasureContext:
 
 
 def test_every_tool_is_registered() -> None:
-    assert sorted(REGISTRY) == sorted(PARAMS)
+    assert sorted(REGISTRY) == sorted([*PARAMS, *OUTCOME_DOMAIN_TOOLS])
 
 
 @pytest.mark.parametrize("name", sorted(PARAMS))
@@ -197,7 +200,7 @@ def test_a_tool_run_twice_with_other_parameters_never_clashes_in_one_book(
 
 
 def test_the_param_sets_cover_every_registered_tool(ctx: MeasureContext) -> None:
-    assert sorted(_param_sets(ctx)) == sorted(REGISTRY)
+    assert sorted([*_param_sets(ctx), *OUTCOME_DOMAIN_TOOLS]) == sorted(REGISTRY)
 
 
 # the tools read the pack, never the live store ----------------------------------------------

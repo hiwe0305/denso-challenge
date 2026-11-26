@@ -99,7 +99,7 @@ Giới hạn của phép thử 1, nói trước: người thiết kế hai công
 ## Nhiệm vụ
 
 - [x] 1.1 Viết story và thiết kế (file này)
-- [ ] 2.1 Công cụ `measure_compare` và `measure_tally`, đăng ký, có test (AC 1)
+- [x] 2.1 Công cụ `measure_compare` và `measure_tally`, đăng ký, có test (AC 1)
 - [ ] 2.2 Công tắc `disabled_rules`, có test (AC 2)
 - [ ] 2.3 Bản ghi và schema của vòng lặp; kiểm giả thuyết của model vừa `RoundHypothesis`; vai `investigate` trong `roles.yaml`, prompt (AC 3, 8)
 - [ ] 2.4 Bước `investigate`: vòng lặp, trần ngân sách, rơi về sàn code, có test (AC 3, 4, 7)

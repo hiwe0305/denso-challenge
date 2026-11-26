@@ -43,6 +43,13 @@ from flywheel.eval.agentqa.tools.coverage import coverage_distance
 from flywheel.eval.agentqa.tools.history import history_lookup
 from flywheel.eval.agentqa.tools.latch import latch_consistency
 from flywheel.eval.agentqa.tools.lineage import lineage
+from flywheel.eval.agentqa.tools.measures import (
+    SUCCESSES,
+    Domains,
+    domains,
+    measure_compare,
+    measure_tally,
+)
 from flywheel.eval.agentqa.tools.paired import paired_compare
 from flywheel.eval.agentqa.tools.relaxed import relaxed_sweep
 from flywheel.eval.agentqa.tools.signals import labels_seen, signal_presence
@@ -118,8 +125,52 @@ def concerned_runs(params: Mapping[str, Any], ctx: MeasureContext) -> list[str]:
     return [r for r in ctx.runs if r in named]
 
 
+def measure_domains(ctx: MeasureContext) -> Domains:
+    """The cluster ids and measure references of the pack (`measure_compare`, `measure_tally`)."""
+    return domains(ctx.task, ctx.runs, ctx.outcomes, ctx.conditions)
+
+
+def _some(values: tuple[str, ...]) -> str:
+    """A few values of a closed domain, for an error message."""
+    if not values:
+        return "none"
+    shown = ", ".join(values[:8])
+    return shown if len(values) <= 8 else f"{shown}, ... ({len(values)} in all)"
+
+
+def _check_measure(domain: str, name: str, value: object, params: Mapping[str, Any],
+                   ctx: MeasureContext) -> list[str]:
+    """The DA-52 domains: a cluster, a numeric or a category measure, a reference group."""
+    known = measure_domains(ctx)
+    if domain == "cluster":
+        if not isinstance(value, str) or value not in known.clusters:
+            return [f"{name}: {value!r} is not a failure cluster of the pack "
+                    f"(clusters: {_some(known.clusters)})"]
+        return []
+    if domain in ("number_measure", "category_measure"):
+        held = known.numbers if domain == "number_measure" else known.categories
+        kind = "numeric" if domain == "number_measure" else "boolean or string"
+        if not isinstance(value, str) or value not in held:
+            return [f"{name}: {value!r} is not a {kind} measure the pack's rollouts carry "
+                    f"(measures: {_some(held)})"]
+        return []
+    # reference: the run's successes, or another cluster of the cluster's own run
+    if value == SUCCESSES:
+        return []
+    cluster = params.get("cluster")
+    if not isinstance(value, str) or value not in known.clusters:
+        return [f"{name}: {value!r} is neither {SUCCESSES!r} nor a failure cluster of the pack"]
+    if value == cluster:
+        return [f"{name}: {value!r} compares a cluster with itself"]
+    if isinstance(cluster, str) and known.run_of[value] != known.run_of.get(cluster):
+        return [f"{name}: {value!r} is not a cluster of the run of {cluster!r}"]
+    return []
+
+
 def _check_one(domain: str, name: str, value: object, params: Mapping[str, Any],
                ctx: MeasureContext) -> list[str]:
+    if domain in ("cluster", "number_measure", "category_measure", "reference"):
+        return _check_measure(domain, name, value, params, ctx)
     known = ", ".join(ctx.runs) or "none"
     if domain == "runs":
         if value == "all":
@@ -332,6 +383,18 @@ def _paired_compare(book: FactBook, ctx: MeasureContext,
         paired_compare(book, ctx.runs[a], ctx.runs[b], chosen) for a, b in pairs])
 
 
+def _measure_compare(book: FactBook, ctx: MeasureContext,
+                     params: Mapping[str, Any]) -> ToolResult:
+    return measure_compare(book, ctx.task, ctx.runs, ctx.outcomes, ctx.conditions,
+                           params["cluster"], params["measure"], params["against"])
+
+
+def _measure_tally(book: FactBook, ctx: MeasureContext,
+                   params: Mapping[str, Any]) -> ToolResult:
+    return measure_tally(book, ctx.task, ctx.runs, ctx.outcomes, ctx.conditions,
+                         params["cluster"], params["measure"], params["against"])
+
+
 REGISTRY: dict[str, ToolSpec] = {spec.name: spec for spec in (
     ToolSpec("task_lookup", 1, (), {"step": "step"}, _task_lookup),
     ToolSpec("step_pass_table", 1, ("scores",), {"runs": "runs"}, _step_pass_table),
@@ -356,4 +419,12 @@ REGISTRY: dict[str, ToolSpec] = {spec.name: spec for spec in (
              _history_lookup),
     # v2: per cluster, the yaw miss and where the tray comes to rest (height, tilt)
     ToolSpec("relaxed_sweep", 2, ("scores", "outcomes"), {"runs": "runs"}, _relaxed_sweep),
+    # DA-52: one measure of a cluster against the run's successes or another cluster; not in
+    # the plan, for the investigation loop. Every parameter is a closed domain of the pack.
+    ToolSpec("measure_compare", 1, ("scores", "outcomes"),
+             {"cluster": "cluster", "measure": "number_measure", "against": "reference"},
+             _measure_compare),
+    ToolSpec("measure_tally", 1, ("scores", "outcomes"),
+             {"cluster": "cluster", "measure": "category_measure", "against": "reference"},
+             _measure_tally),
 )}
