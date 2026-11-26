@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
 from flywheel.contracts.entities import Score
 from flywheel_psi0.tray.eval_batch import Chunk
 from flywheel_psi0.tray.export_scores import export, main, step_status
@@ -94,3 +95,87 @@ def test_main_writes_valid_score_lines(tmp_path: Path) -> None:
     lines = scores_file.read_text().splitlines()
     assert len(lines) == 3
     assert all(Score.model_validate_json(line).first_failed_step == 1 for line in lines)
+
+
+# --- DA-47: scorer version stamp and repeats -----------------------------------------
+
+
+def versioned(out: Path, folder: str, i: int, version: int | None, ok: bool = True) -> None:
+    """A DA-42 row of chunk directory `folder` (`l1-000` or `l1-000.r<k>`)."""
+    attempt = out / folder / "attempt-0"
+    (attempt / "eval").mkdir(parents=True, exist_ok=True)
+    row: dict[str, Any] = {
+        "seed": L1.seed_of(i),
+        "level": 1,
+        "success": ok,
+        "failure": None if ok else "L-TIMEOUT",
+        "scorer_steps": [ok] * 7,
+    }
+    if version is not None:
+        row["scorer_version"] = version
+    with (attempt / "outcomes.jsonl").open("a") as f:
+        f.write(json.dumps(row) + "\n")
+    with (attempt / "eval/eval_stats.txt").open("a") as f:
+        f.write(f"episode_{i}: {ok} \n")
+    steps = attempt / "traces" / f"t{i}" / "steps.jsonl"
+    steps.parent.mkdir(parents=True)
+    (steps.parent / "rollout_result.json").write_text("{}")
+    steps.write_text(json.dumps({"episode_id": f"episode_{i}", "step": 0}) + "\n")
+
+
+def test_a_versioned_row_is_stamped_with_its_version(tmp_path: Path) -> None:
+    out = tmp_path / "batch"
+    for i in range(3):
+        versioned(out, L1.id, i, 2)
+    scores = export(eval_set(tmp_path), out, "C_70", scorer_config=config(tmp_path))
+    assert {s.scorer_version for s in scores} == {"simple-tray-predicates@2"}
+
+
+def test_rows_before_da42_keep_the_bare_stamp(tmp_path: Path) -> None:
+    out = tmp_path / "batch"
+    for i in range(3):
+        versioned(out, L1.id, i, None)
+    scores = export(eval_set(tmp_path), out, "C_70", scorer_config=config(tmp_path))
+    assert {s.scorer_version for s in scores} == {"simple-tray-predicates"}
+
+
+def test_a_batch_of_two_scorer_versions_is_refused(tmp_path: Path) -> None:
+    out = tmp_path / "batch"
+    for i, v in enumerate((2, None, 2)):
+        versioned(out, L1.id, i, v)
+    with pytest.raises(ValueError, match="mix scorer versions"):
+        export(eval_set(tmp_path), out, "C_70", scorer_config=config(tmp_path))
+
+
+def test_repeats_get_their_own_episode_ids(tmp_path: Path, capsys: Any) -> None:
+    out = tmp_path / "batch"
+    for folder in (L1.id, f"{L1.id}.r1"):
+        for i in range(3):
+            versioned(out, folder, i, 2, ok=folder == L1.id)
+    conditions = eval_set(tmp_path)
+    scores = export(conditions, out, "C_70", scorer_config=config(tmp_path), repeats=2)
+    assert [s.episode_id for s in scores] == [
+        "C_70/l1-s1000100", "C_70/l1-s1000101", "C_70/l1-s1000102",
+        "C_70/l1-s1000100-r1", "C_70/l1-s1000101-r1", "C_70/l1-s1000102-r1",
+    ]  # fmt: skip
+    assert [s.success for s in scores] == [True] * 3 + [False] * 3
+    scores_file = tmp_path / "scores.jsonl"
+    assert (
+        main(
+            [
+                "--set",
+                str(conditions),
+                "--out",
+                str(out),
+                "--run",
+                "C_70",
+                "--scores",
+                str(scores_file),
+                "--scorer-config",
+                str(config(tmp_path)),
+            ]
+        )
+        == 0
+    )
+    assert len(scores_file.read_text().splitlines()) == 3
+    assert "2 repeats per condition, 1 read" in capsys.readouterr().err

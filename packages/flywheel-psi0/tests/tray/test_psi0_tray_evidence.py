@@ -327,3 +327,13 @@ def test_a_round_refuses_runs_outside_it(tmp_path: Path) -> None:
         build(Inputs(plan, tmp_path / "set", {("B_70", 60000): tmp_path}), tmp_path / "pack")
     with pytest.raises(ValueError, match="40000"):
         build(Inputs(plan, tmp_path / "set", {("C70_R1", 40000): tmp_path}), tmp_path / "pack")
+
+
+def test_an_eval_directory_with_repeats_is_refused(tmp_path: Path) -> None:
+    """The pack reads one rollout per condition (DA-47): `.r<k>` repeats are not read in part."""
+    chunks = chunks_of(tmp_path)
+    run(tmp_path / "b60", chunks, wins_per_chunk=8)
+    (tmp_path / "b60" / f"{chunks[0].id}.r2" / "attempt-0").mkdir(parents=True)
+    evals = {("B_70", 60000): tmp_path / "b60"}
+    with pytest.raises(ValueError, match=r"repeats per condition \{'B_70@60000': 3\}"):
+        build(Inputs(PLAN, tmp_path / "set", evals), tmp_path / "pack")

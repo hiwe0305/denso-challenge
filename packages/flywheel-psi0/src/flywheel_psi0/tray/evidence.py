@@ -49,6 +49,9 @@ the round's id, its base and uniform branches and its targeted set.
 
 Eval results are read through the frozen plan of `eval_of`: `pairplan.check` holds the
 pair's eval, stats and conditions equal to it, and `eval_results` reads that plan's type.
+The pack reads one rollout per condition: an eval directory holding repeats
+(`eval_batch --repeats`, `<chunk>.r<k>/`, DA-42) is refused, not read in part; read such
+a batch with `eval_results --repeats`.
 `flywheel_simple` (the target pose of rule c) is imported only when that part runs.
 """
 
@@ -75,6 +78,7 @@ from flywheel_psi0.tray.eval_results import (
     Rollout,
     collect,
     paired_diff,
+    repeats_found,
     stage1_outcome,
     summarize,
 )
@@ -539,6 +543,14 @@ def build(
     unknown_runs = sorted(({b for b, _ in inputs.evals} | set(inputs.trains)) - set(plan.branches))
     if unknown_runs:
         raise ValueError(f"{unknown_runs} are not branches of the plan {sorted(plan.branches)}")
+    repeated = {
+        f"{b}@{s}": n for (b, s), d in inputs.evals.items() if (n := repeats_found(d, chunks)) > 1
+    }
+    if repeated:
+        raise ValueError(
+            f"eval directories hold repeats per condition {repeated}: the pack reads one "
+            "rollout per condition; read them with eval_results --repeats"
+        )
     pack: dict[str, Any] = {
         "provenance": provenance(plan, inputs.trains, repo),
         "lock": lock_path(inputs.plan_path).is_file(),
