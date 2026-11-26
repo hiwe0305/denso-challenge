@@ -606,6 +606,8 @@ Nhóm A đo tay: 22 lượt khay gác lên thành đồ gá và khoảng 10 lư�
 
 Ngưỡng nghiêng của bộ chấm là 15° (fact `threshold_tilt_max_deg`). Sau ba luật, 41 trong 44 lượt hỏng nằm trong cụm có giả thuyết cơ chế; ba cụm một lượt còn lại là thiếu số đo hoặc chưa có luật.
 
+**`claude-opus-5-5` sau ba luật** (cổng ckey, một lần chạy): 8 lời gọi vai `rank`, đều `ok`, 1 phút 57 giây, 21 243 token vào, 4 343 token ra. Cả 8 cụm được xét đều `accepted`; model giữ nguyên hạng của lớp code ở mọi cụm (`place_rests_raised` trên `near_miss_placement` và `place_yaw_miss`; `scorer_latch_too_strict` trên hai luật dữ liệu ở cụm `approach_a`). Ba cụm một lượt vượt trần số cụm, không được xét. Lời đề xuất của model cụ thể hơn loại can thiệp của code ("hạ khay hẳn xuống mặt đặt", "giữ khay ổn định khi còn bê"), nhưng đó là lời văn, không phải fact. Một câu của model đọc sai fact `rest_judged` thành "mọi lượt đều nằm yên"; câu đó qua được phép kiểm vì không mang số.
+
 Giới hạn:
 
 - Luật nghiêng khay chỉ nói khay nghiêng quá ngưỡng khi hai tay còn giữ và chưa đặt xuống; nó không nói vì sao (bước đi, tay lệch, va vào đồ gá). Tên cụm ghi bước `place` hoặc `release_stand` vì các bước vẫn được chốt tiếp sau khi nhãn lỗi đã đặt, không phải vì khay nghiêng ở bước đó.
