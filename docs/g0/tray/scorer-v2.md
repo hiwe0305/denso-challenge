@@ -207,5 +207,6 @@ Một episode của release `tray_s1_bfbdcbcf719e` (kho `tray-s1-jig2-20261122`,
 Đọc:
 
 - Đường eval trên `jig2` chạy trọn và ghi đủ tín hiệu; đích theo cảnh là cần thiết (hai đích cho hai kết luận khác nhau về cùng một khay).
-- Episode này thành công lúc sinh (7 bước, release đã qua QA) nhưng phát lại hở vòng qua đường eval thì hỏng ở bước nhả: khay bị kéo lệch khi buông và nằm nghiêng 3,6° trên bàn B, cách đích 5,7 cm. Trên `zone1` (mục 7.1) phát lại vẫn thành công. Giả thuyết, chưa kiểm: đồ gá đòi vị trí chính xác hơn nên sai khác nhỏ giữa lúc sinh và lúc phát lại (khởi động của `eval-decoupled-wbc`, chia action thành đoạn 24) đủ làm hỏng; policy chạy kín vòng nên không chịu đúng lỗi này. Vì vậy cổng phát lại trên `jig2` chỉ xác nhận phần kỹ thuật, không xác nhận rằng một quỹ đạo tốt được chấm thành công.
+- Episode seed 500000 thành công lúc sinh (7 bước, release đã qua QA) nhưng phát lại hở vòng qua đường eval thì hỏng ở bước nhả: khay bị kéo lệch khi buông và nằm nghiêng 3,6° trên bàn B, cách đích 5,7 cm.
+- Phát lại thêm 5 episode kế tiếp của cùng release (seed 500008, 500016, 500024, 500032, 500040): cả 5 thành công ở cả hai bản bộ chấm, xong ở 30,3–31,1 s mô phỏng. Tổng 5/6. Vậy đường eval trên `jig2` chấm thành công một quỹ đạo tốt; lượt hỏng là sai khác của phát lại hở vòng ở một seed (nguyên nhân chưa kiểm).
 - Rollout hỏng lúc 30,6 s vẫn chạy tới hết giờ (93,3 s mô phỏng): env không dừng khi bộ chấm đã gắn lỗi. Đây là phần lớn thời gian của một lô có nhiều rollout hỏng; chưa sửa.
