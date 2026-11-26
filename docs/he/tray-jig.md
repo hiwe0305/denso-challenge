@@ -2,7 +2,7 @@
 
 Tài liệu này giữ quy tắc đọc kết quả và runbook của run M, lần train Ψ₀ đầu tiên trên cảnh đồ gá `jig2`. Story: [DA-48](../product/stories/DA-48-train-vong-moi-canh-do-ga.md). Plan: `configs/runplans/tray/he-tray-jig-m.yaml`. Các vòng trước (cảnh cũ) ở [tray.md](tray.md).
 
-Mọi số ở mục 1 và 3 là ước lượng trừ khi ghi "thực đo". Kết quả eval chưa có.
+Mọi số ở mục 1 và 3 là ước lượng trừ khi ghi "thực đo". Kết quả eval của run M ở mục 5; đề xuất vòng train tiếp (run N) và luật đọc của nó ở mục 6.
 
 ## 1. Run M là gì
 
@@ -130,6 +130,75 @@ Ba lỗi vận hành gặp trong run, không ảnh hưởng trọng số:
 
 Giao cho DA-47: đường dẫn Drive và sha256 ở bảng trên; `ckpt_60000` và `ckpt_80000` là bản đọc sớm theo quy tắc 6.
 
+## 5. Kết quả eval run M (thực đo, 26/11/2026)
+
+Eval của story DA-47 (file story nằm trong PR 228, chưa merge): `ckpt_100000`, cảnh `jig2`, bộ chấm bản 2, 60 điều kiện (mức 1 và 2, seed 1000100–1000129) × 3 lượt = 180 rollout. Đọc theo đúng mục 2. Số là sơ bộ: một seed train, một lần train, trong mô phỏng; rollout dưới EGL không lặp lại được từng bit.
+
+**Điều kiện trước khi đọc.** Plan `rp_a410d01efa62` trùng `MIX_FROZEN` và sha256 của checkpoint đã đối chiếu lúc nạp server; `conditions.sha256` `bbec07e3…5d348`; seed eval nằm ngoài seed train; đủ 180 rollout, không lô nào chạy lại, không rollout nào bị loại. Code eval ở commit `f809d363` (nhánh DA-47, chưa merge lúc chạy).
+
+| Quy tắc | Tỉ lệ | Khoảng tin cậy 95 % | Kết luận |
+|---|---|---|---|
+| 1. Cả task, mức 1 và 2 (60 điều kiện) | 75,6 % (136/180) | 70,0–81,1 | **Chưa đạt mốc 80 %** |
+| 2. Mức 1 (30 điều kiện) | 85,6 % (77/90) | 78,9–92,2 | **Đạt mốc 70 %** |
+| 2. Mức 2 (30 điều kiện) | 65,6 % (59/90) | 55,6–75,6 | **Chưa đạt mốc 70 %** |
+| 3. Bước `place`, mức 1 và 2 | 89,4 % (161/180) | 85,0–93,9 | **Bước đặt trên 50 %** |
+
+Bootstrap theo điều kiện, 10 000 lần, seed 20261125, bằng hàm `bootstrap_ci` của `eval_results`. Khoảng gộp hai mức lấy lại trong từng mức (cách `eval_results` đã làm từ trước); mục 2 không nói rõ điểm này, và lấy lại chung 60 điều kiện cho 68,9–82,2, cùng kết luận. `eval_results` không nạp được plan của run M nên lệnh chạy với `he-tray-v2.yaml` (seed 20261103); bảng trên là số tính lại với seed của mục 2.
+
+Quy tắc 4 và 5: không so hơn kém với các run DA-34, và không quy kết quả cho dữ liệu bước đặt vì chưa có run K.
+
+**Quy tắc 7, lỗi theo bước (mô tả).**
+
+| | Mức 1 (trên 90) | Mức 2 (trên 90) |
+|---|---|---|
+| Qua `approach_a` … `reach_b` | 90 | 88 |
+| Qua `place` | 82 | 79 |
+| Thành công | 77 | 59 |
+| Thành công theo lượt 0 / 1 / 2 (trên 30) | 26 / 28 / 23 | 21 / 19 / 19 |
+| Điều kiện thành công 3/3, 2/3, 1/3, 0/3 | 18, 11, 1, 0 | 10, 9, 11, 0 |
+| `L-PLACE-POSE` | 8 | 20 |
+| `L-TRAY-TILT` | 5 | 8 |
+| Nhãn khác | 0 | `L-TIMEOUT` 1, `L-PART-DROP` 1, `L-ONE-HAND` 1 |
+
+Phân tích 44 lượt hỏng từ số đo của dòng outcome (vị trí, độ cao, độ nghiêng của khay lúc lỗi và lúc cuối); chưa xem video:
+
+- **`L-PLACE-POSE` (28).** 22 lượt khay gác lên thành đồ gá: cao hơn mặt bàn 1,5–3,5 cm, nghiêng 3–13°, lệch ngang 5–10 cm hoặc lệch góc 8–15°. 5 lượt khay nằm phẳng trên bàn, lệch 6–11 cm về phía robot. 1 lượt lệch góc 21°. Lead-in của mặt vát là 4,2 cm mỗi trục ([jig.md](../g0/tray/jig.md) mục 2.3), tức policy hạ khay khi còn lệch ngoài vùng đồ gá tự dẫn. Ở 27/28 lượt, khay không đổi vị trí từ lúc lỗi tới hết giờ: robot không sửa sau khi buông.
+- **`L-TRAY-TILT` (13).** Cả 13 xảy ra khi hai tay còn cầm khay trên không; 11 lượt vừa chạm ngưỡng (15,0–15,8°). 8 lượt ở giữa đường đi, 5 lượt ở sát bàn B lúc hạ.
+- **Tham số cảnh của mức 2.** Tương quan giữa số lượt thành công của điều kiện và khoảng cách bàn, vị trí đứng, khối lượng linh kiện, ánh sáng đều yếu (|r| ≤ 0,39 trên 30 điều kiện); không kết luận được tham số nào gây lỗi.
+- **Khay nằm phẳng trong đồ gá.** Theo định nghĩa "phẳng" của jig.md mục 4.2 (nghiêng ≤ 2°, cao < 5 mm), 120/180 lượt có khay cuối phẳng, 58 không phẳng, 2 không tới bàn B. Trong 136 lượt thành công có 26 lượt không phẳng: bộ chấm chỉ xét vị trí và góc. Đây là mô tả; luật của mục 2 không đổi.
+
+Sai số đặt so với đích (`place_error`): lượt thành công p50 1,6 cm và 1,1°; `L-PLACE-POSE` p50 6,7 cm và 9,0°. Thành công nới (số phụ, chỉ nới `L-PLACE-POSE`, góc giữ 10°): 150/180 ở 10 cm, 154/180 ở 20 cm.
+
+Chi phí eval, thực đo: một phiên L4 chạy ba server Ψ₀, 2 giờ 24 phút, 6,8 CU (số dư 158,63 xuống 151,83); ba làn `eval_batch` trên `rtx3060`. Outcome K1 (180 dòng `RolloutOutcome`) đã giao nhóm C.
+
+## 6. Run N: đề xuất và luật đọc
+
+**[Đề xuất]** của Claude, 26/11/2026, viết sau khi đọc kết quả run M và **trước** khi sinh dữ liệu hay train run N. Story: [DA-50](../product/stories/DA-50-train-run-n-nham-loi-dat.md). Có hiệu lực khi Hiếu merge PR đóng băng plan của run N, plan ghim sha256 của khối luật dưới đây.
+
+Run N giữ nguyên recipe, checkpoint cha, số bước (100 000), seed train và stats kiểu `own_train_set` của run M; **chỉ đổi tập dữ liệu**. Dữ liệu thêm nhắm vào hai lỗi của mục 5; thành phần cụ thể chốt ở DA-50 sau khi đo tập train của M.
+
+<!-- jig-n-rules -->
+
+**Phạm vi.** Một run: N, `ckpt_100000`, một seed train. Eval trên đúng tập điều kiện của run M (`conditions.sha256` `bbec07e31ee022ac46d59e5322628c226519abe76363160ccbdb78b68725d348`), cảnh `jig2`, bộ chấm bản 2, 3 lượt mỗi điều kiện, 180 rollout.
+
+**Đơn vị thống kê là điều kiện.** Tỉ lệ của một điều kiện là số lượt thành công chia số lượt. Khoảng tin cậy 95 % lấy bằng bootstrap theo điều kiện, 10 000 lần, seed 20261126; khi gộp hai mức thì lấy lại trong từng mức.
+
+1. **Mốc tuyệt đối.** Quy tắc 1, 2, 3 của mục 2 áp cho run N, không đổi ngưỡng: 80 % cả task, 70 % từng mức, bước đặt trên 50 %, đều đọc ở cận dưới.
+2. **N so với M, cả task.** Với mỗi điều kiện, hiệu là tỉ lệ của N trừ tỉ lệ của M (mỗi bên 3 lượt). Chỉ viết "N tốt hơn M" khi khoảng tin cậy của trung bình hiệu trên 60 điều kiện nằm hẳn trên 0; "N kém hơn M" khi nằm hẳn dưới 0; còn lại viết "chưa phân biệt được N với M" kèm hiệu và khoảng.
+3. **N so với M, mức 2.** Đọc riêng 30 điều kiện mức 2 theo đúng cách của quy tắc 2. Đây là nơi dữ liệu thêm nhắm tới.
+4. **Cơ chế (mô tả, không ngưỡng).** Báo cho cả M và N: số lượt `L-PLACE-POSE`, số lượt `L-TRAY-TILT`, và số lượt khay cuối không phẳng (nghiêng > 2° hoặc cao ≥ 5 mm so với khay nằm trong đồ gá) trong các lượt tới bàn B. Số của M: 28, 13, 58/178.
+5. **Quy kết.** Hiệu N trừ M chỉ được quy cho **cả tập dữ liệu mới**, không cho riêng một phần thêm nào, vì các phần đổi cùng lúc.
+6. **Checkpoint.** Số chính là `ckpt_100000`. Checkpoint sớm hơn chỉ đọc trên tối đa 20 điều kiện để phát hiện run hỏng. Báo số của checkpoint khác thì ghi rõ là chọn sau khi xem kết quả.
+7. **Lỗi theo bước.** Như quy tắc 7 của mục 2.
+
+**Điều kiện trước khi đọc.** Plan của N đã đóng băng; sha256 của checkpoint trùng bản ghi lúc persist; seed của dữ liệu thêm không trùng seed eval (1000100–1000129); đủ 180 rollout. Rollout chỉ được loại khi lỗi hạ tầng, liệt kê từng cái. Số của M là bản đã ghi ở mục 5, không chạy lại.
+
+**Giới hạn phải ghi cùng kết quả.** Một seed train, một lần train, trong mô phỏng. Dữ liệu của N được chọn **sau khi đã xem lỗi của M trên chính 60 điều kiện này**, nên đây là kết quả trên tập dev, không phải holdout. Hai lần eval của cùng một checkpoint trên 60 lượt đã lệch nhau tới 5 lượt (mục 5, theo lượt), nên hiệu nhỏ không có nghĩa.
+
+**Không đổi quy tắc sau khi có kết quả.** Muốn đổi thì viết một Decision mới, ghi lý do và ngày, và giữ nguyên khối này.
+
+<!-- /jig-n-rules -->
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -137,3 +206,4 @@ Giao cho DA-47: đường dẫn Drive và sha256 ở bảng trên; `ckpt_60000` 
 | 25/11/2026 | Tạo: mô tả run M, quy tắc đọc kết quả (đề xuất), runbook | Hiếu (soạn với Claude) |
 | 25/11/2026 | Thêm đoạn bật wandb online qua `FW_WANDB_MODE` ở bước D (ngoài khối luật đọc) | Hiếu (soạn với Claude) |
 | 26/11/2026 | Mục 4 mới: số thực đo của lần train (100 000 bước, 56,15 CU, sha256 của `ckpt_100000`), ba lỗi vận hành; sửa câu cuối bước E | Hiếu (soạn với Claude) |
+| 26/11/2026 | Mục 5 mới: kết quả eval run M đọc theo mục 2 (thực đo). Mục 6 mới: đề xuất run N và khối luật đọc `jig-n-rules`. Khối `jig-m-rules` không đổi | Hiếu (soạn với Claude) |
