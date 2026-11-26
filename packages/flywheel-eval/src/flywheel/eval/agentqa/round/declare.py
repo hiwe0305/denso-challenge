@@ -9,8 +9,15 @@ For a log copy as DA-27 writes it (`flywheel.data.inject.log_defects`):
                        probe_p4.json, probe_p4_parent.json
     <root>/rtc/<job>/rtc.jsonl
 
-Each file DA-08 or DA-13 reads becomes one entry with its kind and `subject.job`;
-any other file (`meta/`, a figure) is left out. The engineer still owns the
+and for the work dir `fw data qa` leaves on a dataset copy (`flywheel.data.cli`):
+
+    <root>/qa/reports.jsonl, episodes.jsonl, episode_index.json,
+           report/dataset_report.json, replay*.jsonl
+
+Each file DA-08 or DA-13 reads becomes one entry with its kind and `subject.job`; each
+file of the work dir one entry with its kind and no subject (one dataset per root, and
+no step reads a subject of these kinds). Any other file (`meta/`, `source.json`,
+`qa/summary.json`, a figure) is left out. The engineer still owns the
 declaration: the class is given, never guessed, and the file is written once.
 """
 
@@ -32,11 +39,20 @@ JOB_FILES: dict[str, dict[str, str]] = {
               "probe_p4_parent.json": "probe_p4_parent"},
     "rtc": {"rtc.jsonl": "rtc_log"},
 }
+# path under the root -> pack kind, for a `fw data qa` work dir
+DATA_FILES: dict[str, str] = {
+    "qa/reports.jsonl": "qa_reports", "episodes.jsonl": "episodes",
+    "episode_index.json": "episode_index", "report/dataset_report.json": "dataset_report",
+}
+# `replay*.jsonl` at the root are ReplayReport lines (version 3's `inputs.kind_of`), but
+# DA-17's replay run (`flywheel.data.replay_check`) leaves outcome rows under this name.
+REPLAY_OUTCOMES = "replay_outcomes.jsonl"
 
 
 def declare_jobs(root: Path, task_id: str, declared_by: str,
                  data_class: DataClass) -> dict[str, Any]:
-    """The declaration of every known file under `root/train/*/` and `root/rtc/*/`."""
+    """The declaration of every known file under `root/train/*/`, `root/rtc/*/` and of a
+    `fw data qa` work dir at `root`."""
     entries: list[dict[str, Any]] = []
     for part, kinds in JOB_FILES.items():
         base = root / part
@@ -46,8 +62,15 @@ def declare_jobs(root: Path, task_id: str, declared_by: str,
                 if (job / name).is_file():
                     entries.append({"path": f"{part}/{job.name}/{name}", "kind": kind,
                                     "subject": {"job": job.name}})
+    for name, kind in DATA_FILES.items():
+        if (root / name).is_file():
+            entries.append({"path": name, "kind": kind, "subject": {}})
+    for path in sorted(root.glob("replay*.jsonl")):
+        if path.is_file() and path.name != REPLAY_OUTCOMES:
+            entries.append({"path": path.name, "kind": "replay_reports", "subject": {}})
     if not entries:
-        raise PackRefused(f"{root}: no train/<job>/ or rtc/<job>/ file to declare")
+        raise PackRefused(f"{root}: no train/<job>/, rtc/<job>/ or `fw data qa` work dir "
+                          "file to declare")
     return {"task_id": task_id, "declared_by": declared_by, "data_class": data_class,
             "entries": entries}
 

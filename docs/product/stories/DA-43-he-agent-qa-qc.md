@@ -74,6 +74,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [x] 5.6 Vai `rank` chạy được trong đường ống vòng (23/11/2026; phần `rank` của 5.2 và 5.3): bước `judge` và `verify`, thư viện luật kiểm, phán quyết và sàn code, `--gateway-config`. Vai `adjudicate`, `look` và các luật kiểm riêng của chúng còn mở ở 5.2, 5.3
   - [x] 5.7 Hai luật kiểm sau lần đo 24/11/2026: `system_first` (cụm bị chặn thì hạng 1 là giả thuyết lỗi hệ thống) và nhận `check.id: null` như "không chọn phép kiểm"; chấm lại sáu lần chạy bằng `--from verify` (agent-qa 9.5)
   - [x] 5.8 Vai `adjudicate` trong đường ống vòng (25/11/2026; phần `adjudicate` của 5.2 và 5.3): bước `adjudicate` trước `judge`, phần xét ứng viên của bản 3 chạy qua cổng model, ghi `reports.jsonl`, `dropped.jsonl`, `estimates.jsonl`; `round/declare.py` dựng `round.yaml` cho một thư mục job; bộ lỗi cấy log ở lớp code trên đường mới: 30/30, 0/40 (agent-qa 9.7)
+  - [x] 5.9 Loại mục `episode_index` và khai báo thư mục làm việc của `fw data qa` (26/11/2026), để `adjudicate` phân tích chủ thể dataset như bản 3 và chấm được nửa dataset của DA-31
   - [ ] 5.5 Xuất `round_diagnosis.json` theo `RoundDiagnosis` sau khi PR hợp đồng K2 merge
 - [ ] 6. Bộ ca lịch sử (1,5 ngày)
   - [ ] 6.1 Kiểm artifact của từng ca ứng viên còn đủ; loại ca thiếu, ghi lý do
@@ -141,6 +142,7 @@ Danh sách chung của story:
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 26/11/2026 | Thêm nhiệm vụ 5.9 (chủ thể dataset trên đường ống vòng) | Hiếu (soạn với Claude) |
 | 25/11/2026 | Thêm nhiệm vụ 5.8 (vai `adjudicate`); 5.2 và 5.3 còn mở phần vai `look` | Hiếu (soạn với Claude) |
 | 25/11/2026 | 1.4 xong (outcome thật); thêm nhiệm vụ 2.5 (ngưỡng vùng phủ theo spec 6.8) | Hiếu (soạn với Claude) |
 | 24/11/2026 | Hiếu duyệt design 24/11/2026 (Q1–Q7), chưa dựng vội; design lên bản 0.2 (mục 13: model tốt nhất, đa model, `run_analysis`), kiến trúc 20/11 lên bản 0.7 | Hiếu (soạn với Claude) |

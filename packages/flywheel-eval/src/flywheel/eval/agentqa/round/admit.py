@@ -55,9 +55,13 @@ from flywheel.eval.agentqa.round.records import (
     Rejected,
     highest,
 )
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, RootModel, StrictInt, ValidationError
 
 ADMISSION_FILE = "admission.json"
+
+
+class EpisodeIndex(RootModel[dict[str, StrictInt]]):
+    """`episode_index.json` of `fw data ingest`: episode_id -> episode_index of the dataset."""
 
 
 @dataclass(frozen=True)
@@ -92,6 +96,8 @@ KINDS: dict[str, Kind] = {
     "probe_p3": Kind(ProbeP3, one=True),
     "probe_p4": Kind(ProbeP4, one=True),
     "probe_p4_parent": Kind(ProbeP4, one=True),
+    # A dataset subject's episode ids -> indices, for its targets (`episode_000012`).
+    "episode_index": Kind(EpisodeIndex, one=True),
 }
 # Kinds whose files can be large (real data: 1.5 GB of trace, 280 MB of metrics). Their
 # records are never kept: every read parses the file again, one record at a time.
@@ -317,5 +323,5 @@ def write_admission(admission: Admission, out: Path) -> Path:
     return path
 
 
-__all__ = ["ADMISSION_FILE", "KINDS", "PACK_FILE", "UNCACHED", "Admitted", "Kind", "Reader",
-           "Records", "admit", "write_admission"]
+__all__ = ["ADMISSION_FILE", "KINDS", "PACK_FILE", "UNCACHED", "Admitted", "EpisodeIndex", "Kind",
+           "Reader", "Records", "admit", "write_admission"]
