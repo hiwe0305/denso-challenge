@@ -18,6 +18,7 @@ from flywheel_psi0.tray.eval_results import (
     mcnemar_exact,
     paired,
     paired_diff,
+    paired_diff_repeats,
     reached,
     repeat_0,
     scorer_v1_vs_v2,
@@ -572,3 +573,172 @@ def test_stage1_with_repeats_checks_repeat_0_only(tmp_path: Path, capsys: Any) -
     assert eval_results.main([*common, "--json", str(out)]) == 0  # repeats 1 left unread
     assert "2 repeats per condition, 1 read" in capsys.readouterr().out
     assert "2 repeats per condition" in json.loads(out.read_text())["repeats_note"]
+
+
+# --- DA-50: paired difference on every repeat (docs/he/tray-jig.md 6) ---------------
+
+
+def _repeated_levels(out: Path, wins: dict[int, list[list[bool]]], version: int = 2) -> Any:
+    """wins[level][i][r]: success of repeat r of condition i of that level."""
+    chunks = []
+    for level, conds in wins.items():
+        base = Chunk(f"l{level}-000", level, 0, tuple(1000100 + i for i in range(len(conds))))
+        for chunk in with_repeats([base], len(conds[0])):
+            for i, oks in enumerate(conds):
+                if chunk.repeat < len(oks):
+                    episode(out, chunk, 0, i, success=oks[chunk.repeat], scorer_version=version)
+            chunks.append(chunk)
+    chosen, _, _ = collect(out, chunks)
+    return chosen
+
+
+T, F = True, False
+# level 1 condition means: variant 1, 1/3, 0; baseline 1/3, 1/3, 1/3 -> d 2/3, 0, -1/3
+# level 2: variant 2/3, 0; baseline 0, 0 -> d 2/3, 0
+VAR = {1: [[T, T, T], [T, F, F], [F, F, F]], 2: [[T, T, F], [F, F, F]]}
+BASE = {1: [[T, F, F], [F, T, F], [F, F, T]], 2: [[F, F, F], [F, F, F]]}
+
+
+def test_paired_diff_repeats_reads_every_repeat_per_condition(tmp_path: Path) -> None:
+    var = _repeated_levels(tmp_path / "var", VAR)
+    base = _repeated_levels(tmp_path / "base", BASE)
+    result = paired_diff_repeats(var, base, [1, 2], 2000, 7, 0.95)
+    assert (result["levels"], result["conditions"], result["repeats"]) == ([1, 2], 5, 3)
+    assert result["variant_rate"] == 0.4 and result["baseline_rate"] == 0.2
+    assert result["diff"] == 0.2
+    assert result["conditions_variant_higher"] == 2
+    assert result["conditions_baseline_higher"] == 1 and result["conditions_equal"] == 2
+    assert (result["resamples"], result["seed"]) == (2000, 7)
+    assert result["scorer_versions"] == {"variant": 2, "baseline": 2}
+    assert result["cross_scorer"] is False
+    only_2 = paired_diff_repeats(var, base, [2], 2000, 7, 0.95)
+    assert (only_2["conditions"], only_2["diff"]) == (2, 0.3333)
+
+
+def test_paired_diff_repeats_resamples_within_each_level(tmp_path: Path) -> None:
+    var = _repeated_levels(tmp_path / "var", VAR)
+    base = _repeated_levels(tmp_path / "base", BASE)
+    result = paired_diff_repeats(var, base, [1, 2], 2000, 7, 0.95)
+    stratified = bootstrap_ci([[2 / 3, 0, -1 / 3], [2 / 3, 0]], 2000, 7, 0.95)
+    assert result["ci"] == pytest.approx(stratified, abs=1e-4)
+    assert result["ci_vs_0"] == ("above" if stratified[0] > 0 else "contains")
+    # the same seed gives the same CI; the seed is what the CI is drawn with
+    assert paired_diff_repeats(var, base, [1, 2], 2000, 7, 0.95)["ci"] == result["ci"]
+    other = paired_diff_repeats(var, base, [1, 2], 2000, 8, 0.95)
+    assert other["ci"] == pytest.approx(
+        bootstrap_ci([[2 / 3, 0, -1 / 3], [2 / 3, 0]], 2000, 8, 0.95), abs=1e-4
+    )
+
+
+def test_paired_diff_repeats_above_zero_and_identical_sides_contain_zero(
+    tmp_path: Path,
+) -> None:
+    var = _repeated_levels(tmp_path / "var", {1: [[T, T, T]] * 4, 2: [[T, T, F]] * 4})
+    base = _repeated_levels(tmp_path / "base", {1: [[F, F, F]] * 4, 2: [[F, F, F]] * 4})
+    better = paired_diff_repeats(var, base, [1, 2], 2000, 7, 0.95)
+    assert better["ci_vs_0"] == "above" and better["ci"][0] > 0
+    # identical sides: every d_i is 0, the CI is (0, 0) and reads "contains", not a difference
+    same = paired_diff_repeats(var, var, [1, 2], 2000, 7, 0.95)
+    assert (same["diff"], same["ci"], same["ci_vs_0"]) == (0.0, (0.0, 0.0), "contains")
+    assert same["conditions_equal"] == 8
+
+
+def test_paired_diff_repeats_refuses_unpaired_sides(tmp_path: Path) -> None:
+    var = _repeated_levels(tmp_path / "var", VAR)
+    base = _repeated_levels(tmp_path / "base", BASE)
+    with pytest.raises(ValueError, match="different conditions"):
+        paired_diff_repeats([r for r in var if r.seed != 1000102], base, [1], 2000, 7, 0.95)
+    with pytest.raises(ValueError, match="no condition"):
+        paired_diff_repeats(var, base, [0], 2000, 7, 0.95)
+    two = _repeated_levels(tmp_path / "two", {1: [[T, F]] * 3, 2: [[F, F]] * 2})
+    with pytest.raises(ValueError, match="3 rollouts per condition, baseline 2"):
+        paired_diff_repeats(var, two, [1, 2], 2000, 7, 0.95)
+    uneven = [r for r in var if not (r.level == 1 and r.seed == 1000100 and r.repeat == 2)]
+    with pytest.raises(ValueError, match="variant has uneven rollouts per condition"):
+        paired_diff_repeats(uneven, base, [1, 2], 2000, 7, 0.95)
+    old = _repeated_levels(tmp_path / "v1", BASE, version=1)
+    with pytest.raises(ValueError, match="--cross-scorer"):
+        paired_diff_repeats(var, old, [1, 2], 2000, 7, 0.95)
+    crossed = paired_diff_repeats(var, old, [1, 2], 2000, 7, 0.95, cross_scorer=True)
+    assert crossed["scorer_versions"] == {"variant": 2, "baseline": 1}
+    assert crossed["cross_scorer"] is True
+
+
+def _cli_set(tmp_path: Path, var: dict[int, list[list[bool]]], base: Any) -> list[str]:
+    """A level 1 + 2 set with both sides written for every repeat; the common CLI args."""
+    from flywheel_psi0.tray.eval_batch import chunk_plan, phases_for
+
+    rows = [{"level": lv, "seed": 1000100 + i} for lv in var for i in range(len(var[lv]))]
+    (tmp_path / "set").mkdir()
+    (tmp_path / "set/conditions.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+    chunks = with_repeats(chunk_plan(rows, 10, phases_for(rows)), len(var[1][0]))
+    for name, wins in (("var", var), ("base", base)):
+        for chunk in chunks:
+            for i in range(len(chunk.seeds)):
+                ok = wins[chunk.level][i][chunk.repeat]
+                episode(tmp_path / name, chunk, 0, chunk.start + i, success=ok, scorer_version=2)
+    return [
+        str(ROOT / "configs/runplans/tray/he-tray-v2.yaml"), "--set", str(tmp_path / "set"),
+        "--out", str(tmp_path / "var"), "--no-yaw", "--baseline", str(tmp_path / "base"),
+    ]  # fmt: skip
+
+
+def test_cli_adds_the_all_repeats_pairing_beside_repeat_0(tmp_path: Path, capsys: Any) -> None:
+    from flywheel_psi0.tray import eval_results
+
+    common = _cli_set(tmp_path, VAR, BASE)
+    out1, out3 = tmp_path / "r1.json", tmp_path / "r3.json"
+    assert eval_results.main([*common, "--json", str(out1)]) == 0
+    assert eval_results.main([*common, "--repeats", "3", "--json", str(out3)]) == 0
+    r1, r3 = json.loads(out1.read_text()), json.loads(out3.read_text())
+    assert "repeats" not in r1["paired"] and "bootstrap_seed" not in r1
+    # the repeat-0 block is the same whether or not the later repeats are read
+    assert {k: v for k, v in r3["paired"].items() if k != "repeats"} == r1["paired"]
+    block = r3["paired"]["repeats"]
+    assert block["on"] == "all repeats of each condition"
+    head = block["headline"]
+    assert (head["levels"], head["conditions"], head["repeats"]) == ([1, 2], 5, 3)
+    assert (head["diff"], head["variant_rate"], head["baseline_rate"]) == (0.2, 0.4, 0.2)
+    assert head["seed"] == PLAN.stats.seed and head["resamples"] == PLAN.stats.resamples
+    stratified = bootstrap_ci(
+        [[2 / 3, 0, -1 / 3], [2 / 3, 0]], PLAN.stats.resamples, PLAN.stats.seed, PLAN.stats.ci
+    )
+    assert head["ci"] == pytest.approx(stratified, abs=1e-4)
+    assert sorted(block["by_level"]) == ["1", "2"]
+    assert block["by_level"]["2"]["diff"] == 0.3333
+    printed = capsys.readouterr().out
+    assert "Cặp theo điều kiện, mọi lượt (3 lượt/điều kiện), mức 1+2 gộp: 5 điều kiện" in printed
+    assert f"seed {PLAN.stats.seed}" in printed
+
+
+def test_cli_bootstrap_seed_replaces_the_plans_seed(tmp_path: Path) -> None:
+    from flywheel_psi0.tray import eval_results
+
+    common = _cli_set(tmp_path, VAR, BASE)
+    out = tmp_path / "r.json"
+    args = [*common, "--repeats", "3", "--bootstrap-seed", "20261126", "--json", str(out)]
+    assert eval_results.main(args) == 0
+    result = json.loads(out.read_text())
+    assert result["bootstrap_seed"] == 20261126 and result["stats"]["seed"] == 20261126
+    assert result["paired"]["repeats"]["headline"]["seed"] == 20261126
+    stats = PLAN.stats.model_copy(update={"seed": 20261126})
+    expected = bootstrap_ci([[2 / 3, 0, -1 / 3], [2 / 3, 0]], stats.resamples, stats.seed, stats.ci)
+    assert result["paired"]["repeats"]["headline"]["ci"] == pytest.approx(expected, abs=1e-4)
+    # the repeat-0 paired CI and the per-level CI are drawn with it too
+    var = _repeated_levels(tmp_path / "var2", VAR)
+    base = _repeated_levels(tmp_path / "base2", BASE)
+    repeat0 = paired_diff(repeat_0(var), repeat_0(base), [1, 2], stats)
+    assert result["paired"]["headline"]["ci"] == pytest.approx(repeat0["ci"], abs=1e-4)
+    level_1 = bootstrap_ci([[1.0, 1 / 3, 0.0]], stats.resamples, stats.seed, stats.ci)
+    assert result["levels"]["1"]["ci"] == pytest.approx(level_1)
+
+
+def test_cli_skips_the_all_repeats_pairing_when_a_rollout_is_missing(tmp_path: Path) -> None:
+    from flywheel_psi0.tray import eval_results
+
+    common = _cli_set(tmp_path, VAR, BASE)
+    (tmp_path / "base/l2-000.r2/attempt-0/eval/eval_stats.txt").write_text("")
+    out = tmp_path / "r.json"
+    assert eval_results.main([*common, "--repeats", "3", "--json", str(out)]) == 0
+    block = json.loads(out.read_text())["paired"]["repeats"]
+    assert "headline" not in block and block["skipped"] == "missing: variant 0, baseline 2"
