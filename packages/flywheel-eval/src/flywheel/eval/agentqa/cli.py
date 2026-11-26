@@ -11,6 +11,7 @@
     fw agentqa round --pack <pack.json> --out <dir> [--no-model] [--from <step>]
         [--plan <yaml>] [--store <dir>] [--gateway-config <dir>]
                                                            run a round into index.html (DA-43)
+    fw agentqa mcp --pack <pack.json> [--log <file>]       the tools over MCP on stdio (DA-49)
 
 Errors exit 2 with one line, as `fw eval` does. A run whose model part broke a
 report still writes everything and exits 1.
@@ -35,6 +36,7 @@ from flywheel.eval.agentqa.endpoint import (
     load_endpoint,
 )
 from flywheel.eval.agentqa.html import render_index, render_report
+from flywheel.eval.agentqa.mcp import server as mcp_server
 from flywheel.eval.agentqa.review import make_review, write_review
 from flywheel.eval.agentqa.round.hypotheses import RulesRefused
 from flywheel.eval.agentqa.round.measure import PlanRefused
@@ -245,3 +247,15 @@ def estimates_command(
         verdict = "unmeasured" if c.inside is None else ("inside" if c.inside else "outside")
         typer.echo(f"{c.estimate_ref}  {c.quantity}  [{c.low:g}, {c.high:g}]  "
                    f"measured {c.measured}  {verdict}")
+
+
+@app.command("mcp")
+def mcp_command(
+    pack: Path = typer.Option(..., "--pack", help="The pack.json of the round."),
+    log: Path | None = typer.Option(None, "--log", help=mcp_server.LOG_HELP),
+) -> None:
+    """Serve the analysis tools of one round pack to a chat shell over MCP on stdio.
+
+    Only a pack that admit confirms public is served; no option overrides this check.
+    """
+    raise typer.Exit(mcp_server.run(pack, log))
