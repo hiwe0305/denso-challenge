@@ -90,7 +90,8 @@ def test_the_earliest_finished_rollout_is_chosen_and_later_ones_are_counted(
 def test_an_episode_never_finished_is_missing(tmp_path: Path) -> None:
     episode(tmp_path, L1, 0, 0, success=True)
     _, _, missing = collect(tmp_path, [L1])
-    assert missing == [(1, 1000101), (1, 1000102)]
+    assert missing == [(1, 1000101, 0), (1, 1000102, 0)]
+    assert missing[0].seed == 1000101 and missing[0].repeat == 0
 
 
 def test_bootstrap_is_seeded_and_resamples_inside_each_group() -> None:
@@ -403,6 +404,7 @@ def _repeated(out: Path, wins: list[list[bool]]) -> Any:
 def test_one_rollout_per_condition_keeps_the_plain_wilson() -> None:
     result = clustered_wilson([[1], [0], [0], [0], [0]])
     assert result["interval"] == pytest.approx(wilson(1, 5))
+    assert clustered_wilson([[0]] * 5)["interval"] == pytest.approx(wilson(0, 5))
     assert result["n_eff"] == 5 and result["design_effect"] == 1
     assert result["method"].startswith("independent")
 
@@ -412,21 +414,34 @@ def test_conditions_that_always_agree_count_once() -> None:
     # information of 4 conditions
     result = clustered_wilson([[1, 1, 1], [0, 0, 0], [0, 0, 0], [0, 0, 0]])
     assert result["design_effect"] == pytest.approx(3 * 4 / 3, rel=1e-3)  # 4 / (4-1) * ...
-    assert result["n_eff"] < 4
+    assert result["n_eff"] == 4 and result["interval"] == pytest.approx(wilson(1, 4))
     plain = wilson(3, 12)
     assert result["interval"][1] - result["interval"][0] > plain[1] - plain[0]
 
 
-def test_coin_flip_conditions_are_close_to_independent() -> None:
-    # every condition 1 of 2: no between-condition variance beyond chance
+def test_coin_flip_conditions_still_count_per_condition() -> None:
+    # every condition 1 of 2: design effect 1, reported; the interval stays per condition
     result = clustered_wilson([[1, 0]] * 10)
-    assert result["design_effect"] == 1 and result["n_eff"] == 20
+    assert result["design_effect"] == 1 and result["n_eff"] == 10
+    assert result["interval"] == pytest.approx(wilson(5, 10))
 
 
-def test_all_failures_fall_back_to_one_per_condition() -> None:
+def test_all_failures_count_per_condition_and_leave_the_design_effect_null() -> None:
     result = clustered_wilson([[0, 0, 0]] * 5)
     assert result["n_eff"] == 5 and "n_eff = conditions" in result["method"]
     assert result["interval"] == pytest.approx(wilson(0, 5))
+    assert result["design_effect"] is None
+
+
+def test_the_interval_moves_monotonically_with_the_successes() -> None:
+    # 30 conditions x 3 repeats: the bound of 0/90 is not above the bound of 1/90 (review c)
+    def bounds(k: int) -> tuple[float, float]:
+        groups = [[1, 0, 0] if i < k else [0, 0, 0] for i in range(30)]
+        return clustered_wilson(groups)["interval"]
+
+    (l0, h0), (l1, h1), (l2, h2) = bounds(0), bounds(1), bounds(2)
+    assert l0 <= l1 <= l2 and h0 < h1 < h2
+    assert h0 == pytest.approx(wilson(0, 30)[1]) and h1 == pytest.approx(wilson(1 / 3, 30)[1])
 
 
 def test_repeats_give_per_condition_counts_and_step_rates(tmp_path: Path) -> None:
@@ -438,7 +453,8 @@ def test_repeats_give_per_condition_counts_and_step_rates(tmp_path: Path) -> Non
     result = summarize(PLAN, chosen, extra, missing, full=False)
     level = result["levels"]["1"]
     assert (level["n"], level["conditions"], level["successes"]) == (6, 3, 3)
-    assert level["p"] == 0.5 and level["wilson_n_eff"] <= 6
+    assert level["p"] == 0.5 and level["wilson_n_eff"] == 3
+    assert level["wilson_design_effect"] is not None
     assert level["step_pass"]["approach_a"] == 1.0 and level["step_pass"]["place"] == 0.5
     assert result["repeats"] == 2
     assert result["per_condition"] == {
@@ -455,7 +471,7 @@ def test_a_missing_repeat_is_listed_per_repeat(tmp_path: Path) -> None:
     chunks = with_repeats([base], 2)
     episode(tmp_path, chunks[0], 0, 0, success=True)
     _, _, missing = collect(tmp_path, chunks)
-    assert missing == [(1, 1000100)]  # repeat 1 never ran
+    assert missing == [(1, 1000100, 1)]  # repeat 1 never ran
 
 
 def test_pairing_reads_repeat_0_only(tmp_path: Path) -> None:
@@ -515,3 +531,44 @@ def test_rows_without_version_1_have_no_comparison(tmp_path: Path) -> None:
     chosen, extra, missing = _scored(tmp_path, [2, 2])
     assert scorer_v1_vs_v2(chosen) is None
     assert summarize(PLAN, chosen, extra, missing, full=False)["scorer_v1_vs_v2"] is None
+
+
+def test_more_repeats_on_disk_than_read_are_noted(tmp_path: Path) -> None:
+    from flywheel_psi0.tray.eval_results import repeats_found, repeats_note
+
+    base = Chunk("l1-000", 1, 0, (1000100,))
+    for chunk in with_repeats([base], 3):
+        episode(tmp_path, chunk, 0, 0, success=True)
+    (tmp_path / "l2-000.r7").mkdir()  # another chunk's repeat is not counted
+    assert repeats_found(tmp_path, [base]) == 3
+    assert repeats_note(tmp_path, [base], 3) is None
+    note = repeats_note(tmp_path, [base], 1)
+    assert note is not None and "3 repeats per condition, 1 read" in note
+    assert repeats_found(tmp_path / "none", [base]) == 1
+
+
+def test_stage1_with_repeats_checks_repeat_0_only(tmp_path: Path, capsys: Any) -> None:
+    from flywheel_psi0.tray import eval_results
+
+    chunks = _stage1_set(tmp_path)
+    for chunk in chunks[:6]:
+        for i in range(10):
+            episode(tmp_path / "b", chunk, 0, chunk.start + i, success=i < 2)
+            episode(tmp_path / "c", chunk, 0, chunk.start + i, success=False)
+    # repeat 1 of the first chunk only: repeats 1 of the other five are missing
+    first_r1 = with_repeats(chunks[:1], 2)[1]
+    for i in range(10):
+        episode(tmp_path / "b", first_r1, 0, first_r1.start + i, success=True)
+    common = [
+        str(ROOT / "configs/runplans/tray/he-tray-b.yaml"), "--set", str(tmp_path / "set"),
+        "--out", str(tmp_path / "b"), "--no-yaw", "--baseline", str(tmp_path / "c"), "--stage1",
+    ]  # fmt: skip
+    out = tmp_path / "r.json"
+    assert eval_results.main([*common, "--repeats", "2", "--json", str(out)]) == 0
+    result = json.loads(out.read_text())
+    assert result["stage1"]["outcome"] == "E1" and len(result["missing"]) == 50
+    assert all(m[2] == 1 for m in result["missing"]) and result["repeats_note"] is None
+    capsys.readouterr()
+    assert eval_results.main([*common, "--json", str(out)]) == 0  # repeats 1 left unread
+    assert "2 repeats per condition, 1 read" in capsys.readouterr().out
+    assert "2 repeats per condition" in json.loads(out.read_text())["repeats_note"]
