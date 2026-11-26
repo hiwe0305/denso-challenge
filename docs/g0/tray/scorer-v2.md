@@ -210,3 +210,75 @@ Một episode của release `tray_s1_bfbdcbcf719e` (kho `tray-s1-jig2-20261122`,
 - Episode seed 500000 thành công lúc sinh (7 bước, release đã qua QA) nhưng phát lại hở vòng qua đường eval thì hỏng ở bước nhả: khay bị kéo lệch khi buông và nằm nghiêng 3,6° trên bàn B, cách đích 5,7 cm.
 - Phát lại thêm 5 episode kế tiếp của cùng release (seed 500008, 500016, 500024, 500032, 500040): cả 5 thành công ở cả hai bản bộ chấm, xong ở 30,3–31,1 s mô phỏng. Tổng 5/6. Vậy đường eval trên `jig2` chấm thành công một quỹ đạo tốt; lượt hỏng là sai khác của phát lại hở vòng ở một seed (nguyên nhân chưa kiểm).
 - Rollout hỏng lúc 30,6 s vẫn chạy tới hết giờ (93,3 s mô phỏng): env không dừng khi bộ chấm đã gắn lỗi. Đây là phần lớn thời gian của một lô có nhiều rollout hỏng; chưa sửa.
+
+### 9.2 Runbook: eval một checkpoint trên `jig2`, 3 lượt, ba làn (nhiệm vụ 6.2)
+
+Đúng các bước của lô run M ngày 26/11/2026 (mục 9.3). Server Ψ₀ chạy trên Colab L4, sim chạy trên `rtx3060`, laptop nối hai đầu. Chạy từ một commit đã push và ghi lại commit đó.
+
+**Chi phí.** Thực đo của lô run M: 2 giờ 24 phút cho 180 rollout với ba làn; cả phiên Colab (dựng VM, nạp checkpoint, mẫu, lô) dài khoảng 3 giờ và tốn 6,8 CU ở 2,33 CU/giờ. Rollout thành công mất khoảng 100 giây thực, rollout hỏng khoảng 290 giây (chạy tới hết giờ), nên một checkpoint kém hơn sẽ lâu hơn: ước lượng 3,3 giờ cho lô và khoảng 10 CU cho cả phiên ở 50 % thành công. Một làn mất khoảng ba lần thời gian đó.
+
+**A. Tập điều kiện** (laptop, một lần cho mỗi plan; `D` là `fwdata/datasets`):
+
+```bash
+uv run python -m flywheel_psi0.tray.eval_set configs/runplans/tray/he-tray-jig-m.yaml --scene jig2 --levels 1:1000100:1000130 2:1000100:1000130 --release $D/tray-s1-jig2-20261122/releases/tray_s1_bfbdcbcf719e --exclude-seeds-of $D/tray-s1-jig2-20261122/releases/tray_s1_bfbdcbcf719e $D/tray-s1-jig2-20261122/releases/tray_s1_8631ace9b1b3 $D/tray-s1place-jig2-20261124/releases/tray_s1place_a1797e480160 $D/tray-s1place-jig2-20261124/releases/tray_s1place_56e6d006d8d1 --out $SET
+```
+
+Sim chỉ nhận seed eval trong dải dev 1000000–1000999. Tập của run M có `conditions.sha256` `bbec07e3…5d348`; eval run khác trên cùng tập thì chép lại thư mục này, không dựng lại. Thêm mọi release train mới vào `--exclude-seeds-of`.
+
+**B. Code và tập trên `rtx3060`.** Thư mục riêng (`~/denso-da47`), chép code bằng `git archive <commit>`, ghi commit vào file `COMMIT`, nối `fwdata/simple` tới một bản cài SIMPLE có sẵn (kiểm sha256 của manifest SimReady trùng laptop), chép tập điều kiện. Không đụng thư mục của người khác.
+
+**C. File `expected` của checkpoint** (laptop): `colab_serve expect --branch <nhánh> --step <bước> --runs <fwdata/tray/...> --stats <meta/stats_psi0.json của tập train>`. File này ghi sha256 của checkpoint và stats; `fetch` và `serve` từ chối nếu lệch.
+
+**D. Phiên Colab.** Hỏi Hiếu trước khi mở. Chạy bộ canh `scripts/colab/cu_watch.py` (`guard` và `session --gpu L4 --cap <trần>`); kiểm `guard` còn sống sau khi phiên được cấp, nó thoát nếu chưa có phiên nào lúc Colab trả 503. Trên VM, thư mục `/content/da48s`: chép code bằng `git archive`, `colab drivemount`, rồi `colab_serve fetch --expected expected-<bước>.json --work /content/da48s --drive <thư mục runs trên Drive>` và ba lần `colab_serve serve … --port 22085`, `22086`, `22087`. Một L4 (23 GB) chứa được ba server, mỗi server 6,2–7,3 GB.
+
+Mỗi VM chỉ nhận **một** kết nối `colab ssh`. Kết nối đó dành cho chuyển tiếp cổng; mọi lệnh khác trên VM chạy bằng `colab exec -s <phiên> -f <file.py>`.
+
+**E. Chuyển tiếp cổng** (laptop, giữ máy thức và mở nắp suốt lô):
+
+```bash
+ssh -N -o ProxyCommand="colab ssh --proxy-mode -s <phiên>" -o ServerAliveInterval=15 -o ExitOnForwardFailure=yes -L 22297:127.0.0.1:22085 -L 22299:127.0.0.1:22086 -L 22301:127.0.0.1:22087 root@colab
+```
+
+```bash
+ssh -N -o ServerAliveInterval=15 -o ExitOnForwardFailure=yes -R 22207:127.0.0.1:22297 -R 22209:127.0.0.1:22299 -R 22211:127.0.0.1:22301 rtx3060
+```
+
+**F. Mẫu trước, rồi cả lô** (`rtx3060`). Kiểm bộ nhớ trống; tổng worker sim của cả máy không quá 14. Mỗi làn một tiến trình `eval_batch`, bọc `systemd-run --user --scope -p MemoryMax=8G -p MemorySwapMax=0` dưới `nohup setsid … < /dev/null &`:
+
+```bash
+python -m flywheel_psi0.tray.eval_batch --set <tập, đường dẫn tuyệt đối> --conditions-sha256 <sha> --out <thư mục output, tuyệt đối> --server 127.0.0.1:22207 --listen 22208 --simple-python <python của SIMPLE, tuyệt đối> --pythonpath <các packages/*/src, tuyệt đối> --scene jig2 --chunk 10 --repeats 3 --attempts 3 --chunks l1-000,l2-000
+```
+
+Làn hai và ba dùng `--server` 22209 và 22211, `--listen` 22210 và 22212, `--chunks l1-010,l2-010` và `l1-020,l2-020`. Mọi đường dẫn phải tuyệt đối: client chạy với thư mục làm việc là thư mục của từng lần thử, đường dẫn tương đối cho mã thoát 127. Mẫu kỹ thuật: `--chunk 3 --max-chunks 2 --attempts 2` vào một thư mục output khác, xem 6 dòng outcome rồi mới chạy cả lô. `--dry-run` in danh sách lô.
+
+**G. Dừng.** Lô xong khi `runs.jsonl` có 18 dòng `exit` 0 và `missing` rỗng. Dừng VM ngay (`colab stop -s <phiên>`), đóng hai đường `ssh` theo pid (không dùng `pkill -f`), ghi dòng ledger thực đo.
+
+**H. Đọc và xuất** (laptop; chép thư mục output về, bỏ `traces/`):
+
+```bash
+uv run python -m flywheel_psi0.tray.eval_results configs/runplans/tray/he-tray-v2.yaml --set $SET --out $OUT --repeats 3 --no-yaw --json <file>
+```
+
+```bash
+uv run python -m flywheel_psi0.tray.place_error configs/runplans/tray/he-tray-v2.yaml --set $SET --out $OUT --repeats 3 --curve
+```
+
+```bash
+uv run python -m flywheel_psi0.tray.export_outcomes --set $SET --out $OUT --run <tên run> --outcomes <outcomes.jsonl> --repeats 3
+```
+
+Giới hạn đã biết: `eval_results` và `place_error` chưa nạp được plan `mix_train`, nên lệnh dùng `he-tray-v2.yaml`; khoảng tin cậy in ra dùng seed bootstrap của plan đó (20261103). Số theo luật của một run phải tính lại bằng `eval_results.bootstrap_ci` với seed của khối luật (run M: 20261125, khi gộp hai mức thì lấy lại trong từng mức). Không chạy `evidence.py` trên lô `jig2`.
+
+### 9.3 Lô run M `ckpt_100000` (thực đo, 26/11/2026)
+
+| Mục | Giá trị |
+|---|---|
+| Commit code | `f809d363d3f8c39794c64bded3975f19c561c8c3` (nhánh DA-47, đã push) |
+| Checkpoint | Run M `ckpt_100000`, sha256 `33584349…b02120a3`, kiểm lúc `fetch` |
+| Tập điều kiện | 60 điều kiện, `conditions.sha256` `bbec07e3…5d348` |
+| Mẫu kỹ thuật | 6 điều kiện, 1 lượt: 5 thành công, 1 `L-PLACE-POSE`; chỉ để kiểm đường chạy |
+| Lô | 18 lô × 10 rollout, 06:34Z–08:58Z, mọi lô `exit` 0 ở lần thử đầu, `missing` rỗng |
+| Colab | Một phiên L4, ba server; 6,8 CU cho cả phiên (158,63 xuống 151,83) |
+| Kết quả | 136/180; đọc theo luật ở [tray-jig.md](../../he/tray-jig.md) mục 5 |
+| Outcome K1 | 180 dòng `RolloutOutcome` hợp lệ, 44 dòng hỏng đều có `failure_t` và `at_failure`; đã giao nhóm C |
+| Sổ chi phí | [DA-47.csv](../ledger/DA-47.csv) |
