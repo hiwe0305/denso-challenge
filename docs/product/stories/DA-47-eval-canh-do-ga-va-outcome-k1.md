@@ -57,7 +57,7 @@ Tên số đo K1 đề xuất (hợp đồng yêu cầu hậu tố đơn vị):
 - [x] 1. Viết story này
 - [ ] 2. Eval trên cảnh đồ gá (AC 1, 2)
   - [x] 2.1 `eval_driver`: đăng ký env đồ gá, ghi `task_uid` vào dòng outcome
-  - [ ] 2.2 `eval_batch --scene`, từ chối lệch cảnh với tập điều kiện
+  - [x] 2.2 `eval_batch --scene`, từ chối lệch cảnh với tập điều kiện
 - [ ] 3. Đích theo cảnh trong `export_outcomes` và `place_error` (AC 3)
 - [ ] 4. `export_outcomes` xuất tín hiệu của DA-42 và `repeat` (AC 4)
 - [ ] 5. Tập điều kiện `jig2` (AC 5)

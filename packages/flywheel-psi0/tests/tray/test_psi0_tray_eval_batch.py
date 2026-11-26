@@ -247,3 +247,129 @@ def test_repeats_on_the_command_line(tmp_path: Path, capsys: pytest.CaptureFixtu
     ]
     with pytest.raises(SystemExit):
         eval_batch.main([*common, "--repeats", "0"])
+
+
+# --- DA-47 2.2: scene ----------------------------------------------------------------
+
+ZONE1_COMMAND = [
+    "py/simple", "-m", "flywheel_psi0.tray.eval_driver",
+    "simple/G1WholebodyTrayTransferTeleop-v0", "psi0_decoupled_wbc",
+    "--host", "127.0.0.1", "--port", "22186", "--data-format", "lerobot",
+    "--data-dir", "SET/dr-level-1", "--sim-mode", "mujoco", "--headless",
+    "--num-episodes", "4", "--episode-start", "10", "--eval-dir", "ATTEMPT/eval",
+]  # fmt: skip  # the command before DA-47, with SET and ATTEMPT for the paths
+OLD_RUN_KEYS = [
+    "chunk", "repeat", "level", "attempt", "start", "n", "seeds", "began", "wall_s", "exit",
+    "finished", "missing",
+]  # fmt: skip
+
+
+def captured_commands(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **setup: Any
+) -> tuple[list[list[str]], list[dict[str, Any]]]:
+    """Runs CHUNK through the real launcher with subprocess stubbed: client commands, runs rows."""
+    from flywheel_psi0.tray import eval_batch
+
+    commands: list[list[str]] = []
+
+    class Proxy:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def terminate(self) -> None:
+            pass
+
+        def wait(self, timeout: float) -> int:
+            return 0
+
+    def run(command: list[str], cwd: Path, **kwargs: Any) -> Any:
+        commands.append(command)
+        for episode in range(10, 14):
+            write_episode(cwd, CHUNK, episode)
+        return type("Done", (), {"returncode": 0})()
+
+    monkeypatch.setattr(eval_batch, "TIME_V", tmp_path / "no-time")
+    monkeypatch.setattr(eval_batch, "wait_for_port", lambda port: None)
+    monkeypatch.setattr(eval_batch.subprocess, "Popen", Proxy)
+    monkeypatch.setattr(eval_batch.subprocess, "run", run)
+    scene = setup.pop("scene", None)
+    base = eval_batch.Setup(
+        set_dir=Path("SET"),
+        server="127.0.0.1:22185",
+        listen=22186,
+        simple_python=Path("py/simple"),
+        proxy_python=Path("py/proxy"),
+        pythonpath="x",
+        run_plan_id="rp_x",
+        **setup,
+    )
+    kwargs = {} if scene is None else {"scene": scene}
+    out = tmp_path / "out"
+    assert run_batch(out, [CHUNK], eval_batch.launcher(base), log=lambda _: None, **kwargs) == 0
+    attempt = str(out / "l1-010/attempt-0")
+    paths = [[a.replace(attempt, "ATTEMPT") for a in c] for c in commands]
+    runs = [json.loads(line) for line in (out / "runs.jsonl").read_text().splitlines()]
+    return paths, runs
+
+
+def test_zone1_is_the_command_and_runs_rows_of_before(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commands, runs = captured_commands(tmp_path, monkeypatch)
+    assert commands == [ZONE1_COMMAND]
+    assert list(runs[0]) == OLD_RUN_KEYS
+
+
+def test_jig2_runs_the_jig_env_and_records_its_scene(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from flywheel_psi0.tray.eval_batch import SCENES
+
+    commands, runs = captured_commands(tmp_path, monkeypatch, env_id=SCENES["jig2"], scene="jig2")
+    jig = [*ZONE1_COMMAND]
+    jig[3] = "simple/G1WholebodyTrayTransferJigTeleop-v0"
+    assert commands == [jig]
+    assert list(runs[0]) == [*OLD_RUN_KEYS, "scene"] and runs[0]["scene"] == "jig2"
+
+
+def scene_set(tmp_path: Path, scene: str | None) -> list[str]:
+    """A 20 + 20 condition set of `scene` (None: no recorded scene), dry-run arguments."""
+    from flywheel_psi0.tray.eval_set import conditions_sha256
+
+    flywheel: dict[str, Any] = {"run_plan_id": "rp_a410d01efa62"}
+    if scene is not None:
+        flywheel["scene"] = scene
+    tmp_path.mkdir()
+    conditions = [
+        row | {"environment_config": {"flywheel": flywheel}} for row in rows({1: 20, 2: 20})
+    ]
+    (tmp_path / "conditions.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in conditions)
+    )
+    return [
+        "--set", str(tmp_path), "--conditions-sha256", conditions_sha256(conditions),
+        "--out", str(tmp_path / "out"), "--simple-python", "python", "--pythonpath", "x",
+        "--dry-run", "--max-chunks", "2",
+    ]  # fmt: skip
+
+
+def test_dry_run_prints_the_scene_and_a_set_of_another_scene_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from flywheel_psi0.tray import eval_batch
+
+    def no_subprocess(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("no subprocess before the scene check")
+
+    monkeypatch.setattr(eval_batch.subprocess, "Popen", no_subprocess)
+    monkeypatch.setattr(eval_batch.subprocess, "run", no_subprocess)
+    jig = scene_set(tmp_path / "jig", "jig2")
+    assert eval_batch.main([*jig, "--scene", "jig2"]) == 0
+    assert capsys.readouterr().out.splitlines()[0] == "l1-000 1000100 1000109 10 jig2"
+    assert eval_batch.main(jig) == 1  # default zone1: refused
+    assert eval_batch.main([*jig, "--scene", "zone1"]) == 1
+    old = scene_set(tmp_path / "old", None)  # no recorded scene: zone1
+    assert eval_batch.main(old) == 0
+    assert capsys.readouterr().out.splitlines()[0].endswith(" zone1")
+    assert eval_batch.main([*old, "--scene", "jig2"]) == 1
+    assert "set is for scene ['zone1'], --scene is jig2" in capsys.readouterr().err
