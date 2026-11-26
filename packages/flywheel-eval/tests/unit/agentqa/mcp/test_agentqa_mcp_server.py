@@ -24,6 +24,7 @@ from flywheel.eval.agentqa.mcp.server import (  # noqa: E402
     SERVER_NAME,
     McpServer,
     PackNotPublic,
+    _writer,
     build_parser,
     open_public_session,
 )
@@ -56,11 +57,11 @@ class Harness:
                                 clock=lambda: float(next(ticks)),
                                 now=lambda: datetime(2026, 11, 27, tzinfo=timezone.utc))
 
-    def raw(self, line: str) -> dict[str, Any] | None:
+    def raw(self, line: str | bytes) -> dict[str, Any] | None:
         reply = self.server.handle_line(line)
         if reply is None:
             return None
-        assert "\n" not in reply
+        assert "\n" not in reply and reply.isascii()
         message: dict[str, Any] = json.loads(reply)
         assert message["jsonrpc"] == "2.0"
         assert ("result" in message) != ("error" in message)
@@ -165,14 +166,15 @@ def test_params_that_are_not_an_object_are_refused(h: Harness) -> None:
     assert reply is not None and reply["error"]["code"] == -32602
 
 
-def test_a_tool_that_raises_is_an_internal_error_and_the_server_goes_on(
+def test_a_tool_that_raises_is_a_tool_error_and_the_server_goes_on(
         h: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
     def boom(*_: object) -> Any:
         raise RuntimeError("broken at /some/secret/path.py\nsecond line")
 
     monkeypatch.setitem(REGISTRY, "lineage", dataclasses.replace(REGISTRY["lineage"], run=boom))
-    error = h.request("tools/call", {"name": "lineage"}, id_=9)["error"]
-    assert error == {"code": -32603, "message": "Internal error: tool lineage failed: RuntimeError"}
+    result = h.request("tools/call", {"name": "lineage"}, id_=9)["result"]
+    assert result == {"content": [{"type": "text", "text": "tool lineage failed: RuntimeError"}],
+                      "isError": True}  # no structuredContent, no message, no path
     assert h.request("ping", id_=10)["result"] == {}
     assert h.records[0]["status"] == "failed" and h.records[0]["fact_ids"] == []
     assert h.records[0]["error"] == "RuntimeError: broken at /some/secret/path.py"
@@ -327,3 +329,82 @@ def test_the_server_refuses_a_pack_that_is_not_public(pack: Path, tmp_path: Path
     lines = done.stderr.splitlines()
     assert len(lines) == 1 and lines[0].startswith("error: ") and "internal" in lines[0]
     assert not (tmp_path / "calls.jsonl").exists()
+
+
+# -- what a client can send that is not clean (review of PR 240) -------------------------
+
+
+class Utf8Sink:
+    """A log stream that fails, as a UTF-8 file would, on what it cannot encode."""
+
+    def __init__(self) -> None:
+        self.text = ""
+
+    def write(self, s: str) -> int:
+        s.encode("utf-8")
+        self.text += s
+        return len(s)
+
+    def flush(self) -> None:
+        pass
+
+
+def test_a_line_that_is_not_utf8_is_a_parse_error(h: Harness) -> None:
+    assert h.raw(b"\xff\xfe\n") == {"jsonrpc": "2.0", "id": None,
+                                     "error": {"code": -32700, "message": "Parse error"}}
+    assert h.raw(b'{"jsonrpc":"2.0","id":1,"method":"\xc3\xa9"}\n')["error"] == {  # type: ignore[index]
+        "code": -32601, "message": "Method not found: \u00e9"}
+    assert h.request("ping")["result"] == {}
+
+
+@pytest.mark.parametrize("line", [
+    '{"jsonrpc":"2.0","id":3,"method":"ping"}\r\n',
+    b'{"jsonrpc":"2.0","id":3,"method":"ping"}\r\n',
+    '{"jsonrpc":"2.0","id":3,"method":"ping"}',
+    b'{"jsonrpc":"2.0","id":3,"method":"ping"}',
+    '\ufeff{"jsonrpc":"2.0","id":3,"method":"ping"}\n',
+    b'\xef\xbb\xbf{"jsonrpc":"2.0","id":3,"method":"ping"}\n',
+], ids=["crlf", "crlf-bytes", "no-newline", "no-newline-bytes", "bom", "bom-bytes"])
+def test_line_ends_and_a_byte_order_mark_are_served(h: Harness, line: str | bytes) -> None:
+    assert h.raw(line) == {"jsonrpc": "2.0", "id": 3, "result": {}}
+
+
+def test_a_long_line_is_answered(h: Harness) -> None:
+    filler = "x" * 2_000_000
+    reply = h.raw(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping",
+                              "params": {"pad": filler}}))
+    assert reply == {"jsonrpc": "2.0", "id": 1, "result": {}}
+
+
+@pytest.mark.parametrize(("line", "code"), [
+    ('{"jsonrpc":"2.0","id":1,"method":"\\ud800"}', -32601),
+    ('{"jsonrpc":"2.0","id":"\\ud800","method":"ping"}', None),
+    ('{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"\\udfff"}}', -32602),
+    ('{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"step_pass_table",'
+     '"arguments":{"runs":["\\ud800"]}}}', None),
+    ('{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"step_pass_table",'
+     '"arguments":{"\\ud800":1}}}', None),
+], ids=["method", "id", "tool-name", "argument-value", "argument-name"])
+def test_a_lone_surrogate_is_echoed_as_ascii(h: Harness, line: str, code: int | None) -> None:
+    reply = h.server.handle_line(line)
+    assert reply is not None and reply.isascii()
+    reply.encode("utf-8")
+    message = json.loads(reply)
+    if code is None:
+        assert "result" in message
+    else:
+        assert message["error"]["code"] == code
+    for record in h.records:  # as `run` writes the log, it must encode
+        sink = Utf8Sink()
+        _writer(sink)(record)  # type: ignore[arg-type]
+        assert sink.text.isascii()
+    assert h.request("ping")["result"] == {}
+
+
+def test_a_refused_call_with_a_surrogate_is_logged_in_ascii(h: Harness) -> None:
+    line = ('{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"step_pass_table",'
+            '"arguments":{"runs":["\\ud800"]}}}')
+    result = json.loads(h.server.handle_line(line) or "{}")["result"]
+    assert result["isError"] is True and "ud800" in result["content"][0]["text"]
+    assert [r["status"] for r in h.records] == ["refused"]
+    assert h.records[0]["params"] == {"runs": ["\ud800"]}
