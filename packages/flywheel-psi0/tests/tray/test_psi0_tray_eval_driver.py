@@ -38,8 +38,14 @@ class FakeTracker:
         }
 
 
+TASK_UID = "g1_wholebody_tray_transfer_teleop"
+JIG_TASK_UID = "g1_wholebody_tray_transfer_jig_teleop"
+
+
 def fake_simple_task() -> Any:
     class Task:
+        uid = TASK_UID
+
         def __init__(self, version: int = 2) -> None:
             self.tracker = FakeTracker("cfg", "sample", version)
             self.report: Any = None
@@ -54,7 +60,7 @@ def fake_simple_task() -> Any:
     class TrayTransferEnv:
         def __init__(self, steps: tuple[bool, ...] | None, time: float) -> None:
             report = None if steps is None else SimpleNamespace(steps=steps)
-            self.task = SimpleNamespace(report=report)
+            self.task = SimpleNamespace(report=report, uid=TASK_UID)
             self.mujoco = SimpleNamespace(mjData=SimpleNamespace(time=time))
 
         def outcome(self) -> dict[str, Any]:
@@ -78,6 +84,7 @@ def test_outcome_rows_get_the_step_flags_and_the_sim_time() -> None:
         "failure": "L-TIMEOUT",
         "scorer_steps": [True, True, False, False, False, False, False],
         "sim_time_s": 93.285,
+        "task_uid": TASK_UID,
     }
     assert simple_task.TrayTransferEnv(None, 0.0).outcome()["scorer_steps"] is None
 
@@ -107,6 +114,34 @@ def test_shadow_follows_the_tracker_of_each_reset() -> None:
     assert env_with(simple_task, task).outcome()["scorer_v1"] is None  # no step yet
     task.compute_reward(0.0)
     assert env_with(simple_task, task).outcome()["scorer_v1"]["failure"] is None
+
+
+def test_the_jig_task_gets_the_patches_and_its_shadow_scores_the_jig_target() -> None:
+    # jig_task.G1WholebodyTrayTransferJigTeleop: no compute_reward of its own; its reset
+    # runs the parent's (tracker of the zone1 sample), then replaces sample and tracker.
+    simple_task = fake_simple_task()
+    install(simple_task)
+    parent = simple_task.G1WholebodyTrayTransferTeleop
+
+    class JigTask(parent):  # type: ignore[misc, valid-type]
+        uid = JIG_TASK_UID
+
+        def reset(self) -> None:
+            super().reset()
+            self.sample = "jig sample"
+            self.tracker = FakeTracker("cfg", self.sample, self.tracker.version)
+
+    assert "compute_reward" not in vars(JigTask)
+    task = JigTask()
+    task.compute_reward(0.0)
+    task.reset()
+    jig_tracker = task.tracker
+    task.compute_reward(1.0)
+    assert task.tracker is jig_tracker  # the step did not swap trackers
+    assert task._fw_shadow[0] is task.tracker and task._fw_shadow[1].sample == "jig sample"
+    row = env_with(simple_task, task).outcome()
+    assert row["task_uid"] == JIG_TASK_UID
+    assert row["scorer_v1"]["failure"] == "L-TRAY-TILT" and row["scorer_v1"]["failure_t"] == 1.0
 
 
 def test_no_shadow_when_the_task_scores_with_version_1() -> None:
