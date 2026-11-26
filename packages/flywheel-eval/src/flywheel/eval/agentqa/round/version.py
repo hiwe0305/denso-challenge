@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Sequence
 from pathlib import Path
 
 import yaml
@@ -20,7 +21,7 @@ def agent_version(config: Path = AGENT_CONFIG) -> str:
 
 
 def agent_hash(task_id: str, plan: Path | None = None, root: Path = CONFIG_ROOT,
-               gateway_root: Path | None = None) -> str:
+               gateway_root: Path | None = None, disabled: Sequence[str] = ()) -> str:
     """sha256 over the (name, file sha256) pairs of what decides a round's verdict.
 
     The task view of `task_id`, the plan actually used (`plan`, by default the task's plan
@@ -36,6 +37,10 @@ def agent_hash(task_id: str, plan: Path | None = None, root: Path = CONFIG_ROOT,
 
     `gateway_root` is the directory the gateway read `routing.yaml` and `hosted.yaml`
     from; by default (or when it is `root`) the hash is the one of `root` alone.
+
+    `disabled`: rule ids a run switches off besides `agent.yaml`'s `disabled_rules` (which
+    the file's own hash covers), from `fw agentqa round --disable-rule`. Empty, the hash is
+    the files' alone; otherwise the sorted ids enter it as one more pair.
     """
     plan = plan if plan is not None else root / "plans" / f"{task_id}.yaml"
     gateway = gateway_root is not None and gateway_root.resolve() != root.resolve()
@@ -53,4 +58,6 @@ def agent_hash(task_id: str, plan: Path | None = None, root: Path = CONFIG_ROOT,
                         if (path := gateway_root / name).is_file())
     if plan.is_file():
         pairs.append(("plan", hashlib.sha256(plan.read_bytes()).hexdigest()))
+    if disabled:
+        pairs.append(("disabled_rules", ",".join(sorted(set(disabled)))))
     return hashlib.sha256("\n".join(f"{p} {h}" for p, h in pairs).encode()).hexdigest()

@@ -145,6 +145,11 @@ class RunRecord(Record):
         default=True, description="The code floor only (no judge, no verify); old files: true.")
     totals: RunTotals = Field(default_factory=RunTotals)
     model_hosts: list[str] = Field(default_factory=list)
+    # Left out of run.json when empty, so a run with every rule on writes what it wrote
+    # before DA-52; old files parse.
+    disabled_rules: list[str] = Field(
+        default_factory=list, exclude_if=lambda ids: not ids,
+        description="Rule ids switched off for this run: agent.yaml's, then --disable-rule.")
 
 
 class ModelRequest(Record):

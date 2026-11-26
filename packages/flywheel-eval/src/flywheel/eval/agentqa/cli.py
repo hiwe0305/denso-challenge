@@ -9,7 +9,7 @@
     fw agentqa estimates --path <estimates.jsonl> [--measure <ref>=<value> --source <ref>]
     fw agentqa pack --round <round.yaml> [--store <dir>]   freeze a round into pack.json (DA-43)
     fw agentqa round --pack <pack.json> --out <dir> [--no-model] [--from <step>]
-        [--plan <yaml>] [--store <dir>] [--gateway-config <dir>]
+        [--plan <yaml>] [--store <dir>] [--gateway-config <dir>] [--disable-rule <id> ...]
                                                            run a round into index.html (DA-43)
 
 Errors exit 2 with one line, as `fw eval` does. A run whose model part broke a
@@ -97,6 +97,9 @@ def round_command(
     store: Path | None = typer.Option(None, "--store"),
     gateway_config: Path | None = typer.Option(
         None, "--gateway-config", help="Directory with routing.yaml and hosted.yaml."),
+    disable_rule: list[str] = typer.Option(
+        [], "--disable-rule", help="Switch a rule off by id for this run (repeatable); "
+        "added to agent.yaml's disabled_rules, recorded in run.json and the agent hash."),
 ) -> None:
     """Run a round: pack, admit, measure, hypothesize, adjudicate, judge, verify, assemble,
     render."""
@@ -104,7 +107,7 @@ def round_command(
     try:
         record = run_round(pack, out, plan_path=plan, from_step=from_step,
                            command="fw agentqa round", no_model=mode, store=store,
-                           gateway_root=gateway_config)
+                           gateway_root=gateway_config, disable_rules=disable_rule)
     except (PackRefused, PlanRefused, RulesRefused, RunRefused, FileExistsError) as error:
         _fail(str(error))
         return
