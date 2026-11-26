@@ -59,7 +59,7 @@ Tên số đo K1 đề xuất (hợp đồng yêu cầu hậu tố đơn vị):
   - [x] 2.1 `eval_driver`: đăng ký env đồ gá, ghi `task_uid` vào dòng outcome
   - [x] 2.2 `eval_batch --scene`, từ chối lệch cảnh với tập điều kiện
 - [x] 3. Đích theo cảnh trong `export_outcomes` và `place_error` (AC 3)
-- [ ] 4. `export_outcomes` xuất tín hiệu của DA-42 và `repeat` (AC 4)
+- [x] 4. `export_outcomes` xuất tín hiệu của DA-42 và `repeat` (AC 4)
 - [x] 5. Tập điều kiện `jig2` (AC 5)
 - [ ] 6. Thử trên laptop và runbook (AC 6, 7)
   - [ ] 6.1 Cổng phát lại trên `jig2`, xuất K1, ghi kết quả
