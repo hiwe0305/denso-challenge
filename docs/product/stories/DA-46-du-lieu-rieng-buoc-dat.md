@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm (mở ngày 23/11/2026; dừng sau lô mẫu trên laptop để Hiếu xem) |
+| Trạng thái | Xong 26/11/2026 (lô `rtx3060` 612 episode cắt; số đo ở `docs/g0/tray/place-data.md` mục 7) |
 | Người làm | Hiếu |
 | Làn | Ngoài ba làn: adapter `flywheel-simple` (task bê khay), không sửa nhân hay làn |
 | Nguồn yêu cầu | Kế hoạch vòng chung kết ngày 19/11/2026 (`docs/mentor/2026-11-19-ke-hoach-vong-chung-ket.md`, chưa có trong git), hướng B: dữ liệu riêng cho bước đặt. Quyết định của Hiếu ngày 23/11/2026: sinh dữ liệu này trước, rồi train một lần trên toàn bộ |
@@ -50,7 +50,7 @@ Vì sao C: pha ARRIVE_B của planner đã có sẵn vòng sửa (bước tới 
 - [x] 3.1 Lệnh cắt release dẫn xuất từ ARRIVE_B, có test trên dữ liệu nhỏ (AC 3)
 - [x] 4.1 Lô mẫu trên laptop, số đo và runbook nháp cho `rtx3060` trong `docs/g0/tray/place-data.md` (AC 4)
 - [x] 4.2 Chạy đủ kiểm tra, `pr_guard`, mở PR (AC 6)
-- [ ] 5.1 Lô trên `rtx3060`, kho, thẻ dataset, `round.yaml` (AC 5; sau khi Hiếu xem mẫu)
+- [x] 5.1 Lô trên `rtx3060`, kho, thẻ dataset, `round.yaml` (AC 5; sau khi Hiếu xem mẫu)
 
 ## Phạm vi file
 
@@ -88,6 +88,7 @@ Theo 07 mục 3.1. File story luôn được sửa.
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 26/11/2026 | 5.1 xong: lô `rtx3060` 710 lượt, 612 episode cắt, kho có thẻ, `round.yaml`, bản sao laptop; số đo ở place-data.md mục 7 | Hiếu (soạn với Claude) |
 | 24/11/2026 | Hiếu chốt biên độ lệch đích CARRY ±10 cm cả hai trục cho lô `rtx3060` (5.1); lô chưa chạy | Hiếu (soạn với Claude) |
 | 23/11/2026 | Lô mẫu laptop (4.1): đính chính mục Story về độ lệch dọc sẵn có; đề xuất biên độ ±10 cm | Hiếu (soạn với Claude) |
 | 23/11/2026 | Tạo story theo quyết định của Hiếu ngày 23/11/2026 (sinh dữ liệu bước đặt trước, train một lần); phương án C do Claude đề xuất | Hiếu (soạn với Claude) |
