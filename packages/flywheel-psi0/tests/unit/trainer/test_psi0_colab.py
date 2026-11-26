@@ -183,6 +183,12 @@ def test_only_fully_saved_checkpoints_count_as_complete(tmp_path: Path) -> None:
     assert [p.name for p in completed_checkpoints(job)] == ["ckpt_20", "ckpt_40"]
 
 
+def test_latest_completed_checkpoint_is_ordered_by_step_not_by_name(tmp_path: Path) -> None:
+    job = fake_job(tmp_path, saved_step=100000, steps=(20000, 90000, 100000))
+
+    assert [p.name for p in completed_checkpoints(job)][-1] == "ckpt_100000"
+
+
 def test_persist_then_restore_brings_the_job_back_on_a_fresh_vm(tmp_path: Path) -> None:
     fake_job(tmp_path / "vm1", saved_step=40, steps=(20, 40, 60))
     drive = tmp_path / "drive"
