@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm (mở ngày 25/11/2026; PR mã trước, dữ liệu và freeze sau) |
+| Trạng thái | Train xong 26/11/2026 (nhiệm vụ 1.1–4.2); eval thuộc DA-47 |
 | Người làm | Hiếu |
 | Làn | Ngoài ba làn: adapter `flywheel-psi0` (task bê khay), không sửa nhân hay làn |
 | Nguồn yêu cầu | Quyết định của Hiếu ngày 23/11/2026 (DA-46: sinh dữ liệu bước đặt trước, rồi train một lần trên toàn bộ) và ngày 25/11/2026 (ngưỡng lọc sai lệch đặt ≤ 3 cm và ≤ 5°; một run) |
@@ -79,8 +79,8 @@ Vì sao cần mã mới (đã đọc mã ở `origin/master` `d54a4d89`):
 - [x] 3.1 Trên `rtx3060`: tách file giữ, `demo_sets --keep-seeds` cho bốn release, `demo_subset` bốn phần, `cplus_cut` ghép, đọc các giá trị cần ghim (AC 5)
 - [x] 3.2 PR freeze: điền ghim vào plan, bỏ `status: draft`, `mixplan freeze`, đặt frozen id trong `colab_train`, luật đọc và runbook trong `docs/he/tray-jig.md` (AC 5)
 - [x] 4.0 Cho phép wandb online qua FW_WANDB_MODE (Hiếu yêu cầu 25/11/2026), có test
-- [ ] 4.1 `mixplan pack`, đưa tar lên Drive, launch trên Colab L4 dưới watcher (AC 5)
-- [ ] 4.2 Persist checkpoint lên Drive, dừng VM, dòng sổ chi phí thực đo, giao checkpoint cho DA-47 nhóm A (AC 5)
+- [x] 4.1 `mixplan pack`, đưa tar lên Drive, launch trên Colab L4 dưới watcher (AC 5)
+- [x] 4.2 Persist checkpoint lên Drive, dừng VM, dòng sổ chi phí thực đo, giao checkpoint cho DA-47 nhóm A (AC 5)
 
 ## Phạm vi file
 
@@ -92,6 +92,8 @@ Theo 07 mục 3.1. File story luôn được sửa.
 - `packages/flywheel-psi0/tests/` (chỉ test của trainer)
 - `scripts/he/demo_subset.py` (chỉ khi một lỗi chặn release cắt)
 - `configs/runplans/tray/`
+- `packages/flywheel-psi0/src/flywheel_psi0/trainer/colab.py` và test của nó (chỉ thứ tự checkpoint, lỗi lộ ra ở run M)
+- `docs/g0/ledger/DA-48.csv`
 - `docs/he/` (file mới `docs/he/tray-jig.md` cho luật đọc và runbook; `docs/he/tray.md` chỉ thêm tối đa một dòng chỉ mục)
 
 ## Ghi chú cho người làm
@@ -123,3 +125,4 @@ Theo 07 mục 3.1. File story luôn được sửa.
 | 25/11/2026 | 3.1, 3.2: tập M dựng trên `rtx3060` (1 037 episode, 948 639 khung, thực đo) và ghim vào plan; Hiếu chốt GPU L4, trần 60 CU; plan đóng băng `rp_a410d01efa62`; luật đọc và runbook ở `docs/he/tray-jig.md` | Hiếu (soạn với Claude) |
 | 25/11/2026 | Tạo story theo quyết định của Hiếu ngày 25/11/2026 (ngưỡng lọc ≤ 3 cm và ≤ 5°, một run M); phương án do Claude đề xuất | Hiếu (soạn với Claude) |
 | 25/11/2026 | 4.0: công tắc `FW_WANDB_MODE` (offline mặc định, online khi đặt) cho trainer, để run M ghi wandb.ai trực tiếp; thêm hai đường dẫn vào Phạm vi file | Hiếu (soạn với Claude) |
+| 26/11/2026 | 4.1, 4.2 xong: run M đủ 100 000 bước, số thực đo ở `docs/he/tray-jig.md` mục 4 và `docs/g0/ledger/DA-48.csv`; sửa `restore` (symlink) và thứ tự checkpoint; thêm hai đường dẫn vào Phạm vi file | Hiếu (soạn với Claude) |

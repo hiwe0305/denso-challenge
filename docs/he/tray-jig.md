@@ -102,9 +102,33 @@ Mặc định wandb chạy `offline`. Muốn đồ thị lên wandb.ai theo th�
 python3 -m flywheel_psi0.tray.colab_train restore --branch M --work /content/da48
 ```
 
-`restore` chép về checkpoint mới nhất còn nguyên vẹn trên Drive; `train` chạy tiếp từ đó với cùng job `da48-ft-m-s0`. Bước này chưa thử trên job thật.
+`restore` chép về checkpoint mới nhất còn nguyên vẹn trên Drive; `train` chạy tiếp từ đó với cùng job `da48-ft-m-s0`. Lần thử thật ngày 26/11/2026 hỏng vì symlink `wandb/latest-run` trên Drive (mục 4); bản sửa bỏ qua symlink, có test, chưa chạy lại trên job thật.
 
 **F. Khi xong.** Dừng VM, ghi dòng ledger thực đo (CU, giờ) trỏ về dòng ước tính, ghi sha256 của `ckpt_100000`, và giao đường dẫn Drive cho story DA-47.
+
+## 4. Kết quả train (thực đo, 26/11/2026)
+
+Chỉ là số của lần train. Chưa có eval; mọi quy tắc ở mục 2 còn nguyên.
+
+| Mục | Giá trị thực đo |
+|---|---|
+| Số bước | 100 000 / 100 000, `result.json` ghi `status: ok` |
+| Phiên 1 | L4, 03:48Z 25/11 tới khoảng 17:12Z; laptop tắt nên watcher trả VM ở khoảng bước 61 374; 31,22 CU; 1,46 bước/giây |
+| Phiên 2 | L4 mới, chạy tiếp từ `ckpt_60000` lúc 18:08Z 25/11, tới bước 100 000 lúc 02:31Z 26/11 (0,74 giây/bước); 24,93 CU, trong đó khoảng 4,3 CU là VM chờ sau khi train xong |
+| Tổng | 56,15 CU (số dư 214,88 xuống 158,73), khoảng 21 giờ train. Ước lượng trước là 40 CU và 20 giờ |
+| Checkpoint | `ckpt_10000` … `ckpt_100000` trên `MyDrive/denso/da48/runs/da48-ft-m-s0/`; laptop có bản không kèm optimizer ở `fwdata/tray/jig-m/da48-ft-m-s0/` |
+| sha256 của `ckpt_100000/model.safetensors` | `3358434935cea2cd64e17ed57fc22799218bc630f5c322c787a836b9b02120a3`, khớp giữa Drive và laptop (6 253 648 840 byte) |
+| Loss validation | 0,615 (20k), 0,408 (40k), 0,361 (60k), 0,342 (80k), 0,174 (bước cuối). Dao động mạnh giữa các lần đo (0,402 ở 98k), không dùng để kết luận chất lượng |
+| wandb | run `ikp5c209` của project `psi`, một run cho cả hai phiên |
+| Sổ chi phí | [DA-48.csv](../g0/ledger/DA-48.csv), hai dòng thực đo. Không có dòng ước tính ghi trước (sót, đã ghi trong sổ) |
+
+Ba lỗi vận hành gặp trong run, không ảnh hưởng trọng số:
+
+1. `restore` hỏng khi Drive có symlink `wandb/latest-run`; lần này chép `ckpt_60000` bằng `rsync`. Đã sửa trong mã, có test.
+2. Vòng `follow` không thấy `ckpt_100000` vì `completed_checkpoints` xếp theo tên (`ckpt_100000` đứng trước `ckpt_20000`), nên không tự dừng VM; kéo tay rồi dừng. Đã sửa trong mã, có test. Lỗi chỉ lộ khi run từ 100 000 bước.
+3. Tiến trình `guard` thoát ở phút thứ 5 của phiên 1 (chưa có phiên nào được liệt kê lúc Colab trả 503) và không chạy ở phiên 2; chỉ watcher của phiên canh CU. Chưa sửa.
+
+Giao cho DA-47: đường dẫn Drive và sha256 ở bảng trên; `ckpt_60000` và `ckpt_80000` là bản đọc sớm theo quy tắc 6.
 
 ## Change log
 
@@ -112,3 +136,4 @@ python3 -m flywheel_psi0.tray.colab_train restore --branch M --work /content/da4
 |---|---|---|
 | 25/11/2026 | Tạo: mô tả run M, quy tắc đọc kết quả (đề xuất), runbook | Hiếu (soạn với Claude) |
 | 25/11/2026 | Thêm đoạn bật wandb online qua `FW_WANDB_MODE` ở bước D (ngoài khối luật đọc) | Hiếu (soạn với Claude) |
+| 26/11/2026 | Mục 4 mới: số thực đo của lần train (100 000 bước, 56,15 CU, sha256 của `ckpt_100000`), ba lỗi vận hành; sửa câu cuối bước E | Hiếu (soạn với Claude) |
