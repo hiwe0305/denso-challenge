@@ -616,3 +616,69 @@ Giới hạn:
 - `L-TIMEOUT` và `L-PART-DROP` còn thiếu số đo (`cmd_*`, `meas_*`, `part_positions`); tín hiệu chốt bước `approach_a` (`palm_handle_distance_min`) chưa nối với tên mới của outcome.
 - Lượt `M/l2-s1000100-r1` tới bàn B mà không bước nào được chốt; agent xếp vào lỗi bộ chấm, cần nhóm A xem.
 - Agent chỉ đề xuất loại dữ liệu (`teleop_correction`), chưa nói nội dung demo (sửa góc, hạ khay vào lòng đồ gá) và chưa có chi phí.
+
+## 10. Máy chủ MCP cho các công cụ phân tích (DA-49)
+
+`fw agentqa mcp` mở một gói vòng và lộ các công cụ của sổ đăng ký (`agentqa/tools/registry.py`, hiện 13 công cụ) qua MCP trên stdio, để một vỏ chat nói được MCP gọi chúng. Máy chủ chỉ trả fact do code tính; nó không sinh văn bản và không gọi model. Story: [DA-49](../product/stories/DA-49-may-chu-mcp-cong-cu-phan-tich.md). **[Đã chốt]** phương án A (thư viện chuẩn của Python, không thêm phụ thuộc), Hiếu, 26/11/2026.
+
+### 10.1 Cách chạy
+
+```bash
+uv run fw agentqa mcp --pack fwdata/agentqa/cases/stage1-60k-out/pack.json [--log <file>]
+```
+
+Chạy từ gốc repo, vì công cụ đọc `configs/eval/agentqa/` theo đường dẫn tương đối. Máy chủ chạy `admit` một lần, giữ `MeasureContext` và một `FactBook` trong bộ nhớ, rồi đọc JSON-RPC 2.0 từ stdin (mỗi dòng một thông điệp) đến khi stdin đóng. Stdout chỉ chứa thông điệp giao thức.
+
+| Phần | Nội dung |
+|---|---|
+| Bản giao thức | Ghim `2025-11-25`, trả đúng bản này ở `initialize` dù vỏ chat hỏi bản nào. Bản hiện hành của MCP là `2026-07-28`, đã bỏ `initialize` và `ping` mà story yêu cầu, nên máy chủ ghim bản cuối còn hai phương thức này. Nguồn đặc tả ghi ở đầu `agentqa/mcp/server.py` |
+| Phương thức | `initialize`, `ping`, `tools/list`, `tools/call`. Phương thức lạ trả `-32601`; dòng không phải JSON trả `-32700` và máy chủ chạy tiếp; thông điệp không có `id` (notification) không được trả lời |
+| `tools/list` | Tên, mô tả và JSON Schema của tham số. Miền đóng của mỗi tham số (run, mức, nhãn, job, bước của task) là `enum` tính từ gói đang mở. Công cụ thiếu dữ liệu vẫn được liệt kê, mô tả ghi rõ loại artifact còn thiếu |
+| `tools/call` | Kết quả có `structuredContent` (`status`, `facts`, `rows`, `not_judged`) và cùng nội dung dạng chuỗi JSON trong `content`. Tham số ngoài miền trả `isError: true` kèm lý do của `check_params`, không chạy gì và không ghi fact. Tên công cụ lạ trả lỗi giao thức `-32602` |
+| Nhật ký | Mỗi dòng một JSON, ra stderr hoặc file `--log` (ghi nối). Dòng đầu là `started` (id và sha256 của gói, lớp dữ liệu, số công cụ, các entry bị loại); sau đó mỗi lời gọi một dòng `call`: công cụ, tham số, trạng thái, id các fact, số giây |
+
+Khai máy chủ trong cấu hình MCP của một vỏ chat (dạng `mcpServers` mà Claude Code và nhiều vỏ khác dùng; tên trường của từng vỏ có thể khác, xem tài liệu của vỏ đó):
+
+```json
+{
+  "mcpServers": {
+    "flywheel-agentqa": {
+      "command": "uv",
+      "args": ["run", "fw", "agentqa", "mcp", "--pack", "fwdata/agentqa/cases/stage1-60k-out/pack.json"],
+      "cwd": "<đường dẫn tới gốc repo>"
+    }
+  }
+}
+```
+
+Mã Python khác (vòng lặp suy luận của agent) không cần stdio: import `ToolSession` từ `flywheel.eval.agentqa.mcp.bridge`, gọi `tools()` và `call(name, params)`.
+
+### 10.2 Ba ràng buộc
+
+- **Lớp dữ liệu.** Máy chủ không biết model sau vỏ chat là tự host hay hosted, nên chỉ mở gói mà `admit` xác nhận `public`, bằng đúng phép kiểm `hosted_refusal` của cổng model. Gói `internal`, `restricted`, hoặc gói khai `public` mà không có bản ghi nguồn xác nhận thì bị từ chối khi khởi động, mã thoát 2. Không có cờ, biến môi trường hay tham số nào bỏ qua phép kiểm này; một test soi danh sách tùy chọn của lệnh để cờ như vậy không được thêm lặng lẽ.
+- **Chỉ đọc gói.** Công cụ chỉ đọc các file mà gói khai và `admit` đã nhận. Không tham số nào nhận đường dẫn file: mọi chuỗi trong schema đều thuộc một `enum`, có test quét.
+- **Số từ code.** Máy chủ chỉ trả fact do công cụ sinh. `FactBook` sống suốt một phiên, nên gọi lại cùng công cụ cùng tham số trả cùng fact, cùng id.
+
+### 10.3 Lần chạy tay trên gói thật, 27/11/2026
+
+Gói `stage1-60k-out` (`pack_d1b5f9462d0d6b36`, 258 entry, `admit` xác nhận `public`, không entry nào bị loại). Một lần chạy, trên laptop, gửi tay năm dòng JSON-RPC qua stdin.
+
+| Bước | Kết quả |
+|---|---|
+| Khởi động | Câu trả lời `initialize` về sau 21,4 giây (một lần đo, gồm cả `uv run`); phần lớn là `admit` băm và kiểm 258 file |
+| `tools/list` | 13 công cụ, đúng thứ tự sổ đăng ký. `cost_lookup` và `history_lookup` ghi thiếu loại `ledger` và `fix_rate` trên gói này |
+| `tools/call` `paired_compare`, `pairs = [["C_70", "B_70"]]` | `ran`, 15 fact, 0,048 giây. `C_70` thành công 10 và `B_70` thành công 7 trên 60 điều kiện ghép cặp; hiệu 0,05, khoảng bootstrap 95% từ −0,0833 đến 0,1833 (chứa 0); McNemar chính xác p = 0,6291 |
+| `tools/call` với run `nope` | `isError: true`: "run 'nope' is not in the pack (runs: C_70, C_ALL, B_70, B_ALL)"; không fact nào được ghi |
+
+Số ở dòng `paired_compare` là số sơ bộ trong sim, cùng nguồn với [tray.md](../he/tray.md); mục này chỉ dùng chúng để xác nhận máy chủ trả đúng fact của công cụ.
+
+### 10.4 Giới hạn
+
+- Chưa thử với vỏ chat thật nào (DeepSeek Harness, Claude Code). Mọi kiểm tra là test và lần gửi tay ở 10.3. Vỏ chat chỉ nói bản MCP khác `2025-11-25` có thể ngắt kết nối sau `initialize`; chưa đo.
+- Khởi động mất khoảng 21 giây trên gói 258 file (một lần đo). Vỏ chat có thời hạn khởi động ngắn hơn cần nâng thời hạn; chưa đo với vỏ nào.
+- Máy chủ không chặn được câu trả lời cuối của vỏ chat: việc mọi câu phải dẫn fact là việc của vỏ. Máy chủ chỉ nhắc điều đó trong `instructions` của `initialize`.
+- Chỉ có phần công cụ của MCP: không có resource, prompt, phân trang hay kiểu truyền HTTP.
+- Schema rộng hơn miền thật ở ba chỗ, `check_params` vẫn kiểm đúng: `levels` liệt kê mức của mọi run chứ không riêng các run của lời gọi; `window` thành khoảng số nguyên khi log có hơn 64 bước; `pairs` không cấm ghép một run với chính nó.
+- Một công cụ ném lỗi giữa chừng trả `-32603` và máy chủ chạy tiếp, nhưng các fact nó đã ghi trước đó vẫn ở lại trong `FactBook` của phiên.
+- Lệnh chưa có `--store` như dòng lệnh trong story: không công cụ nào đọc store lúc gọi, và phiên máy chủ chưa ghi `LedgerEntry`. Cần Hiếu quyết phiên máy chủ có tính là một job hay không.
+- Test tương đương với bước `measure` chạy trên gói giả chỉ có `scores`: 7 công cụ chạy thật, 6 công cụ chỉ được kiểm ở nhánh thiếu dữ liệu.
