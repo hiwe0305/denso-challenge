@@ -11,6 +11,12 @@ condition reader) with two runtime patches, so no pinned file of the plan change
   plus `scorer_v1`: steps, success, failure and failure time of scorer version 1 run
   on the same states by a shadow tracker, so the two versions compare on one rollout
   (rollouts do not repeat on EGL). Rows are only added to; old keys keep their meaning;
+* (DA-47) the task's `uid` (`task_uid`): `simple_task.TASK_UID` on scene zone1,
+  `jig_task.JIG_TASK_UID` on scene jig2; a row without it is zone1. The jig env id is
+  registered too (`jig_task.register`); its task subclasses the zone1 task without
+  overriding `compute_reward`, and runs in the same `TrayTransferEnv`, so both patches
+  apply to it. Its `reset` replaces `task.tracker` after the parent's, before any step;
+  the shadow is built at the first `compute_reward`, from the tracker of the jig target;
 * with `FW_TRACE_JOB_DIR` set, DA-38's trace hook (`flywheel_simple.trace.run`) records
   every control cycle (command, measured state, base yaw) under that directory, the
   input of `fw eval diag-system` and of Agent QA/QC.
@@ -48,6 +54,7 @@ def with_scorer_steps(outcome: Callable[[Any], dict[str, Any]]) -> Callable[[Any
         report = self.task.report
         row["scorer_steps"] = None if report is None else [bool(s) for s in report.steps]
         row["sim_time_s"] = float(self.mujoco.mjData.time)
+        row["task_uid"] = self.task.uid
         tracker = getattr(self.task, "tracker", None)
         if tracker is not None:
             row.update(tracker.outcome_fields())
@@ -133,9 +140,12 @@ def eval_args(argv: Sequence[str]) -> list[str]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = eval_args(sys.argv[1:] if argv is None else argv)
-    from flywheel_simple.tray import run, simple_task  # SIMPLE's venv only
+    from flywheel_simple.tray import jig_task, run, simple_task  # SIMPLE's venv only
 
     install(simple_task)
+    # run.main registers the zone1 env id (run.prepare); one worker builds its env in this
+    # process (eval_args), so registering the jig env id here is enough.
+    jig_task.register()
     if os.environ.get("FW_TRACE_JOB_DIR"):
         from flywheel_simple.trace.run import install_from_env
 

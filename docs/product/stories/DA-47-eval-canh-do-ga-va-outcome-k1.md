@@ -30,7 +30,7 @@ Hiện trạng ngày 25/11/2026 (đọc code trên master `d54a4d89` và nhánh 
 
 1. **Cảnh là một tham số của lô eval.** `eval_batch --scene {zone1,jig2}`, mặc định `zone1` cho đúng lệnh và thư mục cũ. `jig2` chọn env đồ gá. `eval_driver` đăng ký env đồ gá và ghi `task_uid` vào dòng outcome; bản vá bộ chấm đặt trên lớp cha nên lớp đồ gá dùng luôn.
 2. **Đích theo cảnh, một chỗ.** Một hàm `target_of(task_uid)` dùng chung cho `export_outcomes` và `place_error`: `sample_jig_episode` cho đồ gá, `sample_episode` cho phần còn lại. Dòng outcome cũ không có `task_uid` đọc là `zone1`.
-3. **Tập điều kiện.** `eval_set` dựng tập từ plan của nhóm B và một release `jig2` làm mẫu; tập ghi cảnh của nó, và `eval_batch` từ chối chạy tập của cảnh này trên env của cảnh kia. Cỡ đề xuất: mức 1 và 2, mỗi mức 30 điều kiện, 3 lượt, tức 180 rollout mỗi checkpoint. Seed lấy ngoài mọi dải seed train (bảng seed ở jig.md mục 5.1).
+3. **Tập điều kiện.** `eval_set` dựng tập từ plan của nhóm B và một release `jig2` làm mẫu; tập ghi cảnh của nó, và `eval_batch` từ chối chạy tập của cảnh này trên env của cảnh kia. Cỡ đề xuất: mức 1 và 2, mỗi mức 30 điều kiện, 3 lượt, tức 180 rollout mỗi checkpoint. Seed `1000100–1000129` ở cả hai mức: mô phỏng chỉ nhận seed eval trong dải dev `1000000–1000999` (`randomize.py`), và dải này không trùng seed train nào của run M (`500000–501189`, `520000–521212`); `eval_set --exclude-seeds-of` kiểm điều đó với bốn release của plan.
 4. **K1 đủ tín hiệu.** `export_outcomes` đọc dòng outcome của DA-42: phiên bản bộ chấm, `failure_t`, `step_latch_t`, `at_failure`, bản 1 chạy kèm vào `other_verdicts`, khoảng cách tay–tay cầm vào `extrema`, `repeat` thật. Dòng cũ không có các trường đó vẫn xuất như hiện nay.
 
 Tên số đo K1 đề xuất (hợp đồng yêu cầu hậu tố đơn vị):
@@ -56,7 +56,7 @@ Tên số đo K1 đề xuất (hợp đồng yêu cầu hậu tố đơn vị):
 
 - [x] 1. Viết story này
 - [ ] 2. Eval trên cảnh đồ gá (AC 1, 2)
-  - [ ] 2.1 `eval_driver`: đăng ký env đồ gá, ghi `task_uid` vào dòng outcome
+  - [x] 2.1 `eval_driver`: đăng ký env đồ gá, ghi `task_uid` vào dòng outcome
   - [ ] 2.2 `eval_batch --scene`, từ chối lệch cảnh với tập điều kiện
 - [ ] 3. Đích theo cảnh trong `export_outcomes` và `place_error` (AC 3)
 - [ ] 4. `export_outcomes` xuất tín hiệu của DA-42 và `repeat` (AC 4)
@@ -64,6 +64,7 @@ Tên số đo K1 đề xuất (hợp đồng yêu cầu hậu tố đơn vị):
 - [ ] 6. Thử trên laptop và runbook (AC 6, 7)
   - [ ] 6.1 Cổng phát lại trên `jig2`, xuất K1, ghi kết quả
   - [ ] 6.2 Runbook eval checkpoint trên `jig2`
+- [ ] 8. Sửa theo review PR 221: Wilson mô tả dùng n_eff = số điều kiện; `missing` ghi lượt; `--stage1` chỉ kiểm lượt 0; báo khi thư mục có nhiều lượt hơn số đọc; `evidence` từ chối lô có `.rN`
 - [ ] 7. Kiểm tra đủ, `pr_guard`, mở PR (AC 8)
 
 Thứ tự: 2.1, 3 và 4 làm được ngay sau khi DA-42 merge. 5 và 6.2 cần plan của nhóm B.
@@ -72,7 +73,7 @@ Thứ tự: 2.1, 3 và 4 làm được ngay sau khi DA-42 merge. 5 và 6.2 cần
 
 Theo 07 mục 3.1. File story luôn được sửa.
 
-- `packages/flywheel-psi0/src/flywheel_psi0/tray/eval_driver.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/eval_batch.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/eval_set.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/export_outcomes.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/place_error.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/replay_server.py`
+- `packages/flywheel-psi0/src/flywheel_psi0/tray/eval_driver.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/eval_batch.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/eval_set.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/export_outcomes.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/place_error.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/replay_server.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/export_scores.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/eval_results.py`, `packages/flywheel-psi0/src/flywheel_psi0/tray/evidence.py`
 - `packages/flywheel-psi0/tests/tray/`
 - `packages/flywheel-simple/src/flywheel_simple/tray/run.py`, `packages/flywheel-simple/tests/tray/test_run_eval.py`
 - `docs/g0/tray/`
@@ -83,6 +84,7 @@ Theo 07 mục 3.1. File story luôn được sửa.
 2. **Plan của nhóm B.** `eval_set` cần một plan có `eval.by_level` và `run_plan_id`. Cần nhóm B cho biết plan nào, và dải seed train để tránh.
 3. **Cỡ tập điều kiện** (30 điều kiện × 2 mức × 3 lượt) là đề xuất; Hiếu chốt. Ước lượng, chưa đo: 18 lô 10 rollout × 50–61 phút ≈ 15–18 giờ trên một làn cho mỗi checkpoint, khoảng 5–6 giờ với ba làn.
 4. **Tên số đo K1.** `configs/eval/agentqa/tasks/tray.yaml` (`signal_measures`, file của DA-43) ghi tên là giả định cho tới khi bộ xuất chốt. Nhóm C cần thêm ba tín hiệu `tray_tilt_at_failure`, `tray_contact_at_failure`, `tray_on_table_at_failure` trỏ vào tên ở bảng trên. DA-47 không sửa file đó.
+7. **`task_id` của outcome giữ `tray` trên cả hai cảnh** (25/11/2026 chưa hỏi PO): lane chọn task view theo `task_id` và `admit` của agentqa từ chối bản ghi lệch `task_id`, nên đặt id riêng cho đồ gá sẽ bị từ chối cho tới khi có task view đồ gá. Cảnh nhận ra qua `final.target_xy_m`. `evidence.py` vẫn dùng đích `zone1`: không chạy nó trên lô `jig2`.
 5. **`run.py` bị plan đóng băng ghim.** Nếu phải sửa `run.py`, `Decision` của DA-42 hết hiệu lực với file đó và cần ghi lại. Ưu tiên cách không đụng `run.py`.
 6. **Thay đổi hợp đồng:** không cần. `RolloutOutcome` đã đủ chỗ; nếu phát hiện thiếu thì dừng và đề xuất PR hợp đồng cho Hiếu.
 
