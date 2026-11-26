@@ -187,3 +187,25 @@ Cổng phát lại: release `tray_s1_0d84cc87b1e5`, seed 1000, mức 1, episode 
 4. Bản vá `compute_reward` của `eval_driver` đã chạy trong `eval-decoupled-wbc` thật, nhưng chỉ một episode phát lại của planner (mục 7.1); chưa chạy với Ψ₀ serve thật hay khi có lỗi.
 5. Hệ số thiết kế thật của eval lặp.
 6. Plan đã đóng băng ghim `predicates.py` và `run.py` bằng sha256. Từ 25/11/2026 (Hiếu duyệt), `he-tray-pair60k` và `he-tray-v2` có `<plan>.pins.decision.json` ghi sha256 đã ghim và sha256 được chấp nhận; chốt chỉ bỏ qua đúng hai file đó ở đúng nội dung đó, sửa tiếp là chốt bật lại. Số của hai plan đọc trước 25/11/2026 là bản 1. `he-tray-b` và `he-tray-cmax` là bản nháp, không có `Decision`.
+
+## 9. Bản 2 trên cảnh đồ gá `jig2` (DA-47)
+
+Từ DA-47, `eval_batch --scene jig2` chạy env đồ gá của DA-41 với cùng bộ chấm và cùng bản vá. Dòng outcome ghi `task_uid`; `export_outcomes` và `place_error` lấy đích theo cảnh (`place_error.target_for`), và `export_outcomes` xuất đủ tín hiệu của mục 4 theo hợp đồng K1 (`RolloutOutcome`).
+
+### 9.1 Thử trên laptop (26/11/2026)
+
+Một episode của release `tray_s1_bfbdcbcf719e` (kho `tray-s1-jig2-20261122`, seed 500000, mức 1) phát lại qua `eval_driver` thật với env `simple/G1WholebodyTrayTransferJigTeleop-v0`, lệnh như mục 7 bước A, đổi env id và release. Thực đo, một lượt:
+
+| Mục | Kết quả |
+|---|---|
+| Chạy | Client thoát mã 0; 188 lần hỏi action; dòng outcome có `task_uid` `g1_wholebody_tray_transfer_jig_teleop`, `scorer_version` 2, `scorer_v1` |
+| Bản 2 | Sáu bước đầu chốt (7,925 · 8,085 · 10,325 · 14,485 · 23,005 · 24,865 s), `release_stand` không; `L-PLACE-POSE` lúc 30,605 s: khay trên bàn B, không tay nào chạm, nghiêng 3,6° |
+| Bản 1, cùng trạng thái | `L-TRAY-TILT` lúc 28,225 s: khay rời bàn, tay trái còn chạm, nghiêng 17,4° |
+| Sai lệch đặt | Theo đích đồ gá (−1,100; 0,000; 0°): 5,7 cm và 2,3°. Tính nhầm theo đích `zone1` của cùng seed sẽ ra 2,4 cm và 6,6° |
+| Xuất K1 | `RolloutOutcome` hợp lệ: `simple-tray-predicates@2`, `other_verdicts` có `@1`, `failure_t`, `at_failure`, sáu số `extrema` |
+
+Đọc:
+
+- Đường eval trên `jig2` chạy trọn và ghi đủ tín hiệu; đích theo cảnh là cần thiết (hai đích cho hai kết luận khác nhau về cùng một khay).
+- Episode này thành công lúc sinh (7 bước, release đã qua QA) nhưng phát lại hở vòng qua đường eval thì hỏng ở bước nhả: khay bị kéo lệch khi buông và nằm nghiêng 3,6° trên bàn B, cách đích 5,7 cm. Trên `zone1` (mục 7.1) phát lại vẫn thành công. Giả thuyết, chưa kiểm: đồ gá đòi vị trí chính xác hơn nên sai khác nhỏ giữa lúc sinh và lúc phát lại (khởi động của `eval-decoupled-wbc`, chia action thành đoạn 24) đủ làm hỏng; policy chạy kín vòng nên không chịu đúng lỗi này. Vì vậy cổng phát lại trên `jig2` chỉ xác nhận phần kỹ thuật, không xác nhận rằng một quỹ đạo tốt được chấm thành công.
+- Rollout hỏng lúc 30,6 s vẫn chạy tới hết giờ (93,3 s mô phỏng): env không dừng khi bộ chấm đã gắn lỗi. Đây là phần lớn thời gian của một lô có nhiều rollout hỏng; chưa sửa.
