@@ -567,3 +567,40 @@ Kết quả lớp code (`--no-model`), chấm bằng DA-31 (`da31-3`, hash kết
 - Đây là lần đầu trên cả hai nửa của bộ lỗi cấy model bắt thêm được lỗi mà lớp code không bắt: nó giữ hint "cùng dấu vân tay QA" thành phát hiện D5 cho cả ba episode trùng.
 - Cái giá là hai phát hiện D5 sai, ở `episode_000072` và `episode_000090`. Cả hai là episode đã bị cấy NaN (D1 trúng), nên nhiều khả năng chúng có cùng dấu vân tay QA vì cùng hỏng một kiểu chứ không trùng nhau; chưa mở báo cáo để xác nhận lý do model nêu.
 - Một lần chạy, một model, 33 lỗi cấy: chưa đo độ ổn định giữa các lần chạy. Cổng ckey là bên bán lại, không xác minh được model đứng sau tên.
+
+### 9.9 Vòng thật run M trên cảnh đồ gá, 26/11/2026
+
+Đầu vào: 180 `RolloutOutcome` và 180 `Score` của run M (checkpoint 100 000, cảnh `jig2`, mức 1 và 2, 30 seed, 3 lần lặp), do DA-47 xuất; sha256 `a02e84f7…` và `504ec23c…`. Gói `pack_c8c83db67cd49981`, lớp `public` theo một bản ghi `Source` khai tay (dữ liệu sim G1, design 27/10 mục 8.4). Gói không có trace, log train, điều kiện, sổ chi phí, nên lần chạy là `degraded` và năm công cụ không xét (`trace_stats`, `train_window`, `coverage_distance`, `cost_lookup`, `history_lookup`). Số dưới đây là sơ bộ: một run train, một seed train, chỉ trong sim.
+
+Số đếm của agent so với số nhóm A đo tay độc lập:
+
+| Đại lượng | Nhóm A | Agent |
+|---|---|---|
+| Lượt hỏng | 44/180 | 44, trong 11 cụm |
+| `L-PLACE-POSE` | 28 | 28 (5 cụm) |
+| `L-TRAY-TILT` | 13 | 13 (3 cụm) |
+| Lượt hỏng ở mức 2 | 31 | 31 |
+
+**Lần chạy đầu, trước nhiệm vụ 4.11.** Lớp code chỉ có luật `near_miss_placement` cho 16 lượt (đề xuất `teleop_correction`); 11 lượt `L-PLACE-POSE` và cả 13 lượt `L-TRAY-TILT` rơi vào "không luật nào khớp". `claude-opus-5-5` (cổng ckey, 10 lời gọi vai `rank`, đều `ok`, 4 phút 46 giây, 21 801 token vào, 5 217 token ra) giữ nguyên mọi hạng và đề xuất của code; một câu trả lời bị loại ở phép so fact, ba cụm một lượt vượt trần số cụm. Model không nêu được cơ chế nào mới, vì vai `rank` chỉ xếp hạng giả thuyết do luật của code sinh, và chưa fact nào mang độ cao hay sai số góc của từng cụm.
+
+**Sau nhiệm vụ 4.11** (`relaxed_sweep` bản 2, lớp code, chưa chạy lại model). Mốc độ cao là trung vị độ cao cuối của khay ở 136 lượt thành công của chính run: 0,852 m. Biên 0,01 m là **giả định**, đọc từ một run này, và được chọn sau khi đã biết số của nhóm A, nên việc khớp không phải phép kiểm độc lập.
+
+| Cụm `L-PLACE-POSE` | Số lượt | Khay nằm cao hơn mốc | Lệch góc trên 10° | Giả thuyết theo hạng |
+|---|---|---|---|---|
+| `release_stand`, mức 2 | 11 | 8 | 3 | `place_rests_raised`, `near_miss_placement` |
+| `place`, mức 2 | 8 | 6 | 4 | `place_rests_raised` |
+| `place`, mức 1 | 5 | 5 | 0 | `place_rests_raised`, `near_miss_placement` |
+| `release_stand`, mức 1 | 3 | 2 | 2 | `place_rests_raised`, `place_yaw_miss` |
+| `approach_a`, mức 2 | 1 | 1 | 1 | `scorer_latch_too_strict`, `place_rests_raised`, `place_yaw_miss` |
+| Tổng | 28 | 22 | 10 | |
+
+Nhóm A đo tay: 22 lượt khay gác lên thành đồ gá và khoảng 10 lượt lệch góc trên 10°. Mọi cụm trên đề xuất `teleop_correction`, trừ cụm một lượt ở `approach_a` bị chặn tiêu dữ liệu vì còn giả thuyết hệ thống.
+
+Giới hạn:
+
+- 24 trong 136 lượt **thành công** cũng có khay nằm cao hơn mốc quá biên (fact `M_successes_raised`). Nằm cao tự nó không phải là hỏng; luật trích con số này làm nền, nhưng chưa dùng nó làm điều kiện.
+- `place_yaw_miss` cần quá nửa cụm: cụm 8 lượt có đúng 4 lượt lệch góc không được gắn luật.
+- 13 lượt `L-TRAY-TILT` vẫn chưa có luật. Tín hiệu đã đủ sau khi thêm tên số đo của DA-47 (nghiêng lúc lỗi, hai tay chạm khay, khay chưa ở bàn nào).
+- `L-TIMEOUT` và `L-PART-DROP` còn thiếu số đo (`cmd_*`, `meas_*`, `part_positions`); tín hiệu chốt bước `approach_a` (`palm_handle_distance_min`) chưa nối với tên mới của outcome.
+- Lượt `M/l2-s1000100-r1` tới bàn B mà không bước nào được chốt; agent xếp vào lỗi bộ chấm, cần nhóm A xem.
+- Agent chỉ đề xuất loại dữ liệu (`teleop_correction`), chưa nói nội dung demo (sửa góc, hạ khay vào lòng đồ gá) và chưa có chi phí.
