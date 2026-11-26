@@ -27,6 +27,7 @@ import json
 import sys
 import time
 from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, TextIO
@@ -37,11 +38,13 @@ from flywheel.eval.agentqa.round.admit import admit
 from flywheel.eval.agentqa.round.gateway import hosted_refusal
 from flywheel.eval.agentqa.round.measure import PlanRefused
 from flywheel.eval.agentqa.round.pack import PackRefused, read_pack
+from flywheel.eval.agentqa.round.records import Admission
 from flywheel.eval.agentqa.round.version import agent_version
 
 PROTOCOL_VERSION = "2025-11-25"
 SERVER_NAME = "flywheel-agentqa"
 CallLog = Callable[[dict[str, Any]], None]
+LOG_HELP = "append one JSON line per tool call here (default: stderr)"
 
 INSTRUCTIONS = (
     "These tools compute facts about one admitted eval round pack; every number in an "
@@ -224,21 +227,47 @@ class McpServer:
         if self._log is None:
             return
         record: dict[str, Any] = {
-            "ts": self._now().isoformat(), "tool": tool, "params": params, "status": status,
-            "fact_ids": list(fact_ids), "seconds": round(self._clock() - start, 3)}
+            "ts": self._now().isoformat(), "event": "call", "tool": tool, "params": params,
+            "status": status, "fact_ids": list(fact_ids),
+            "seconds": round(self._clock() - start, 3)}
         if error is not None:
             record["error"] = error
         self._log(record)
 
 
-def open_public_session(pack_path: Path) -> ToolSession:
+@dataclass(frozen=True)
+class OpenPack:
+    """A pack that passed the public check: the tool session and what step B1 recorded."""
+
+    session: ToolSession
+    admission: Admission
+
+
+def open_public_session(pack_path: Path) -> OpenPack:
     """read_pack + admit + the hosted check; raises PackRefused / PackNotPublic / PlanRefused."""
     pack = read_pack(pack_path)
     admitted = admit(pack_path)
     reason = hosted_refusal(admitted.admission, True)
     if reason is not None:
         raise PackNotPublic(reason)
-    return ToolSession.from_admitted(pack, admitted)
+    return OpenPack(ToolSession.from_admitted(pack, admitted), admitted.admission)
+
+
+def started_record(opened: OpenPack, now: datetime | None = None) -> dict[str, Any]:
+    """The first line of the log: which pack is served, its class, what admit let through.
+
+    Listing the tools here also builds their schemas once (the `window` domain streams
+    the training logs), so the first `tools/list` of the shell is answered at once.
+    """
+    admission = opened.admission
+    return {
+        "ts": (now or _now()).isoformat(), "event": "started",
+        "pack_id": admission.pack_id, "pack_sha256": admission.pack_sha256,
+        "data_class": admission.data_class, "tools": len(opened.session.tools()),
+        "accepted": len(admission.accepted),
+        "rejected": [{"ref": r.ref, "reason": r.reason} for r in admission.rejected],
+        "protocol": PROTOCOL_VERSION,
+    }
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -246,8 +275,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="python -m flywheel.eval.agentqa.mcp", allow_abbrev=False,
         description="Serve the Agent QA/QC tools of one public round pack over MCP on stdio.")
     parser.add_argument("--pack", type=Path, required=True, help="the pack.json of the round")
-    parser.add_argument("--log", type=Path, default=None,
-                        help="append one JSON line per tool call here (default: stderr)")
+    parser.add_argument("--log", type=Path, default=None, help=LOG_HELP)
     return parser
 
 
@@ -259,22 +287,33 @@ def _writer(stream: TextIO) -> CallLog:
     return write
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+def run(pack: Path, log: Path | None = None) -> int:
+    """Serve `pack` on stdin and stdout until EOF; 2 (one `error:` line) when refused.
+
+    Shared by `python -m flywheel.eval.agentqa.mcp` and `fw agentqa mcp`. The log (the
+    started record, then one record per tool call) goes to `log`, appended, or to stderr.
+    """
     for stream in (sys.stdin, sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
     try:
-        session = open_public_session(args.pack)
-    except (PackRefused, PackNotPublic, PlanRefused) as error:
+        opened = open_public_session(pack)
+    except (PackRefused, PackNotPublic, PlanRefused, OSError) as error:
+        # OSError: a config the tools read from the repo root (the task view) is missing
         print(f"error: {_first_line(error)}", file=sys.stderr)
         return 2
-    log_file = None if args.log is None else open(  # noqa: SIM115  (open for the session)
-        args.log, "a", encoding="utf-8", buffering=1)
+    log_file = None if log is None else open(  # noqa: SIM115  (open for the session)
+        log, "a", encoding="utf-8", buffering=1)
     try:
-        server = McpServer(session, log=_writer(sys.stderr if log_file is None else log_file))
-        server.serve(sys.stdin, sys.stdout)
+        write = _writer(sys.stderr if log_file is None else log_file)
+        write(started_record(opened))
+        McpServer(opened.session, log=write).serve(sys.stdin, sys.stdout)
     finally:
         if log_file is not None:
             log_file.close()
     return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    return run(args.pack, args.log)

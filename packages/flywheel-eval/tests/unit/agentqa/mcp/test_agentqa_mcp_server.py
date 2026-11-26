@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -16,7 +15,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE.parent / "round"))
@@ -30,11 +28,11 @@ from flywheel.eval.agentqa.mcp.server import (  # noqa: E402
     open_public_session,
 )
 from flywheel.eval.agentqa.round.admit import admit  # noqa: E402
-from flywheel.eval.agentqa.round.pack import build_pack, read_pack, write_pack  # noqa: E402
+from flywheel.eval.agentqa.round.pack import read_pack  # noqa: E402
 from flywheel.eval.agentqa.tools.registry import REGISTRY, check_params  # noqa: E402
+from helpers_mcp import REPO, internal, repacked, unlinked  # noqa: E402
 from helpers_round import isolated_store, pack_maker  # noqa: E402, F401
 
-REPO = _HERE.parents[5]  # the tools read configs/ from the repo root
 TIMEOUT_S = 120
 PAIRED = {"pairs": [["C_70", "B_70"]], "levels": [1]}
 
@@ -120,7 +118,8 @@ def test_a_valid_call_returns_the_facts_of_the_bridge(h: Harness, pack: Path) ->
     assert [c["type"] for c in result["content"]] == ["text"]
     assert json.loads(result["content"][0]["text"]) == result["structuredContent"]
     assert [f["fact_id"] for f in result["structuredContent"]["facts"]] == list(direct.fact_ids)
-    assert h.records == [{"ts": "2026-11-27T00:00:00+00:00", "tool": "paired_compare",
+    assert h.records == [{"ts": "2026-11-27T00:00:00+00:00", "event": "call",
+                          "tool": "paired_compare",
                           "params": PAIRED, "status": "ran",
                           "fact_ids": list(direct.fact_ids), "seconds": 1.0}]
 
@@ -261,31 +260,12 @@ def test_serve_writes_one_line_per_answer(h: Harness) -> None:
 # -- the data class -------------------------------------------------------------------
 
 
-def _repacked(pack: Path, name: str, edit: Any) -> Path:
-    """A copy of the fixture pack's files, declared again after `edit(declaration)`."""
-    root = pack.parent.parent / name
-    shutil.copytree(pack.parent, root, ignore=shutil.ignore_patterns("pack.json"))
-    decl = root / "round.yaml"
-    declared = yaml.safe_load(decl.read_text())
-    edit(declared)
-    decl.write_text(yaml.safe_dump(declared))
-    return write_pack(build_pack(decl), root)
-
-
-def _internal(declared: dict[str, Any]) -> None:
-    declared["data_class"] = "internal"
-
-
-def _unlinked(declared: dict[str, Any]) -> None:
-    declared["links"] = []  # public as declared, but no source record vouches for the scores
-
-
 def test_only_a_confirmed_public_pack_opens(pack: Path) -> None:
-    assert [t.name for t in open_public_session(pack).tools()] == list(REGISTRY)
+    assert [t.name for t in open_public_session(pack).session.tools()] == list(REGISTRY)
     with pytest.raises(PackNotPublic, match="internal"):
-        open_public_session(_repacked(pack, "internal", _internal))
+        open_public_session(repacked(pack, "internal", internal))
     with pytest.raises(PackNotPublic, match="unknown"):
-        open_public_session(_repacked(pack, "unlinked", _unlinked))
+        open_public_session(repacked(pack, "unlinked", unlinked))
 
 
 def test_the_command_has_no_option_but_pack_and_log() -> None:
@@ -332,12 +312,14 @@ def test_the_server_answers_over_stdio(pack: Path) -> None:
     assert call["isError"] is False and call["structuredContent"]["facts"]
     assert replies[5]["error"]["code"] == -32601
     logged = [json.loads(line) for line in done.stderr.splitlines()]
-    assert len(logged) == 1 and logged[0]["tool"] == "paired_compare"
-    assert logged[0]["fact_ids"] == [f["fact_id"] for f in call["structuredContent"]["facts"]]
+    assert [r["event"] for r in logged] == ["started", "call"]
+    assert logged[0]["tools"] == 13 and logged[0]["data_class"] == "public"
+    assert logged[1]["tool"] == "paired_compare"
+    assert logged[1]["fact_ids"] == [f["fact_id"] for f in call["structuredContent"]["facts"]]
 
 
 def test_the_server_refuses_a_pack_that_is_not_public(pack: Path, tmp_path: Path) -> None:
-    refused = _repacked(pack, "internal", _internal)
+    refused = repacked(pack, "internal", internal)
     done = _child(refused, json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping"}) + "\n",
                   "--log", str(tmp_path / "calls.jsonl"))
     assert done.returncode == 2
