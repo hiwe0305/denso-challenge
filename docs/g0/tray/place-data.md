@@ -243,3 +243,77 @@ Story: [DA-50](../../product/stories/DA-50-train-run-n-nham-loi-dat.md). Mẫu n
 
 Cổng 85 % của story: đạt ở ±15° sau khi sửa (36/40), trên mẫu 40 lượt.
 
+
+## 9. Lô lệch góc trên `rtx3060` (DA-50 nhiệm vụ 3.2, thực đo 26–27/11/2026)
+
+Story: [DA-50](../../product/stories/DA-50-train-run-n-nham-loi-dat.md). Kho: `~/fwdata/datasets/tray-s1yaw-jig2-20261126/` trên `rtx3060`, 14 GB. Bản sao trên laptop ở `fwdata/datasets/tray-s1yaw-jig2-20261126/` (khoảng 1,7 GB: hai bản cắt và các file nhỏ; không có `gen-l*/shard-*`, hai release cha và `replay17`). Mọi số dưới đây lấy từ `reports/batch_summary.json`, `analysis/da50-clean/` và log của kho; mục 8 là mẫu 40 lượt trên laptop, không trộn với lô này.
+
+**Cái đã chạy.** Sinh episode đầy đủ trên cảnh đồ gá (`jig2`) với lệch góc ±15° ở CARRY, không lệch vị trí. Planner `da41-planner-8+cfg.bee61399+cj.a000s000y150`, mã commit `713dd05a` (đã có sửa ARRIVE_B của mục 8). Sinh từ 23:32 ngày 26/11 tới 00:47 ngày 27/11 (giờ máy, UTC+7), 14 worker trong scope có `MemoryMax` (6 cho mức 1, 8 cho mức 2). Các bước 2–11 (QA phát lại, release, phát lại DA-17, report, lọc chất lượng, tập `ALL`, cắt, thẻ) chạy liền từ 00:48:35 tới 04:48:10. Cắt, tập `ALL` và thẻ làm đúng như mục 5; chỉ đổi biên độ và seed.
+
+| | Mức 1 | Mức 2 | Tổng |
+|---|---|---|---|
+| Seed | `540000–540279` | `541000–541419` | |
+| Lượt sinh | 280 | 420 | 700 |
+| Ghi được | 258 (92,1 %) | 391 (93,1 %) | 649 (92,7 %) |
+| Lượt hỏng lúc sinh | `L-ONE-HAND` 8, `L-PLACE-POSE` 7, `L-TRAY-TILT` 4, hết giờ ở RELEASE 3 | `L-PLACE-POSE` 13, `L-ONE-HAND` 8, `L-TRAY-TILT` 5, hết giờ ở RELEASE 2, hết giờ ở LIFT 1 | 22 và 29 |
+| QA phát lại lúc sinh | 258/258 | 391/391 | 649/649 |
+| QA loại | 2 | 7 | 9 |
+| Lọc chất lượng bỏ | 13 | 19 | 32 |
+| Tập `ALL` | 243 (86,8 % số lượt) | 365 (86,9 % số lượt) | 608 (86,9 %) |
+| Release cha | `tray_s1_2c861cdfe7fd`, 258 episode, 394 929 khung | `tray_s1_02d895d28050`, 391 episode, 596 736 khung | |
+| Bản cắt (từ ARRIVE_B hoặc LOWER, lead 1,0 s) | `tray_s1place_e793fb05a9df`, 243 episode, 125 787 khung | `tray_s1place_6a7b780fb66b`, 365 episode, 184 691 khung | 608 episode, 310 478 khung |
+| Độ dài bản cắt trung bình | 517,6 khung | 506,0 khung | |
+| Tỉ trọng đoạn cắt trong episode `ALL` của cha | 33,8 % | 33,2 % | |
+| Lệch vị trí khi đặt xong (`ALL` của cha): trung vị, p90, lớn nhất | 1,32; 2,58; 4,22 cm | 1,37; 2,62; 4,26 cm | |
+| Lệch góc khi đặt xong (`ALL` của cha): trung vị, p90, lớn nhất | 0,83; 2,16; 8,38° | 0,82; 3,62; 9,93° | |
+| Ngoài 5 cm hoặc 10° | 0 | 0 | |
+| Thời gian mỗi lượt sinh: trung bình, p95 | 87,9 s; 96,9 s | 82,3 s; 96,2 s | 59 166 giây-worker (16,4 giờ-worker) |
+| Dung lượng: thô, cha, cắt | 2,5; 2,3; 0,65 GB | 3,8; 3,4; 0,97 GB | |
+
+Không mức nào chạm ngưỡng dừng 75 % của story (tỉ lệ giữ của `ALL` so với số lượt là 86,8 % và 86,9 %). Lượt sinh `retried_shards` và `failed_shards` đều rỗng.
+
+**So với ước lượng.** Dòng sổ `job_da50_gen_yaw` (mục 8, viết trước khi chạy) ước tính sinh 700 lượt khoảng 1,1 giờ cộng khởi động (ghi 1,3 giờ) và khoảng 3,5 giờ cho các bước sau.
+
+| | Ước lượng | Thực đo |
+|---|---|---|
+| Thời gian một lượt sinh | khoảng 80 s | trung bình 84,5 s (87,9 s mức 1, 82,3 s mức 2; cao hơn lô DA-46 khoảng 8 %) |
+| Thời gian sinh | 1,3 giờ | 1,25 giờ (23:32 tới 00:47) |
+| Các bước 2–11 | khoảng 3,5 giờ | 3,99 giờ (00:48:35 tới 04:48:10) |
+| Tỉ lệ giữ của `ALL` so với số lượt | trên 75 % (ngưỡng dừng); lô DA-46 đạt 86,2 % | 86,9 % |
+| Dung lượng cả kho | khoảng 15 GB (mục 5) | 14 GB |
+
+Các bước dài nhất: QA phát lại 85,3 phút với 12 worker (tối đa 17,1 giờ-worker, cận trên vì worker không luôn bận), phát lại DA-17 72,2 phút với 12 worker (tối đa 14,4 giờ-worker, cận trên), cắt khoảng 70 phút một tiến trình (mức 1 28,4 phút, mức 2 41,7 phút theo mốc bước). Chỉ dùng CPU, 0 CU; máy là máy của đội.
+
+**Lọc theo vị trí đặt xong (như run M).** Giữ episode có lệch vị trí cuối ≤ 3 cm và lệch góc cuối ≤ 5°, tính trên `ALL` của cha, bằng bộ script của `analysis/da48-clean/` chỉ đổi đường dẫn và id trong `common.py`. Kết quả ghi ở `analysis/da50-clean/keep_3cm_5deg.json`, `per_episode.jsonl`, `summary.json`.
+
+| | Mức 1 | Mức 2 | Tổng |
+|---|---|---|---|
+| Đạt cả hai ngưỡng | 227/243 (93,4 %) | 327/365 (89,6 %) | 554/608 (91,1 %) |
+| Đạt riêng ≤ 3 cm | 233 | 343 | |
+| Đạt riêng ≤ 5° | 236 | 338 | |
+| Trượt vì vị trí, vì góc, vì cả hai | 10, 7, 1 | 22, 27, 11 | |
+| So với số lượt sinh | 227/280 (81,1 %) | 327/420 (77,9 %) | 554/700 (79,1 %) |
+
+Phần của mức 2 trong tập giữ lại là 327/554 = 59,0 %, sát mục tiêu khoảng 60 % của nhiệm vụ 2. Trong `keep_3cm_5deg.json`, hai bản cắt có cùng số seed giữ lại (227 và 327) như hai release cha.
+
+Theo độ lớn và dấu của góc lệch ở CARRY (`|carry_yaw|`, tính trên `ALL`):
+
+| `\|carry_yaw\|` | Mức 1: đạt/tổng | Mức 2: đạt/tổng | Tổng |
+|---|---|---|---|
+| [0°, 5°) | 68/73 | 115/131 | 183/204 (89,7 %) |
+| [5°, 10°) | 78/84 | 113/127 | 191/211 (90,5 %) |
+| [10°, 15°) | 81/86 | 99/107 | 180/193 (93,3 %) |
+| Dấu dương | 114/119 | 169/191 | 283/310 (91,3 %) |
+| Dấu âm | 113/124 | 158/174 | 271/298 (90,9 %) |
+
+Tỉ lệ đạt không giảm khi lệch góc tăng (nhóm 10–15° còn cao hơn một chút), và hai dấu gần bằng nhau. Mẫu 40 lượt ở mục 8 thấy lệch âm trên 10° kém hơn; ở 608 episode điều đó không còn thấy, nhưng mục 8 đo tỉ lệ thành công lúc sinh còn bảng này đo sai số đặt cuối trên episode đã ghi, nên hai số không so thẳng được. Nguyên nhân trượt chưa phân tích theo từng phase.
+
+**Điều cần biết khi dùng lô này.**
+
+- Lô mẫu ở mục 8 và lô này mang cùng chuỗi `planner_version` (`...y150`) dù mã ARRIVE_B khác nhau: lô mẫu có hai lần chạy, trước và sau khi sửa, còn lô này chỉ chạy sau khi sửa (commit `713dd05a`). Mã commit, không phải chuỗi này, phân biệt hai lô; không trộn thư mục.
+- Thẻ trong `cards/` để `null` các trường không có nguồn trong kho, như mục 7.
+- `round.yaml` có trong kho nhưng chưa chạy qua `fw agentqa pack`; Agent QA/QC chưa đọc lô này.
+- Bộ giữ ≤ 3 cm và ≤ 5° là script dùng một lần (đổi `common.py` của `da48-clean`). Đã kiểm bằng cách tái tạo file giữ của DA-48 (`tray-s1-jig2-20261122`, hai lô cũ nằm trong cùng `keep_3cm_5deg.json`, cùng khóa); chưa có test tự động.
+- Cờ `replay_dynamic` và `replay_success` trong `dataset_report.json` cùng kiểu với mục 7; chưa kiểm riêng cho lô này.
+- Số giây-worker của QA phát lại và phát lại DA-17 là cận trên (số worker nhân thời gian, không đo thời gian bận từng worker).
+- Số đo là sơ bộ trong sim; chưa có kết quả train hay eval nào dùng lô này.
