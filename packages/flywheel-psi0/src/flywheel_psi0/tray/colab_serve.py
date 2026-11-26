@@ -31,6 +31,16 @@ The round branch `C70_R1` (task 7, docs/he/tray.md 20.15) is served the same way
 job is `colab_train.round_job_id`, the only step is the round's `eval.checkpoint`, and the
 stats must hash to the round's `train.stats_sha256` (ALL's, as its cut is normalised
 with). Stage 1 then runs on three such servers, `eval_batch --chunks` two chunks each.
+
+Run M of DA-48 (`--branch M`, DA-47's eval on the jig2 scene) too: its plan must be frozen
+with id `colab_train.MIX_FROZEN`, the steps are the plan's `checkpoints` (primary, then the
+early reads of docs/he/tray-jig.md rule 6), the stats must hash to the joined set's
+`cut.stats_sha256`, and its runs live under `MyDrive/<plan drive.runs>`. `expect` writes
+that folder into the expected file (`drive_runs`) and `fetch` reads from it, so M needs no
+`--drive`; an expected file without it (written before) reads `MyDrive/denso/da34`.
+
+    python -m flywheel_psi0.tray.colab_serve expect --runs fwdata/tray/jig-m --branch M \
+        --step 100000 --stats <M>/meta/stats_psi0.json
 """
 
 from __future__ import annotations
@@ -46,16 +56,27 @@ import time
 import urllib.request
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from flywheel_psi0.trainer.colab import Report
-from flywheel_psi0.tray.colab_train import ROUND_C70, ROUND_C70_PLAN, pair_job_id, round_job_id
+from flywheel_psi0.tray import colab_train
+from flywheel_psi0.tray.colab_train import (
+    MIX,
+    MIX_PLAN,
+    ROUND_C70,
+    ROUND_C70_PLAN,
+    mix_job_id,
+    pair_job_id,
+    round_job_id,
+)
+from flywheel_psi0.tray.mixplan import TrayMixPlan, launch_problems
 from flywheel_psi0.tray.pairplan import TrayPairPlan
 from flywheel_psi0.tray.pairround import TrayPairRoundPlan
-from flywheel_psi0.tray.runplan import REPO
+from flywheel_psi0.tray.runplan import REPO, run_plan_id
 
 PAIR_PLAN = "configs/runplans/tray/he-tray-pair60k.yaml"
-DRIVE_RUNS = Path("/content/drive/MyDrive/denso/da34")  # he1_colab persist --to of the 4 runs
+MYDRIVE = Path("/content/drive/MyDrive")
+PAIR_DRIVE = "denso/da34"  # he1_colab persist --to of the 4 runs and of C70_R1
 WORK = Path("/content/da34s")  # the serve VM's work root (he1_colab.py serve-setup --work)
 PORT = 22085  # on the VM; the laptop forwards it
 SERVE_ARGS = ("--action-exec-horizon", "24", "--rtc")  # serve_psi0.sh serve defaults
@@ -102,19 +123,51 @@ def bound_problems(run_config: dict[str, Any], stats: dict[str, Any]) -> list[st
     return problems
 
 
-def _job(branch: str, plan_path: Path, round_path: Path) -> tuple[str, tuple[int, ...], str | None]:
-    """The job, the steps the rules read and the stats sha256 of a pair or round branch."""
+class Job(NamedTuple):
+    job: str
+    steps: tuple[int, ...]  # the checkpoints the reading rules read
+    stats_sha256: str | None
+    drive_runs: str  # under MyDrive: one folder per job, as persist --to writes them
+    run_plan_id: str | None = None  # M: the frozen plan's id
+    stats_name: str = "ALL's"
+
+
+def _mix(plan_path: Path) -> Job:
+    """Run M: refused unless its plan is frozen and its id is colab_train.MIX_FROZEN."""
+    plan = TrayMixPlan.load(plan_path)
+    problems = launch_problems(plan, plan_path)
+    frozen = colab_train.MIX_FROZEN
+    if frozen is None:
+        problems.append("no M plan is approved: MIX_FROZEN is unset")
+    elif run_plan_id(plan) != frozen:
+        problems.append(f"{plan_path.name} is {run_plan_id(plan)}; only {frozen} is approved")
+    if list(plan.branches) != [MIX]:
+        problems.append(f"the M plan's branches are {list(plan.branches)}, not [{MIX}]")
+    if problems:
+        raise SystemExit("M plan does not hold, nothing served:\n  " + "\n  ".join(problems))
+    steps = (plan.checkpoints.primary, *plan.checkpoints.reads)
+    job = mix_job_id(MIX, plan.train_seeds[0])
+    return Job(job, steps, plan.cut.stats_sha256, plan.drive.runs, frozen, "the joined set's")
+
+
+def _job(branch: str, plan_path: Path, round_path: Path, mix_path: Path) -> Job:
+    """The job, the steps the rules read, the stats sha256 and Drive folder of a branch."""
+    if branch == MIX:
+        return _mix(mix_path)
     plan = TrayPairPlan.load(plan_path)
     if branch in plan.branches:
         both = (plan.checkpoints.primary, plan.checkpoints.early)
         steps = tuple(s for s in both if s is not None)
-        return pair_job_id(branch, plan.train_seeds[0]), steps, plan.cut.stats_sha256
+        job = pair_job_id(branch, plan.train_seeds[0])
+        return Job(job, steps, plan.cut.stats_sha256, PAIR_DRIVE)
     if branch == ROUND_C70:
         rnd = TrayPairRoundPlan.load(round_path)
         if rnd.branch == branch:
             job = round_job_id(branch, rnd.train.train_seed)
-            return job, (rnd.eval.checkpoint,), rnd.train.stats_sha256
-    raise SystemExit(f"{branch} is not a branch of {plan_path.name} nor its round {ROUND_C70}")
+            return Job(job, (rnd.eval.checkpoint,), rnd.train.stats_sha256, PAIR_DRIVE)
+    raise SystemExit(
+        f"{branch} is not a branch of {plan_path.name}, its round {ROUND_C70} nor {MIX}"
+    )
 
 
 def expect(
@@ -124,13 +177,15 @@ def expect(
     stats: Path,
     plan_path: Path = REPO / PAIR_PLAN,
     round_path: Path = REPO / ROUND_C70_PLAN,
+    mix_path: Path = REPO / MIX_PLAN,
 ) -> dict[str, Any]:
     """Laptop: the sha256 a serve VM must find, after the bounds check; written beside the job."""
-    job, steps, stats_sha256 = _job(branch, plan_path, round_path)
-    if step not in steps:
-        raise SystemExit(f"step {step}: the rules read {list(steps)} only for {branch}")
+    spec = _job(branch, plan_path, round_path, mix_path)
+    job, stats_sha256 = spec.job, spec.stats_sha256
+    if step not in spec.steps:
+        raise SystemExit(f"step {step}: the rules read {list(spec.steps)} only for {branch}")
     if sha256(stats) != stats_sha256:
-        raise SystemExit(f"{stats}: not ALL's stats (sha256 {sha256(stats)})")
+        raise SystemExit(f"{stats}: not {spec.stats_name} stats (sha256 {sha256(stats)})")
     src = run_dir(runs / job)
     config = json.loads((src / "run_config.json").read_text(encoding="utf-8"))
     problems = bound_problems(config, json.loads(stats.read_text(encoding="utf-8")))
@@ -144,6 +199,8 @@ def expect(
         "run": src.name,
         "ckpt_step": step,
         "stats_sha256": stats_sha256,
+        "run_plan_id": spec.run_plan_id,
+        "drive_runs": spec.drive_runs,
         "files": {rel: sha256(src / rel) for rel in served(step)},
     }
     out = runs / job / f"expected-{step}.json"
@@ -160,9 +217,15 @@ def file_problems(base: Path, files: dict[str, str]) -> list[str]:
     return problems
 
 
-def fetch(expected: Path, work: Path = WORK, drive: Path = DRIVE_RUNS) -> list[str]:
-    """VM: copy the served files from the run's Drive copy; return what was copied."""
+def fetch(expected: Path, work: Path = WORK, drive: Path | None = None) -> list[str]:
+    """VM: copy the served files from the run's Drive copy; return what was copied.
+
+    `drive` defaults to `MyDrive/<drive_runs>` of the expected file (DA-34's folder when the
+    file predates the field).
+    """
     want = json.loads(expected.read_text())
+    if drive is None:
+        drive = MYDRIVE / want.get("drive_runs", PAIR_DRIVE)
     src = drive / want["job"] / "psi0" / "finetune" / want["run"]
     dest = work / "serve" / want["job"] / want["run"]
     copied = []
@@ -250,6 +313,7 @@ def serve(
         "argv": argv[1:],
         "sha256_checked": want["files"],
         "stats_sha256": want["stats_sha256"],
+        "run_plan_id": want.get("run_plan_id"),
     }
     Report(work).phase(
         f"serve_{want['branch'].lower()}_{want['ckpt_step']}", time.monotonic() - start, **row
@@ -261,12 +325,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("phase", choices=["expect", "fetch", "serve"])
     parser.add_argument("--runs", type=Path, help="expect: the laptop's fwdata/tray/runs")
-    parser.add_argument("--branch", help="expect: B_ALL, C_ALL, B_70, C_70 or C70_R1")
+    parser.add_argument("--branch", help="expect: B_ALL, C_ALL, B_70, C_70, C70_R1 or M")
     parser.add_argument("--step", type=int, help="expect: the checkpoint to serve")
-    parser.add_argument("--stats", type=Path, help="expect: ALL's meta/stats_psi0.json")
+    parser.add_argument(
+        "--stats", type=Path, help="expect: ALL's (M: the joined set's) meta/stats_psi0.json"
+    )
     parser.add_argument("--expected", type=Path, help="fetch, serve: expected-<step>.json")
     parser.add_argument("--work", type=Path, default=WORK)
-    parser.add_argument("--drive", type=Path, default=DRIVE_RUNS)
+    parser.add_argument(
+        "--drive", type=Path, help="fetch: the runs folder; default MyDrive/<drive_runs>"
+    )
     parser.add_argument("--port", type=int, default=PORT)
     args = parser.parse_args(argv)
     if args.phase == "expect":
