@@ -13,8 +13,66 @@
 # also gives near misses. That is a decision on the task's tolerance (the relaxed table is
 # shown for it), not a fault the rules can see; the hypothesis spends no data budget while
 # a system rule stands for the cluster.
+#
+# Two rules name the mechanism of a failed placement (relaxed_sweep v2; jig eval "M", where
+# both were found by hand). `_rests_raised`: most judged members end with the tray above the
+# run's own rest height of successes by more than the task view's margin (it sits on an
+# obstacle at the target, e.g. a jig wall, instead of lying in it); the tilt is support, not
+# a condition, so the title does not say "tilted". Successes can rest raised too, so the rule
+# cites how many do (`{run}_successes_raised` of `{run}_rest_height_reference_successes`) as
+# the base rate a reader needs. `_yaw_miss`: most members are off by more yaw than the scorer's tolerance.
+# Like `_near_miss`, both words are the tool's, so the rules hold no number.
+#
+# Order. Hypotheses of one cluster are ranked by group, then by the number of support facts
+# that resolve minus contra, then by the order of the rules in the files (hypotheses.py,
+# `hypothesize`). The two mechanism rules come first here so a tie goes to them;
+# `place_rests_raised` cites nine facts, more than `near_miss_placement`'s six, so it ranks
+# above the generic near miss. `place_yaw_miss` and `near_miss_placement` cannot both hold:
+# a member within the widest tolerance has its yaw within the scorer's, so the two
+# majorities are disjoint.
 
 rules:
+  - id: place_rests_raised
+    title: "Most failed placements of this cluster end with the tray resting above the placing surface: it sits on an obstacle at the target instead of lying in it"
+    source: "relaxed_sweep v2 (rest height and tilt); spec 6.9 (weak_skill); jig eval M, found by hand"
+    group: data
+    diagnosis: weak_skill
+    note: place_rests_raised
+    system: false
+    interventions: [teleop_correction]
+    when:
+      - {fact: "{run}_cluster_{cluster_slug}_rests_raised", is: true}
+    support:
+      - "{run}_cluster_{cluster_slug}_rests_raised"
+      - "{run}_cluster_{cluster_slug}_raised"
+      - "{run}_cluster_{cluster_slug}_rest_judged"
+      - "{run}_cluster_{cluster_slug}_final_height_median"
+      - "{run}_cluster_{cluster_slug}_final_tilt_median"
+      - "{run}_rest_height_reference"
+      - "{run}_rest_height_reference_successes"
+      - "{run}_successes_raised"
+      - "relaxed_rest_margin"
+    contra: []
+
+  - id: place_yaw_miss
+    title: "Most failed placements of this cluster miss the target yaw by more than the scorer's tolerance"
+    source: "relaxed_sweep v2 (yaw error); spec 6.9 (weak_skill); jig eval M, found by hand"
+    group: data
+    diagnosis: weak_skill
+    note: place_yaw_miss
+    system: false
+    interventions: [teleop_correction]
+    when:
+      - {fact: "{run}_cluster_{cluster_slug}_yaw_miss", is: true}
+      - {fact: "{run}_relaxed_first_grid_matches_scorer", is: true}
+    support:
+      - "{run}_cluster_{cluster_slug}_yaw_miss"
+      - "{run}_cluster_{cluster_slug}_yaw_over_tolerance"
+      - "{run}_cluster_{cluster_slug}_yaw_error_median"
+      - "relaxed_yaw_tolerance"
+      - "{run}_relaxed_first_grid_matches_scorer"
+    contra: []
+
   - id: near_miss_placement
     title: "Most failed placements of this cluster land near the target: the skill lacks precision rather than aiming at a wrong destination"
     source: "design 19/11 section 4 (relaxed_sweep); spec 6.9 (weak_skill); tray.md 19.2 c"

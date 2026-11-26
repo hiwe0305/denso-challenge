@@ -353,5 +353,6 @@ REGISTRY: dict[str, ToolSpec] = {spec.name: spec for spec in (
              {"checks": "checks", "interventions": "interventions"}, _cost_lookup),
     ToolSpec("history_lookup", 2, ("fix_rate",), {"interventions": "interventions"},
              _history_lookup),
-    ToolSpec("relaxed_sweep", 1, ("scores", "outcomes"), {"runs": "runs"}, _relaxed_sweep),
+    # v2: per cluster, the yaw miss and where the tray comes to rest (height, tilt)
+    ToolSpec("relaxed_sweep", 2, ("scores", "outcomes"), {"runs": "runs"}, _relaxed_sweep),
 )}

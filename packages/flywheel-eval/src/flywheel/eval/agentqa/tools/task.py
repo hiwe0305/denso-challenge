@@ -64,6 +64,18 @@ class RelaxedSpec(_Frozen):
     # A `signal_measures` entry, `where: final`, with one name in `_m` (the distance to
     # the target) and one in `_deg` (the yaw error): the measures the sweep compares.
     signal: str
+    # Where the tray comes to rest (optional, both or neither): a `signal_measures` entry,
+    # `where: final`, with one name in `_m` (the position [x, y, z]) and one in `_quat` (the
+    # orientation, w x y z), and the margin (m) above the successes' rest height beyond
+    # which a failed rollout counts as resting raised.
+    rest_signal: str | None = None
+    rest_margin_m: float | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def rest_both_or_neither(self) -> Self:
+        if (self.rest_signal is None) != (self.rest_margin_m is None):
+            raise ValueError("relaxed: rest_signal and rest_margin_m go together")
+        return self
 
 
 class Component(_Frozen):
@@ -126,6 +138,8 @@ class TaskView(_Frozen):
             raise ValueError(f"thresholds {missing} have no unit in threshold_units")
         if self.relaxed is not None:
             self.relaxed_measures()
+            if self.relaxed.rest_signal is not None:
+                self.rest_measures()
         return self
 
     def relaxed_measures(self) -> tuple[str, str]:
@@ -148,6 +162,28 @@ class TaskView(_Frozen):
             raise ValueError(f"relaxed.signal {self.relaxed.signal!r}: one name in _m and one "
                              f"in _deg are needed, got {spec.names}")
         return dist[0], yaw[0]
+
+    def rest_measures(self) -> tuple[str, str] | None:
+        """(position, quaternion) measure names of `final` where the tray comes to rest.
+
+        Read by unit from the `signal_measures` entry `relaxed.rest_signal` names; None when
+        the relaxed block declares no rest signal.
+        """
+        if self.relaxed is None or self.relaxed.rest_signal is None:
+            return None
+        name = self.relaxed.rest_signal
+        spec = self.signal_measures.get(name)
+        if spec is None:
+            raise ValueError(f"relaxed.rest_signal {name!r} is not in signal_measures")
+        if spec.where != "final":
+            raise ValueError(f"relaxed.rest_signal {name!r}: the measures must be final ones "
+                             "(where: final)")
+        pos = [n for n in spec.names if n.endswith("_m")]
+        quat = [n for n in spec.names if n.endswith("_quat")]
+        if len(pos) != 1 or len(quat) != 1:
+            raise ValueError(f"relaxed.rest_signal {name!r}: one name in _m and one in _quat "
+                             f"are needed, got {spec.names}")
+        return pos[0], quat[0]
 
     def index(self, step: str) -> int:
         return self.steps.index(step)

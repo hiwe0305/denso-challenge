@@ -6,6 +6,7 @@ rollout carries. The relaxed grid and the measure names are the tray task view's
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +14,7 @@ import pytest
 import yaml
 from flywheel.eval.agentqa.facts import FactBook
 from flywheel.eval.agentqa.tools.base import RunOutcomes, RunScores, ToolResult
-from flywheel.eval.agentqa.tools.relaxed import relaxed_sweep
+from flywheel.eval.agentqa.tools.relaxed import relaxed_sweep, tilt_deg
 from flywheel.eval.agentqa.tools.signals import signal_presence
 from flywheel.eval.agentqa.tools.task import TaskView, load_task
 from helpers_tools import labelled, outcome, outcomes_of
@@ -291,3 +292,198 @@ def test_outcomes_of_a_run_without_scores_are_reported(tray: TaskView) -> None:
     got = named(book, relaxed_sweep(book, tray, [run], {
         "R": held, "X": outcomes_of("X", [outcome("X", "a", True)])}))
     assert "no scores entry" in got["relaxed_sweep_X_not_judged"]
+
+
+# --- relaxed_sweep v2: yaw miss, rest height and tilt --------------------------------------
+
+
+def tilted(deg: float) -> list[float]:
+    """A unit quaternion (w, x, y, z): a rotation of `deg` about the world x axis."""
+    half = math.radians(deg) / 2
+    return [math.cos(half), math.sin(half), 0.0, 0.0]
+
+
+def rest(z: float, tilt: float = 0.0) -> dict[str, object]:
+    return {"tray_pos_m": [-1.1, 0.0, z], "tray_quat": tilted(tilt)}
+
+
+def rest_set(run: str = "R") -> tuple[RunScores, RunOutcomes]:
+    """Three successes at rest near 0.852 m; five place failures of level 1."""
+    rows: list[tuple[str, bool, str | None, dict[str, object]]] = [
+        ("ok1", True, None, rest(0.851)),
+        ("ok2", True, None, rest(0.852)),
+        ("ok3", True, None, rest(0.856)),
+        ("p1", False, PLACE, {**place(0.06, 12.0), **rest(0.870, 4.0)}),    # raised, yaw over
+        ("p2", False, PLACE, {**place(0.08, -15.0), **rest(0.886, 13.0)}),  # raised, yaw over
+        ("p3", False, PLACE, {**place(0.07, 3.0), **rest(0.861, 0.0)}),     # 9 mm: not raised
+        ("p4", False, PLACE, {**place(0.30, 10.0), **rest(0.866, 3.0)}),    # raised; 10 is not over
+        ("p5", False, PLACE, {**place(0.09, -20.0), **rest(0.852, 0.0)}),   # flat, yaw over
+    ]
+    scores = tuple(labelled(run, n, ok, lab) for n, ok, lab, _ in rows)
+    outs = [outcome(run, n, ok, lab, final=final) for n, ok, lab, final in rows]
+    return RunScores(run, f"{run}/scores.jsonl", scores), outcomes_of(run, outs)
+
+
+L1 = "R_cluster_place_L-PLACE-POSE_l1"
+
+
+def test_the_tilt_of_a_quaternion() -> None:
+    assert tilt_deg([1.0, 0.0, 0.0, 0.0]) == pytest.approx(0.0)
+    assert tilt_deg(tilted(13.0)) == pytest.approx(13.0)
+    assert tilt_deg([math.cos(1.5), 0.0, 0.0, math.sin(1.5)]) == pytest.approx(0.0)  # yaw only
+    assert tilt_deg([0.0, 1.0, 0.0, 0.0]) == pytest.approx(180.0)     # upside down
+    assert tilt_deg([2.0, 0.0, 0.0, 0.0]) == pytest.approx(0.0)       # normalised first
+    assert tilt_deg([0.0, 0.0, 0.0, 0.0]) is None
+    # a rounding error past one is clamped, not a math error
+    assert tilt_deg([1.0, 1e-9, 0.0, 0.0]) == pytest.approx(0.0, abs=1e-6)
+
+
+def test_the_yaw_facts_of_a_cluster(tray: TaskView) -> None:
+    run, held = rest_set()
+    book = FactBook()
+    result = relaxed_sweep(book, tray, [run], {"R": held})
+    got = named(book, result)
+    units = {book.get(f).name: book.get(f).unit for f in result.facts}
+    assert got[f"{L1}_yaw_over_tolerance"] == 3          # 12, 15, 20; 10 is the tolerance
+    assert got[f"{L1}_yaw_error_median"] == pytest.approx(12.0)  # of |yaw|
+    assert got[f"{L1}_yaw_miss"] is True                 # 3 of 5
+    assert units[f"{L1}_yaw_over_tolerance"] == "rollouts"
+    assert units[f"{L1}_yaw_error_median"] == "deg"
+
+
+def test_two_of_four_over_the_yaw_tolerance_is_not_a_miss(tray: TaskView) -> None:
+    run, held = rest_set()
+    run = RunScores("R", run.ref, tuple(s for s in run.scores if s.episode_id != "R/p5"))
+    book = FactBook()
+    got = named(book, relaxed_sweep(book, tray, [run], {"R": held}))
+    assert got[f"{L1}_yaw_over_tolerance"] == 2 and got[f"{L1}_yaw_miss"] is False
+
+
+def test_the_rest_facts_against_the_successes_reference(tray: TaskView) -> None:
+    run, held = rest_set()
+    book = FactBook()
+    result = relaxed_sweep(book, tray, [run], {"R": held})
+    got = named(book, result)
+    units = {book.get(f).name: book.get(f).unit for f in result.facts}
+    assert result.judged
+    assert got["relaxed_rest_margin"] == 0.01 and units["relaxed_rest_margin"] == "m"
+    assert got["R_rest_height_reference"] == pytest.approx(0.852)   # median of the successes
+    assert got["R_rest_height_reference_successes"] == 3
+    assert got["R_successes_raised"] == 0            # 0.856 is within the margin
+    assert units["R_rest_height_reference"] == "m"
+    assert units["R_successes_raised"] == "rollouts"
+    assert got[f"{L1}_rest_judged"] == 5
+    assert got[f"{L1}_raised"] == 3                      # above 0.862 m: p1, p2, p4
+    assert got[f"{L1}_final_height_median"] == pytest.approx(0.866)
+    assert got[f"{L1}_final_tilt_median"] == pytest.approx(3.0)
+    assert got[f"{L1}_rests_raised"] is True
+    assert (units[f"{L1}_raised"], units[f"{L1}_final_tilt_median"]) == ("rollouts", "deg")
+    assert units[f"{L1}_final_height_median"] == "m"
+
+
+def test_the_reference_follows_the_data_not_a_constant(tray: TaskView) -> None:
+    run, held = rest_set()
+    lifted = tuple(o.model_copy(update={"final": {**o.final, **rest(0.870)}})
+                   if o.verdict.success else o for o in held.outcomes)
+    book = FactBook()
+    got = named(book, relaxed_sweep(book, tray, [run], {"R": RunOutcomes("R", held.ref,
+                                                                         lifted)}))
+    assert got["R_rest_height_reference"] == pytest.approx(0.870)
+    assert got[f"{L1}_raised"] == 1 and got[f"{L1}_rests_raised"] is False   # only p2
+
+
+def test_without_rest_measures_the_old_facts_stay_and_the_rest_is_not_judged(
+        tray: TaskView) -> None:
+    run, held = rest_set()
+    bare = tuple(o.model_copy(update={"final": {k: v for k, v in o.final.items()
+                                                if k not in ("tray_pos_m", "tray_quat")}})
+                 for o in held.outcomes)
+    book_old, book_new = FactBook(), FactBook()
+    full = named(book_old, relaxed_sweep(book_old, tray, [run], {"R": held}))
+    result = relaxed_sweep(book_new, tray, [run], {"R": RunOutcomes("R", held.ref, bare)})
+    got = named(book_new, result)
+    reason = ("no successful rollout carries final.tray_pos_m, so there is no rest height to "
+              "compare with")
+    assert got["relaxed_sweep_R_rest_not_judged"] == reason
+    assert result.not_judged == (reason,)
+    rest_names = ("_rest_", "_raised", "_final_height", "_final_tilt", "relaxed_rest_margin")
+    kept = {k: v for k, v in full.items() if not any(m in k for m in rest_names)}
+    assert {k: got[k] for k in kept} == kept   # every other fact, the yaw ones too, unchanged
+    assert not any(m in k for k in got for m in ("_raised", "_final_tilt", "_rest_height"))
+
+
+def test_counts_only_over_members_with_the_measures(tray: TaskView) -> None:
+    run, held = rest_set()
+    outs = tuple(o.model_copy(update={"final": {k: v for k, v in o.final.items()
+                                                if k != "tray_quat"}})
+                 if o.episode_id in ("R/p1", "R/p2") else o for o in held.outcomes)
+    book = FactBook()
+    result = relaxed_sweep(book, tray, [run], {"R": RunOutcomes("R", held.ref, outs)})
+    got = named(book, result)
+    assert result.judged
+    assert got[f"{L1}_rest_judged"] == 3                 # p3, p4, p5
+    assert got[f"{L1}_raised"] == 1 and got[f"{L1}_rests_raised"] is False
+    assert got[f"{L1}_yaw_over_tolerance"] == 3          # the yaw facts keep every member
+
+
+def test_a_cluster_whose_members_lack_the_measures_is_not_judged(tray: TaskView) -> None:
+    run, held = rest_set()
+    outs = tuple(o.model_copy(update={"final": {k: v for k, v in o.final.items()
+                                                if k != "tray_pos_m"}})
+                 if not o.verdict.success else o for o in held.outcomes)
+    book = FactBook()
+    result = relaxed_sweep(book, tray, [run], {"R": RunOutcomes("R", held.ref, outs)})
+    got = named(book, result)
+    assert got["R_rest_height_reference"] == pytest.approx(0.852)
+    assert got[f"relaxed_sweep_{L1}_rest_not_judged"] == (
+        "no failure of the cluster carries final.tray_pos_m and final.tray_quat")
+    assert f"{L1}_rests_raised" not in got and got[f"{L1}_near_miss"] is not None
+
+
+def test_the_rest_measures_are_named_in_signal_measures(tray: TaskView) -> None:
+    assert tray.relaxed is not None and tray.relaxed.rest_signal == "final_tray_pose"
+    assert tray.rest_measures() == ("tray_pos_m", "tray_quat")
+
+
+@pytest.mark.parametrize("edit, match", [
+    (lambda raw: raw["relaxed"].pop("rest_margin_m"), "go together"),
+    (lambda raw: raw["relaxed"].update(rest_signal="ghost"), "signal_measures"),
+    (lambda raw: raw["signal_measures"]["final_tray_pose"].update(names=["tray_pos_m"]),
+     "_quat"),
+    (lambda raw: raw["relaxed"].update(rest_margin_m=-0.01), "greater than or equal"),
+])
+def test_a_wrong_rest_block_is_refused(tmp_path: Path, edit: Any, match: str) -> None:
+    src = Path("configs/eval/agentqa/tasks/tray.yaml")
+    raw = yaml.safe_load(src.read_text())
+    raw["scorer_config"] = str(Path("configs/eval/scorer/tray.yaml").resolve())
+    edit(raw)
+    (tmp_path / "tray.yaml").write_text(yaml.safe_dump(raw))
+    with pytest.raises(ValueError, match=match):
+        load_task("tray", tmp_path)
+
+
+def test_successes_that_rest_raised_are_counted(tray: TaskView) -> None:
+    run, held = rest_set()
+    extra = (labelled("R", "ok4", True), labelled("R", "ok5", True))
+    outs = (outcome("R", "ok4", True, final=rest(0.884)),
+            outcome("R", "ok5", True, final=rest(0.853)))
+    run = RunScores("R", run.ref, (*run.scores, *extra))
+    book = FactBook()
+    got = named(book, relaxed_sweep(book, tray, [run], {"R": RunOutcomes(
+        "R", held.ref, (*held.outcomes, *outs))}))
+    assert got["R_rest_height_reference"] == pytest.approx(0.853)
+    assert (got["R_successes_raised"], got["R_rest_height_reference_successes"]) == (1, 5)
+
+
+def test_the_raised_counts_are_comparison_facts() -> None:
+    from flywheel.eval.agentqa.round.judge import (
+        COMPARISON_MARKERS,
+        is_comparison_fact,
+        load_roles,
+    )
+    markers = load_roles().rank.comparison_markers
+    assert set(COMPARISON_MARKERS) <= set(markers)
+    for name in ("R_successes_raised", f"{L1}_raised", f"{L1}_yaw_over_tolerance"):
+        assert is_comparison_fact(name, 1, markers)
+        assert is_comparison_fact(name, 1, COMPARISON_MARKERS)
+    assert not is_comparison_fact("R_rest_height_reference_successes", 3, markers)

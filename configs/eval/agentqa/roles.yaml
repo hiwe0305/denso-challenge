@@ -18,3 +18,5 @@ rank:
     - _matches_
     - _judgeable
     - _largest_drop
+    - _over_tolerance   # relaxed_sweep v2: members above the yaw tolerance
+    - _raised           # relaxed_sweep v2: members above the rest height plus the margin

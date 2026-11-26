@@ -66,6 +66,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [x] 4.8 Trace thật: một run khai được nhiều entry `trace` (một file mỗi lượt); `trace_stats` ghép lượt với `Score` theo `Score.trace_sha256` bằng sha256 của entry, không theo `episode_id`; `metrics` vào `provides` của task khay
   - [x] 4.9 Bộ nhớ: B1 đọc và kiểm từng file theo dòng, không giữ bản ghi của `trace`, `metrics`, `rtc_log`; công cụ đọc lại khi cần và kiểm lại sha256 (23/11/2026; đỉnh RAM trên gói thật từ 5,8 GB xuống 365 MB)
   - [x] 4.10 Bảng luật giả thuyết lên 7 trên 8 dòng của design 5.3 (23/11/2026): controller, kỹ năng yếu, thiếu vùng phủ, ngoài miền, lỗi ở stage train; 4 phép kiểm mới; luật mang danh sách chẩn đoán nó loại trừ. Dòng "policy, không phải controller" chờ quyết định hợp đồng của Hiếu
+  - [x] 4.11 Hai luật cơ chế cho cụm `L-PLACE-POSE` (26/11/2026): `relaxed_sweep` bản 2 ghi fact sai số góc và độ cao, độ nghiêng cuối của khay so với mốc lấy từ lượt thành công của chính run; luật `place_rests_raised` và `place_yaw_miss`; bốn tên số đo lúc lỗi của DA-47 trong `tasks/tray.yaml`
 - [ ] 5. Lớp model (2 ngày; kiến trúc 20/11 mục 8, 19–25)
   - [x] 5.1 Cổng model: hồ sơ, bảng vai × lớp dữ liệu, chặn hosted, ngân sách, ghi và phát lại
   - [ ] 5.2 Vai `adjudicate` và `rank`: prompt, schema câu trả lời
@@ -85,6 +86,7 @@ Mỗi nhiệm vụ con một commit; giờ là ước lượng.
   - [ ] 7.2 Bộ ca lịch sử với M1, và M3 trên ca `public` nếu được mở
   - [ ] 7.3 Báo nhầm trên gói khỏe; thời gian, chi phí, tỉ lệ `broken`, độ ổn định
   - [ ] 7.4 Ghi bảng kết quả và runbook vào `docs/g0/agent-qa.md`
+  - [x] 7.5 Vòng thật run M (cảnh đồ gá, 180 lượt, 26/11/2026): lớp code và `claude-opus-5-5`, đối chiếu với số nhóm A đo tay; ghi ở `docs/g0/agent-qa.md` mục 9.9
 - [ ] 8. Nhìn hình (0,5–1 ngày; rút được khỏi story)
   - [ ] 8.1 `frames_at`, câu hỏi đóng trong config task (vai `look`)
   - [ ] 8.2 Hiệu chỉnh trên câu hỏi code đã biết đáp án; fact `vision` chỉ ủng hộ
@@ -142,6 +144,7 @@ Danh sách chung của story:
 
 | Ngày | Nội dung | Người |
 |---|---|---|
+| 26/11/2026 | Thêm nhiệm vụ 4.11 (hai luật cơ chế của lỗi đặt) và 7.5 (vòng thật run M) | Hiếu (soạn với Claude) |
 | 26/11/2026 | Thêm nhiệm vụ 5.9 (chủ thể dataset trên đường ống vòng) | Hiếu (soạn với Claude) |
 | 25/11/2026 | Thêm nhiệm vụ 5.8 (vai `adjudicate`); 5.2 và 5.3 còn mở phần vai `look` | Hiếu (soạn với Claude) |
 | 25/11/2026 | 1.4 xong (outcome thật); thêm nhiệm vụ 2.5 (ngưỡng vùng phủ theo spec 6.8) | Hiếu (soạn với Claude) |
