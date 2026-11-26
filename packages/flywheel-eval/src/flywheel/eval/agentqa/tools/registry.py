@@ -44,7 +44,9 @@ from flywheel.eval.agentqa.tools.history import history_lookup
 from flywheel.eval.agentqa.tools.latch import latch_consistency
 from flywheel.eval.agentqa.tools.lineage import lineage
 from flywheel.eval.agentqa.tools.measures import (
-    SUCCESSES,
+    REFERENCES as REFERENCES,  # re-exported: the bridge lists them in the reference schema
+)
+from flywheel.eval.agentqa.tools.measures import (
     Domains,
     domains,
     measure_compare,
@@ -154,12 +156,14 @@ def _check_measure(domain: str, name: str, value: object, params: Mapping[str, A
             return [f"{name}: {value!r} is not a {kind} measure the pack's rollouts carry "
                     f"(measures: {_some(held)})"]
         return []
-    # reference: the run's successes, or another cluster of the cluster's own run
-    if value == SUCCESSES:
+    # reference: the run's successes (of the cluster's level, or of all levels), or another
+    # cluster of the cluster's own run
+    if value in REFERENCES:
         return []
     cluster = params.get("cluster")
     if not isinstance(value, str) or value not in known.clusters:
-        return [f"{name}: {value!r} is neither {SUCCESSES!r} nor a failure cluster of the pack"]
+        return [f"{name}: {value!r} is neither one of {', '.join(REFERENCES)} nor a failure "
+                "cluster of the pack"]
     if value == cluster:
         return [f"{name}: {value!r} compares a cluster with itself"]
     if isinstance(cluster, str) and known.run_of[value] != known.run_of.get(cluster):

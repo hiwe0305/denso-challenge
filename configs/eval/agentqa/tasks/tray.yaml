@@ -182,14 +182,17 @@ coverage:
     # spec step 7; kept out so tau_cov matches the round plan's definition.
 
 # How `measure_compare` and `measure_tally` (DA-52) compare a failure cluster with a reference
-# group (the run's successes, or another cluster of the run). The measures themselves are not
-# named here: the tools offer every measure the pack's K1 outcomes (and `conditions` entries)
+# group (the run's successes of the cluster's level or of every level, or another cluster of
+# the run). The measures themselves are not named here: the tools offer every measure the pack's K1 outcomes (and `conditions` entries)
 # carry, as closed references such as `final.<name>`, `final.<name>[k]`, `final.<name>.tilt`.
 #   low_percentile, high_percentile  the reference's bounds; a cluster member outside them
 #                  counts as outside. ASSUMPTION (giả định): 5 and 95, story DA-52; not tuned.
 #   min_reference  judged reference rollouts needed for bounds; fewer leaves the bounds not
 #                  judged. ASSUMPTION (giả định): 10, so a 5-95 range rests on more than a
 #                  handful of rollouts; not tuned.
+#   min_cluster    judged cluster members `separated` needs; fewer leaves it not judged (a
+#                  one-rollout cluster outside the bounds is not a separation). ASSUMPTION
+#                  (giả định): 3; not tuned.
 #   max_values     distinct values of a tally that get their own facts, the most frequent
 #                  first; the rest are summed into one `other` count. ASSUMPTION: 8.
 #   thresholds     measure reference -> the scorer threshold it is compared with
@@ -202,6 +205,7 @@ measures:
   low_percentile: 5
   high_percentile: 95
   min_reference: 10
+  min_cluster: 3
   max_values: 8
   thresholds:
     final.place_distance_m: {threshold: target_pos_tol, beyond: above}

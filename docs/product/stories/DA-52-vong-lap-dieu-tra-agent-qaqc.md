@@ -51,7 +51,7 @@ Giao thức là JSON qua cổng model sẵn có, không dùng API gọi công c�
 
 Bổ sung 27/11/2026 (review của phiên điều phối): khi gói có artifact điều kiện (`Condition`, thứ `coverage_distance` đã đọc), hai công cụ nhận cả tham số điều kiện của lượt (ví dụ khoảng cách hai bàn, vị trí đứng ban đầu, khối lượng linh kiện) như một số đo, cùng luật miền đóng. Câu hỏi "tham số nào của mức 2 gây lỗi" chưa ai có đáp án, nên đây là phần mù của phép thử trên run M. Gói run M chưa có artifact điều kiện; xem ghi chú.
 
-Model không bao giờ truyền con số: ngưỡng lấy từ dữ liệu (phân vị của lượt thành công) hoặc từ cấu hình bộ chấm. Hai phân vị 5 và 95 là **giả định**, ghi trong cấu hình.
+Model không bao giờ truyền con số: ngưỡng lấy từ dữ liệu (phân vị của lượt thành công) hoặc từ cấu hình bộ chấm. Hai phân vị 5 và 95 là **giả định**, ghi trong cấu hình. Sửa theo review 27/11/2026: nhóm đối chiếu mặc định là lượt thành công **cùng mức** với cụm (`successes_same_level`); "mọi mức" là lựa chọn riêng. Cờ "tách biệt" chỉ có khi cụm đủ cỡ tối thiểu (3, **giả định**). Mỗi lời gọi trả cả số lượt của nhóm và số lượt thiếu số đo.
 
 ### Các chốt giữ nguyên
 
@@ -112,12 +112,13 @@ Giới hạn của phép thử 1, nói trước: người thiết kế hai công
 
 Theo 07 mục 3.1. File story luôn được sửa.
 
-- `packages/flywheel-eval/src/flywheel/eval/agentqa/round/` (bước mới `investigate.py`; `pipeline.py`, `records.py`, `hypotheses.py`, `verify.py`, `assemble.py`, `render.py` chỉ ở chỗ nối bước mới)
+- `packages/flywheel-eval/src/flywheel/eval/agentqa/round/` (bước mới `investigate.py`; `pipeline.py`, `records.py`, `hypotheses.py`, `verify.py`, `assemble.py`, `render.py` chỉ ở chỗ nối bước mới; `version.py` cho mã băm agent; `judge.py` chỉ danh sách dấu hiệu fact so sánh)
 - `packages/flywheel-eval/src/flywheel/eval/agentqa/tools/` (hai công cụ mới, `registry.py`)
 - `packages/flywheel-eval/src/flywheel/eval/agentqa/cli.py` (chỉ cờ `--investigate` và `--disable-rule`)
 - `configs/eval/agentqa/` (`roles.yaml`, `agent.yaml`, `prompts/investigate.md`, `tasks/tray.yaml`)
 - `packages/flywheel-eval/tests/unit/agentqa/round/`, `packages/flywheel-eval/tests/unit/agentqa/tools/`
 - `docs/g0/agent-qa.md` (chỉ thêm mục kết quả)
+- `packages/flywheel-eval/src/flywheel/eval/agentqa/mcp/bridge.py`: **chờ Hiếu chấp nhận khi merge PR 239**. Chỉ ba chỗ `DOMAIN_SCHEMAS`, `_PARAM_HELP`, `DESCRIPTIONS` và dòng import đi kèm, cho bốn miền tham số và hai công cụ mới; thiếu thì test của lớp nối DA-49 hỏng khi gộp với master
 
 ## Ghi chú cho người làm
 
@@ -129,9 +130,8 @@ Theo 07 mục 3.1. File story luôn được sửa.
 - Kết quả thi lại của `C70_R1` không trình bày (Hiếu, 16/11/2026): không dùng gói chứa kết quả này.
 - Lời gọi model hosted chỉ chạy khi Hiếu đồng ý; khóa API đọc từ biến môi trường, không ghi vào file hay log.
 - Trần 1 USD cho 400 000 token vào là ước lượng và có thể thấp với `claude-opus-5-5`: đo ở lần chạy đầu trên run M, báo Hiếu số thật trước khi lặp ba lần.
-- Hai việc ngoài phạm vi file hiện nay, **chờ Hiếu quyết** (27/11/2026), chưa làm:
+- Một việc ngoài phạm vi file hiện nay, **chờ Hiếu quyết** (27/11/2026), chưa làm:
   - `packages/flywheel-psi0/src/flywheel_psi0/tray/export_conditions.py` chưa xử lý cảnh đồ gá, nên chưa xuất được `Condition` cho run M (tập eval ở `fwdata/tray/eval-sets/jig-m-rp_a410d01efa62`).
-  - `agentqa/mcp/bridge.py` của DA-49 giữ mô tả và schema theo miền tham số; hai công cụ mới có miền mới nên cần thêm vài dòng ở đó.
 - Số chưa đo ghi là ước lượng.
 
 ## Kiểm thử
