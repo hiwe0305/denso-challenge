@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import math
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -126,3 +128,48 @@ def test_the_scene_of_a_batch_is_one_scene() -> None:
     assert pe.scene_of([old, zone1]) is None and pe.scene_of([]) is None
     with pytest.raises(ValueError, match="mix scenes"):
         pe.scene_of([jig, old])
+
+
+# --- DA-50: a plan that is not the set's plan -----------------------------------------------
+
+
+def _run_main(tmp_path: Path, plan_id: str | None) -> dict[str, Any]:
+    """Runs the CLI on a set of one condition and an empty batch directory; returns the json."""
+    set_dir = tmp_path / "set"
+    set_dir.mkdir(exist_ok=True)
+    row: dict[str, Any] = {"level": 1, "seed": 1000100}
+    if plan_id is not None:
+        row["environment_config"] = {"flywheel": {"run_plan_id": plan_id}}
+    (set_dir / "conditions.jsonl").write_text(json.dumps(row) + "\n")
+    out = tmp_path / "result.json"
+    plan = Path(__file__).resolve().parents[4] / "configs/runplans/tray/he-tray-v2.yaml"
+    argv = [str(plan), "--set", str(set_dir), "--out", str(tmp_path / "batch")]
+    assert pe.main([*argv, "--json", str(out)]) == 0
+    result: dict[str, Any] = json.loads(out.read_text())
+    return result
+
+
+def test_a_set_of_another_plan_is_reported_not_refused(tmp_path: Path, capsys: Any) -> None:
+    from flywheel_psi0.tray.runplan import TrayRunPlan, run_plan_id
+
+    plan = Path(__file__).resolve().parents[4] / "configs/runplans/tray/he-tray-v2.yaml"
+    result = _run_main(tmp_path, "rp_other")
+    assert result["plan_mismatch"] == {
+        "set_run_plan_id": "rp_other",
+        "plan_run_plan_id": run_plan_id(TrayRunPlan.load(plan)),
+        "plan": "he-tray-v2.yaml",
+    }
+    seen = capsys.readouterr()
+    for text in (seen.out, seen.err):
+        assert "CẢNH BÁO" in text and "rp_other" in text and "he-tray-v2.yaml" in text
+    assert seen.out.index("CẢNH BÁO") < seen.out.index("| Nhóm")
+
+
+def test_matching_or_unknown_set_plan_ids_say_nothing(tmp_path: Path, capsys: Any) -> None:
+    from flywheel_psi0.tray.runplan import TrayRunPlan, run_plan_id
+
+    plan = Path(__file__).resolve().parents[4] / "configs/runplans/tray/he-tray-v2.yaml"
+    for plan_id in (run_plan_id(TrayRunPlan.load(plan)), None):
+        assert "plan_mismatch" not in _run_main(tmp_path, plan_id)
+        seen = capsys.readouterr()
+        assert "CẢNH BÁO" not in seen.out + seen.err

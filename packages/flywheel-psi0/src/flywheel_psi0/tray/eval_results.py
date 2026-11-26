@@ -91,7 +91,7 @@ from flywheel_psi0.tray.eval_batch import (
     phases_for,
     with_repeats,
 )
-from flywheel_psi0.tray.runplan import Stats, TrayRunPlan
+from flywheel_psi0.tray.runplan import Stats, TrayRunPlan, run_plan_id
 
 # flywheel_simple.tray.predicates.STEP_NAMES; SIMPLE's venv is not this package's.
 STEP_NAMES = ("approach_a", "grasp", "lift", "carry", "reach_b", "place", "release_stand")
@@ -730,6 +730,41 @@ def paired_repeats(
     return block
 
 
+def plan_mismatch(
+    plan: TrayRunPlan, plan_path: Path, rows: Sequence[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """The set's run_plan_id(s) against the plan read with, or None when they agree or are unknown.
+
+    Not an error: older batches are read with another plan on purpose. The result only says
+    the plan's settings (stats seed, headline levels) are not the ones the set was built for.
+    """
+    ids = sorted(
+        {
+            str(r["environment_config"]["flywheel"]["run_plan_id"])
+            for r in rows
+            if ((r.get("environment_config") or {}).get("flywheel") or {}).get("run_plan_id")
+        }
+    )
+    own = run_plan_id(plan)
+    if not ids or ids == [own]:
+        return None
+    return {
+        "set_run_plan_id": ids[0] if len(ids) == 1 else ids,
+        "plan_run_plan_id": own,
+        "plan": plan_path.name,
+    }
+
+
+def mismatch_warning(mismatch: dict[str, Any], seed_note: str | None = None) -> str:
+    """One Vietnamese line: the set was built for another plan than the one read with."""
+    line = (
+        f"CẢNH BÁO: bộ điều kiện được dựng cho kế hoạch {mismatch['set_run_plan_id']} "
+        f"nhưng đang đọc với thiết lập của kế hoạch {mismatch['plan_run_plan_id']} "
+        f"({mismatch['plan']})"
+    )
+    return line if seed_note is None else f"{line}; {seed_note}"
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("plan", type=Path)
@@ -763,6 +798,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.stage1 and args.baseline is None:
         parser.error("--stage1 pairs with a baseline: give --baseline")
     plan = TrayRunPlan.load(args.plan)
+    loaded = plan  # as on disk: `--bootstrap-seed` below changes the copy's run_plan_id
     if args.bootstrap_seed is not None:
         stats = plan.stats.model_copy(update={"seed": args.bootstrap_seed})
         plan = plan.model_copy(update={"stats": stats})
@@ -790,6 +826,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     result["repeats_note"] = repeats_note(args.out, chunks, args.repeats)
     if args.bootstrap_seed is not None:
         result["bootstrap_seed"] = plan.stats.seed
+    mismatch = plan_mismatch(loaded, args.plan, rows)
+    warning = None
+    if mismatch is not None:
+        mismatch["bootstrap_seed_from"] = (
+            "plan" if args.bootstrap_seed is None else "--bootstrap-seed"
+        )
+        result["plan_mismatch"] = mismatch
+        warning = mismatch_warning(
+            mismatch,
+            f"seed bootstrap {plan.stats.seed} lấy từ kế hoạch đang đọc, không phải kế hoạch của "
+            "bộ; --bootstrap-seed đặt lại seed này"
+            if args.bootstrap_seed is None
+            else f"seed bootstrap {plan.stats.seed} do --bootstrap-seed đặt",
+        )
     if args.baseline is not None:
         first = [c for c in chunks if c.repeat == 0]
         base, _, base_missing = collect(args.baseline, first)
@@ -821,6 +871,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 }
     if args.json is not None:
         args.json.write_text(json.dumps(result, indent=1) + "\n")
+    if warning is not None:
+        print(warning)
+        print(warning, file=sys.stderr)
     print(table(result))
     if result["repeats_note"] is not None:
         print(result["repeats_note"])
@@ -849,6 +902,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         counts["paired"] = brief
     if "stage1" in result:
         counts["stage1"] = result["stage1"]
+    if "plan_mismatch" in result:
+        counts["plan_mismatch"] = result["plan_mismatch"]
     print(json.dumps({k: result[k] for k in ("rule0", "rollouts", "extra_rollouts")} | counts))
     return 0
 

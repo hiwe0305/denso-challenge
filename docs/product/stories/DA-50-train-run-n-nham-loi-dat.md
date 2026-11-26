@@ -96,6 +96,7 @@ Luật đọc: khối `jig-n-rules` ở [tray-jig.md](../../he/tray-jig.md) mụ
 - [ ] 5. Train run N trên Colab L4 (Hiếu chạy), dừng VM ngay khi xong
 - [ ] 6. Eval và đọc
   - [x] 6.1 Hiệu ghép cặp trên nhiều lượt mỗi điều kiện trong `eval_results` (`paired_diff_repeats`, khối `paired.repeats`), có test CPU. Lệnh đọc N so với M: `eval_results configs/runplans/tray/he-tray-v2.yaml --set <tập> --out <lô N> --baseline <lô M> --repeats 3 --no-yaw --bootstrap-seed 20261126`
+  - [x] 6.4 Sửa theo review sau merge của PR 228 (phiên điều phối, 27/11/2026): `eval_set` từ chối cảnh lệch với `task.env_id` của plan; `eval_results` và `place_error` cảnh báo và ghi `plan_mismatch` khi tập điều kiện được dựng cho plan khác plan đang đọc
   - [ ] 6.2 Eval 180 rollout theo runbook của DA-47
   - [ ] 6.3 Đọc theo `jig-n-rules`, ghi kết quả và dòng ledger thực đo
 - [ ] 7. Kiểm tra cuối và PR
@@ -139,3 +140,4 @@ Hiếu (làm cùng Claude), duyệt cuối: Hiếu.
 | 26/11/2026 | Thêm số đo ban đầu của tập train run M; sửa bảng dữ liệu thêm (bỏ lọc theo độ nghiêng, thêm lệch góc), thêm mục rủi ro | Hiếu (soạn với Claude) |
 | 26/11/2026 | Thêm nhận xét từ video camera đầu của 28 lượt đặt lệch; đưa dữ liệu lệch góc lên ưu tiên 1 | Hiếu (soạn với Claude) |
 | 27/11/2026 | 6.1 xong: hiệu ghép cặp trên mọi lượt và `--bootstrap-seed` trong `eval_results` | Hiếu (soạn với Claude) |
+| 27/11/2026 | Thêm và làm xong 6.4 (hai điểm review sau merge của PR 228); chờ Hiếu xác nhận việc này thuộc DA-50 | Hiếu (soạn với Claude) |

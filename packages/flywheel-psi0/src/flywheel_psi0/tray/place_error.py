@@ -42,6 +42,8 @@ from flywheel_psi0.tray.eval_results import (
     UNRECORDED,
     Rollout,
     collect,
+    mismatch_warning,
+    plan_mismatch,
     repeats_note,
     scorer_version,
 )
@@ -209,7 +211,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.repeats < 1:
         parser.error("--repeats must be at least 1")
-    TrayRunPlan.load(args.plan)  # same plan check as eval_results
+    plan = TrayRunPlan.load(args.plan)  # same plan check as eval_results
     rows = [json.loads(line) for line in (args.set / "conditions.jsonl").read_text().splitlines()]
     chunks = chunk_plan(rows, args.chunk, phases_for(rows))
     chosen, _, missing = collect(args.out, with_repeats(chunks, args.repeats))
@@ -241,8 +243,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 for lv in sorted({r["level"] for r in result_rows})
             },
         }
+    mismatch = plan_mismatch(plan, args.plan, rows)
+    if mismatch is not None:
+        result["plan_mismatch"] = mismatch
     if args.json is not None:
         args.json.write_text(json.dumps(result, indent=1) + "\n")
+    if mismatch is not None:
+        warning = mismatch_warning(mismatch)
+        print(warning)
+        print(warning, file=sys.stderr)
     print(f"Bộ chấm khay: phiên bản {version}" if version is not None else UNRECORDED)
     if note is not None:
         print(note)
