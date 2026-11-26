@@ -169,6 +169,7 @@ class MeasuresSpec(_Frozen):
     low_percentile: float = Field(ge=0, lt=100)
     high_percentile: float = Field(gt=0, le=100)
     min_reference: int = Field(gt=0)  # judged rollouts the reference needs for bounds
+    min_cluster: int = Field(gt=0)  # judged members `separated` needs
     max_values: int = Field(gt=0)  # distinct values of a tally given their own facts
     thresholds: dict[Annotated[str, Field(pattern=MEASURE_REF)], ThresholdRef] = Field(
         default_factory=dict)

@@ -32,10 +32,12 @@ from flywheel.eval.agentqa.tools.base import Row, ToolResult, not_judged
 from flywheel.eval.agentqa.tools.cost import check_costs
 from flywheel.eval.agentqa.tools.registry import (
     OPTIONAL,
+    REFERENCES,
     REGISTRY,
     MeasureContext,
     ToolSpec,
     check_params,
+    measure_domains,
 )
 from flywheel.eval.agentqa.tools.train import logged_steps
 
@@ -95,6 +97,19 @@ DESCRIPTIONS: dict[str, str] = {
         "Per run and level, how many rollouts pass when the position tolerance is widened "
         "over the task's grid, from K1 outcome measures; per failure cluster of the relaxed "
         "label, the distance, the yaw miss and where the tray comes to rest."),
+    "measure_compare": (
+        "One numeric measure of the rollouts (a K1 outcome value, one component of a list, "
+        "a quaternion's tilt, or a condition value) for one failure cluster against a "
+        "reference group: members, judged and lacking counts of both, both medians, the "
+        "reference's percentile bounds (set in the task view), how many members lie "
+        "outside them, whether a majority does (separated), and counts beyond a scorer "
+        "threshold when the task maps one. Every parameter is a closed list read from the "
+        "pack."),
+    "measure_tally": (
+        "One boolean or text measure of the rollouts for one failure cluster against a "
+        "reference group: members, judged and lacking counts of both, the count of each "
+        "value in the cluster and in the reference, and the most common value of each. "
+        "Every parameter is a closed list read from the pack."),
 }
 
 _PARAM_HELP: dict[str, str] = {
@@ -113,6 +128,16 @@ _PARAM_HELP: dict[str, str] = {
     "checks": "'all', or a non-empty list of check ids of the check catalog.",
     "interventions": "'all', or a non-empty list of intervention kinds.",
     "step": "One step of the task. Optional: every step when left out.",
+    "cluster": "One failure cluster of the pack, as <run>/<step>/<label>/l<level>.",
+    "number_measure": ("One numeric measure the pack's rollouts carry: <where>.<name>, "
+                       "<where>.<name>[k] for a component, or <where>.<name>.tilt for a "
+                       "quaternion; where is final, extrema, at_failure, verdict or "
+                       "condition."),
+    "category_measure": ("One boolean or text measure the pack's rollouts carry: "
+                         "<where>.<name>."),
+    "reference": ("'successes_same_level' (the run's successes of the cluster's level; the "
+                  "default), 'successes_all_levels', or another failure cluster of the same "
+                  "run."),
 }
 
 
@@ -195,6 +220,10 @@ DOMAIN_SCHEMAS: dict[str, Alternatives] = {
     "checks": lambda ctx: [_words("all"), _list_of(_strings(list(check_costs())))],
     "interventions": _interventions,
     "step": lambda ctx: [_strings(list(ctx.task.steps))],
+    "cluster": lambda ctx: [_strings(list(measure_domains(ctx).clusters))],
+    "number_measure": lambda ctx: [_strings(list(measure_domains(ctx).numbers))],
+    "category_measure": lambda ctx: [_strings(list(measure_domains(ctx).categories))],
+    "reference": lambda ctx: [_strings([*REFERENCES, *measure_domains(ctx).clusters])],
 }
 
 

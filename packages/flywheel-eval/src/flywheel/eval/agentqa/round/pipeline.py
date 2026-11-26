@@ -300,7 +300,9 @@ def _resume(pack_path: Path, out: Path, from_step: str, plan: dict[str, object],
         raise RunRefused(f"{out}: the kept measure outputs come from plan "
                          f"{old.plan_path or '(not recorded)'}, not {plan['plan_path']}; "
                          "redo from measure, or pass that plan")
-    if start > steps.index("hypothesize") and old.disabled_rules != plan["disabled_rules"]:
+    wanted = plan["disabled_rules"]
+    assert isinstance(wanted, list)
+    if start > steps.index("hypothesize") and set(old.disabled_rules) != set(wanted):
         raise RunRefused(f"{out}: the kept hypotheses were made with the rules "
                          f"{old.disabled_rules or 'none'} switched off, not "
                          f"{plan['disabled_rules'] or 'none'}; redo from hypothesize")

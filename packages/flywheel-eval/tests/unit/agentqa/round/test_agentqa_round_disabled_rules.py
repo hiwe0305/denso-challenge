@@ -164,3 +164,14 @@ def test_the_cli_refuses_an_unknown_id_in_one_line(make_pack: PackMaker, tmp_pat
                                       "--no-model", "--disable-rule", "ghost"])
     assert result.exit_code == 2 and "ghost" in result.output
     assert len(result.output.strip().splitlines()) == 1 and not out.exists()
+
+
+def test_a_redo_compares_the_disabled_rules_as_a_set(make_pack: PackMaker,
+                                                     tmp_path: Path) -> None:
+    pack, out = make_pack(), tmp_path / "out"
+    both = [RULE, "label_signal_missing"]
+    run_round(pack, out, now=NOW, disable_rules=both)
+    again = run_round(pack, out, from_step="assemble", disable_rules=both[::-1])
+    assert set(again.disabled_rules) == set(both)
+    with pytest.raises(RunRefused, match="redo from hypothesize"):
+        run_round(pack, out, from_step="assemble", disable_rules=[RULE])
