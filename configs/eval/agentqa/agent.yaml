@@ -49,6 +49,12 @@ models:
 
 prompt: prompts/system.md
 
+# Rules of rules/*.yaml switched off by id (DA-52): a disabled rule gives no hypothesis, its
+# file stays as it is. An id that names no rule refuses the round before anything runs.
+# `fw agentqa round --disable-rule <id>` adds ids for one run (recorded in run.json and in
+# the agent hash); this list is part of the agent hash through this file.
+disabled_rules: []
+
 limits:
   # The window the server runs, not the model's 64K: Ollama serves OLLAMA_CONTEXT_LENGTH
   # (default by VRAM, 4096 on the 8 GB laptop of #175) and its /v1 endpoint cannot ask

@@ -10,6 +10,11 @@ hypothesis. A cluster no rule matches gets the `none` hypothesis: silence is nev
 "clean". While a system rule (`system: true`) stands for a cluster, none of its
 hypotheses may spend the data budget (spec 6.4: system and scorer before data).
 
+A rule may be switched off by id (DA-52): `disabled_rules` in `agent.yaml` (part of the agent
+hash), plus the ids `fw agentqa round --disable-rule` adds for one run. A disabled rule gives
+no hypothesis and its file stays as it is; an id that names no rule is refused before
+anything runs.
+
 A rule may name diagnoses it `refutes`: its facts rule them out for the cluster (for
 instance tracking that fails as often on successes as on failures rules out the
 controller). The hypothesis carries the list, so the page and the case bench can say
@@ -48,6 +53,7 @@ from flywheel.eval.agentqa.round.records import (
     Record,
     ToolCallRecord,
 )
+from flywheel.eval.agentqa.round.version import AGENT_CONFIG
 from flywheel.eval.agentqa.tools.clusters import NO_LEVEL, slug
 from flywheel.eval.agentqa.tools.lineage import TOOL as LINEAGE_TOOL
 from flywheel.eval.agentqa.tools.task import TaskView, load_task
@@ -236,6 +242,36 @@ def load_rules(rules_dir: Path | None = None) -> list[Rule]:
     return rules
 
 
+def configured_disabled(config: Path | None = None) -> list[str]:
+    """The `disabled_rules` of `agent.yaml`, in file order; [] when the key is absent."""
+    path = config or AGENT_CONFIG
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as error:
+        raise RulesRefused(f"{path}: {str(error).strip().splitlines()[0][:200]}") from error
+    value = raw.get("disabled_rules") if isinstance(raw, dict) else None
+    if value is None:
+        return []
+    if not isinstance(value, list) or not all(isinstance(v, str) and v for v in value):
+        raise RulesRefused(f"{path}: disabled_rules must be a list of rule ids")
+    return list(dict.fromkeys(value))
+
+
+def disabled_rules(extra: Sequence[str] = (), rules_dir: Path | None = None,
+                   config: Path | None = None) -> list[str]:
+    """The rule ids switched off for a run: `agent.yaml`'s, then `extra`, each once.
+
+    An id that is not a rule of `rules_dir` is refused (`RulesRefused`).
+    """
+    ids = list(dict.fromkeys([*configured_disabled(config), *extra]))
+    known = {r.id for r in load_rules(rules_dir)}
+    unknown = [i for i in ids if i not in known]
+    if unknown:
+        raise RulesRefused(f"disabled rule(s) {', '.join(map(repr, unknown))} are not rule ids "
+                           f"(rules: {', '.join(sorted(known))})")
+    return ids
+
+
 def rule_title(rule_id: str, titles: dict[str, str]) -> str:
     """The title a hypothesis of `rule_id` is shown with (`titles`: rule id -> title)."""
     return NO_RULE_TITLE if rule_id == NONE_RULE else titles.get(rule_id, rule_id)
@@ -408,10 +444,18 @@ def _keep_budget(kinds: Sequence[InterventionKind]) -> list[InterventionKind]:
 
 
 def hypothesize(out: Path, task_id: str, rules_dir: Path | None = None,
-                checks_path: Path | None = None) -> list[HypothesisRecord]:
-    """Hypotheses of every failure cluster of the run directory `out`; writes them."""
+                checks_path: Path | None = None,
+                disabled: Sequence[str] | None = None) -> list[HypothesisRecord]:
+    """Hypotheses of every failure cluster of the run directory `out`; writes them.
+
+    `disabled`: the rule ids switched off; None reads `agent.yaml`'s `disabled_rules`.
+    """
     rules = load_rules(rules_dir)
-    checks = load_checks(rules, checks_path)
+    checks = load_checks(rules, checks_path)  # checks may still name a disabled rule
+    off = set(disabled_rules(rules_dir=rules_dir) if disabled is None else disabled)
+    unknown = sorted(off - {r.id for r in rules})
+    if unknown:
+        raise RulesRefused(f"disabled rule(s) {unknown} are not rule ids")
     task = load_task(task_id)
     by_name: dict[str, list[FactRecord]] = {}
     facts_path = out / FACTS_FILE
@@ -433,7 +477,7 @@ def hypothesize(out: Path, task_id: str, rules_dir: Path | None = None,
                    list(rule.interventions), _ids(rule.support, cluster, facts),
                    _ids(rule.contra, cluster, facts), k, list(rule.refutes))
             for k, rule in enumerate(rules)
-            if all(_holds(c, cluster, task, facts) for c in rule.when)]
+            if rule.id not in off and all(_holds(c, cluster, task, facts) for c in rule.when)]
         if not drafts:
             drafts = [_Draft(NONE_RULE, "data", "unknown", "no_rule_matched", False,
                              ["report_only"], [], [], len(rules), [])]

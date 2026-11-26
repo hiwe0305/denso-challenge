@@ -26,6 +26,7 @@ from __future__ import annotations
 import hashlib
 import shutil
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -50,6 +51,8 @@ from flywheel.eval.agentqa.round.gateway_config import CONFIG_ROOT as GATEWAY_RO
 from flywheel.eval.agentqa.round.gateway_config import load_gateway_config
 from flywheel.eval.agentqa.round.hypotheses import (
     HYPOTHESES_FILE,
+    configured_disabled,
+    disabled_rules,
     hypothesize,
     missing_clusters_reason,
 )
@@ -129,6 +132,7 @@ class _Work:
     factory: ProviderFactory | None = None
     usage: Usage | None = None
     gateway: Gateway | None = None
+    disabled: tuple[str, ...] = ()  # rule ids switched off: agent.yaml's and --disable-rule
     run: RunRecord | None = None
     pack: Pack | None = None
     admitted: Admitted | None = None
@@ -190,7 +194,7 @@ def _step_measure(w: _Work) -> int:
 
 def _step_hypothesize(w: _Work) -> int:
     assert w.pack is not None
-    hypotheses = hypothesize(w.out, w.pack.task_id)
+    hypotheses = hypothesize(w.out, w.pack.task_id, disabled=w.disabled)
     reason = missing_clusters_reason(w.out)
     if reason:
         w.degraded.append(reason)
@@ -296,6 +300,10 @@ def _resume(pack_path: Path, out: Path, from_step: str, plan: dict[str, object],
         raise RunRefused(f"{out}: the kept measure outputs come from plan "
                          f"{old.plan_path or '(not recorded)'}, not {plan['plan_path']}; "
                          "redo from measure, or pass that plan")
+    if start > steps.index("hypothesize") and old.disabled_rules != plan["disabled_rules"]:
+        raise RunRefused(f"{out}: the kept hypotheses were made with the rules "
+                         f"{old.disabled_rules or 'none'} switched off, not "
+                         f"{plan['disabled_rules'] or 'none'}; redo from hypothesize")
     if start > len(old.steps) or [s.name for s in old.steps[:start]] != list(steps[:start]):
         raise RunRefused(f"{out}: the steps before {from_step} are not all recorded")
     kept = old.steps[:start]
@@ -340,13 +348,17 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
               now: datetime | None = None, no_model: bool | None = None,
               store: Path | None = None, run_plan_id: str | None = None,
               gateway_root: Path | None = None,
-              gateway_factory: ProviderFactory | None = None) -> RunRecord:
+              gateway_factory: ProviderFactory | None = None,
+              disable_rules: Sequence[str] = ()) -> RunRecord:
     """Run the pipeline on the pack `pack_path` into `out`; see the module docstring.
 
     `no_model`: None means the code floor for a fresh run and the recorded mode for
     `from_step`; a value that differs from the recorded mode is refused. `gateway_root`
     holds `routing.yaml` and `hosted.yaml` (default: the repo's config root);
     `gateway_factory` builds providers in place of the real ones (tests).
+    `disable_rules`: rule ids switched off for this run besides `agent.yaml`'s
+    `disabled_rules`; recorded in run.json and in the agent hash. An unknown id is refused
+    before anything is created.
     """
     if from_step is not None and from_step not in STEPS:
         raise RunRefused(f"unknown step {from_step!r} (steps: {', '.join(STEPS)})")
@@ -357,6 +369,8 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
     plan_file = plan_path or plan_of(task_id)
     if not plan_file.is_file():
         raise RunRefused(f"{plan_file}: no plan file there")
+    disabled = disabled_rules(disable_rules)  # RulesRefused for an unknown id
+    configured = configured_disabled()
     old: RunRecord | None = None
     if from_step is not None:
         if not (out / RUN_FILE).is_file():
@@ -372,9 +386,11 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
     planned: dict[str, object] = {
         "plan_path": plan_file.as_posix(), "plan_sha256": sha256_of(plan_file),
         "agent_version": agent_version(),
-        "agent_hash": agent_hash(task_id, plan_file, gateway_root=gateway_root)}
+        "agent_hash": agent_hash(task_id, plan_file, gateway_root=gateway_root,
+                                 disabled=[i for i in disabled if i not in configured]),
+        "disabled_rules": disabled}
     work = _Work(pack_path, out, plan_path, no_model=mode, store=store, gateway_root=groot,
-                 factory=gateway_factory)
+                 factory=gateway_factory, disabled=tuple(disabled))
     steps = steps_of(mode)
     if from_step is None:
         if out.exists():
