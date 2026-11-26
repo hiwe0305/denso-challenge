@@ -67,7 +67,7 @@ Ba ràng buộc không được nới:
 ## Nhiệm vụ
 
 - [x] 1.1 Viết story (file này)
-- [ ] 2.1 Lớp nối: từ `ToolSpec` và `MeasureContext` ra schema công cụ và từ `ToolResult` ra nội dung trả về, có test (AC 2, 3, 5)
+- [x] 2.1 Lớp nối: từ `ToolSpec` và `MeasureContext` ra schema công cụ và từ `ToolResult` ra nội dung trả về, có test (AC 2, 3, 5)
 - [ ] 2.2 Vòng lặp stdio JSON-RPC: `initialize`, `ping`, `tools/list`, `tools/call`, notification, xử lý lỗi, có test tiến trình con (AC 1)
 - [ ] 2.3 Lệnh `fw agentqa mcp`, phép kiểm lớp dữ liệu khi khởi động, nhật ký lời gọi, có test (AC 4)
 - [ ] 3.1 Mục tài liệu trong `docs/g0/agent-qa.md`, lần chạy tay trên gói thật, chạy đủ kiểm tra (AC 6, 7)
