@@ -88,3 +88,41 @@ def test_relaxed_curve_relaxes_place_pose_only_and_never_yaw() -> None:
     assert [c["distance_m"] for c in curve] == [0.05, 0.075, 0.10, 0.15, 0.20]
     assert [c["relaxed_successes"] for c in curve] == [1, 2, 2, 3, 3]
     assert {c["n"] for c in curve} == {6} and {c["yaw_error_deg"] for c in curve} == {10.0}
+
+
+# --- DA-47: target by scene -----------------------------------------------------------
+
+
+def test_the_jig_uid_is_jig_task_s() -> None:
+    """`JIG_TASK_UID` copies flywheel_simple.tray.jig_task's, which imports SIMPLE."""
+    from pathlib import Path
+
+    import flywheel_simple.tray
+
+    source = Path(flywheel_simple.tray.__file__).with_name("jig_task.py").read_text()
+    assert f'JIG_TASK_UID = "{pe.JIG_TASK_UID}"' in source
+
+
+def test_a_tray_on_the_jig_target_is_placed_on_the_jig_scene_only() -> None:
+    from flywheel_simple.tray.jig import JigConfig, sample_jig_episode
+
+    level, seed = 1, 1_000_003
+    t = sample_jig_episode(TrayConfig.load(), JigConfig.load(), level, seed).target_pose
+    pos, quat = [t.x, t.y, 0.85], quat_of_yaw(t.yaw)
+    jig = pe.target_for(pe.JIG_TASK_UID)(level, seed)
+    zone1 = pe.target_for(None)(level, seed)
+    assert pe.target_for("g1_wholebody_tray_transfer_teleop")(level, seed) == zone1
+    d, y = pe.pose_error(pos, quat, jig)
+    assert d == pytest.approx(0.0, abs=1e-9) and y == pytest.approx(0.0, abs=1e-9)
+    d, y = pe.pose_error(pos, quat, zone1)
+    assert d > 0.01 or y > 1.0  # the zone1 target of this seed is jittered off the jig's
+
+
+def test_the_scene_of_a_batch_is_one_scene() -> None:
+    jig = _rollout(1, 7, [0.0, 0.0, 0.8], 0.0, task_uid=pe.JIG_TASK_UID)
+    old = _rollout(1, 8, [0.0, 0.0, 0.8], 0.0)
+    zone1 = _rollout(1, 9, [0.0, 0.0, 0.8], 0.0, task_uid="g1_wholebody_tray_transfer_teleop")
+    assert pe.scene_of([jig, jig]) == pe.JIG_TASK_UID
+    assert pe.scene_of([old, zone1]) is None and pe.scene_of([]) is None
+    with pytest.raises(ValueError, match="mix scenes"):
+        pe.scene_of([jig, old])

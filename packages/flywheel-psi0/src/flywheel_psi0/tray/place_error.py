@@ -7,11 +7,15 @@ the terms of the scorer's `in_target` check (`flywheel_simple.tray.predicates`):
     yaw error  min(|yaw - target_yaw|, |yaw - target_yaw - pi|), wrapped, deg (the tray is
                symmetric under a half turn)
 
-The target pose is rebuilt from (level, seed) with `sample_episode`, as the env builds the scene.
-Rollouts are the ones `eval_results` reads: per condition, the earliest finished attempt.
+The target pose is rebuilt from (level, seed) as the env builds the scene, by the scene of the
+rollout's `task_uid` (`target_for`, DA-47): `sample_jig_episode` on the jig scene
+(JIG_TASK_UID), `sample_episode` otherwise (the `+zone1` scene; rows without `task_uid` were
+written before DA-47 and are zone1). A batch mixing the two scenes is refused (`scene_of`).
+Rollouts are the ones `eval_results` reads: per condition and repeat, the earliest finished
+attempt; `--repeats N` reads the `.r<k>` repeats of `eval_batch --repeats`.
 
     python -m flywheel_psi0.tray.place_error <plan> --set <eval set> --out <eval_batch dir>
-        [--json <file>] [--curve]
+        [--json <file>] [--curve] [--repeats N]
 
 `--curve` adds the relaxed success of rule (c) of the 60k pair (tray.md 19.2): per position
 tolerance of RELAXED_M, the rollouts that succeeded or failed as L-PLACE-POSE within that
@@ -27,16 +31,60 @@ import argparse
 import json
 import math
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-from flywheel_psi0.tray.eval_batch import chunk_plan, phases_for
-from flywheel_psi0.tray.eval_results import UNRECORDED, Rollout, collect, scorer_version
+from flywheel_psi0.tray.eval_batch import chunk_plan, phases_for, with_repeats
+from flywheel_psi0.tray.eval_results import (
+    UNRECORDED,
+    Rollout,
+    collect,
+    repeats_note,
+    scorer_version,
+)
 
 RELAXED_M = (0.05, 0.075, 0.10, 0.15, 0.20)  # tray.md 19.2 (c): 5 cm is the scorer's own
+# flywheel_simple.tray.jig_task.JIG_TASK_UID; jig_task imports SIMPLE, not in this venv.
+JIG_TASK_UID = "g1_wholebody_tray_transfer_jig_teleop"
+Target = tuple[float, float, float]  # x, y, yaw of the target zone
+TargetOf = Callable[[int, int], Target]
+
+
+def scene_of(rollouts: Sequence[Rollout]) -> str | None:
+    """The one `task_uid` of the rollouts' rows (None: zone1); refuses a batch of two scenes."""
+    uids = {r.row.get("task_uid") for r in rollouts}
+    scenes = {JIG_TASK_UID if u == JIG_TASK_UID else None for u in uids}
+    if len(scenes) > 1:
+        shown = sorted(uids, key=lambda u: (u is None, u or ""))
+        raise ValueError(f"rollouts mix scenes, task_uid {shown} (None: zone1, before DA-47)")
+    return scenes.pop() if scenes else None
+
+
+def target_for(task_uid: str | None) -> TargetOf:
+    """(level, seed) -> target (x, y, yaw) on the scene of `task_uid`, as the env samples it."""
+    from flywheel_simple.tray.config import TrayConfig
+    from flywheel_simple.tray.randomize import sample_episode
+
+    cfg = TrayConfig.load()
+    if task_uid == JIG_TASK_UID:
+        from flywheel_simple.tray.jig import JigConfig, sample_jig_episode
+
+        jig = JigConfig.load()
+
+        def jig_target(level: int, seed: int) -> Target:
+            t = sample_jig_episode(cfg, jig, level, seed).target_pose
+            return float(t.x), float(t.y), float(t.yaw)
+
+        return jig_target
+
+    def zone1_target(level: int, seed: int) -> Target:
+        t = sample_episode(cfg, level, seed).target_pose
+        return float(t.x), float(t.y), float(t.yaw)
+
+    return zone1_target
 
 
 def yaw_of(quat: Sequence[float]) -> float:
@@ -51,7 +99,7 @@ def wrapped(a: float, b: float) -> float:
 
 
 def pose_error(
-    tray_pos: Sequence[float], tray_quat: Sequence[float], target: tuple[float, float, float]
+    tray_pos: Sequence[float], tray_quat: Sequence[float], target: Target
 ) -> tuple[float, float]:
     """(distance m, yaw error deg) of the final tray pose to a target (x, y, yaw)."""
     tx, ty, tyaw = target
@@ -75,6 +123,7 @@ def rows_for(
             {
                 "level": r.level,
                 "seed": r.seed,
+                "repeat": r.repeat,
                 "success": bool(r.row.get("success")),
                 "failure": r.row.get("failure"),
                 "reach_b": bool(len(steps) > 4 and all(steps[:5])),
@@ -142,7 +191,6 @@ def groups(rows: Sequence[dict[str, Any]]) -> dict[str, dict[str, Any]]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     from flywheel_simple.tray.config import TrayConfig
-    from flywheel_simple.tray.randomize import sample_episode
 
     from flywheel_psi0.tray.runplan import TrayRunPlan
 
@@ -155,21 +203,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--curve", action="store_true", help="relaxed success per tolerance (tray.md 19.2 c)"
     )
+    parser.add_argument(
+        "--repeats", type=int, default=1, help="rollouts per condition, as run (DA-42)"
+    )
     args = parser.parse_args(argv)
+    if args.repeats < 1:
+        parser.error("--repeats must be at least 1")
     TrayRunPlan.load(args.plan)  # same plan check as eval_results
     rows = [json.loads(line) for line in (args.set / "conditions.jsonl").read_text().splitlines()]
-    chosen, _, missing = collect(args.out, chunk_plan(rows, args.chunk, phases_for(rows)))
+    chunks = chunk_plan(rows, args.chunk, phases_for(rows))
+    chosen, _, missing = collect(args.out, with_repeats(chunks, args.repeats))
     cfg = TrayConfig.load()
-
-    def target_of(level: int, seed: int) -> tuple[float, float, float]:
-        t = sample_episode(cfg, level, seed).target_pose
-        return float(t.x), float(t.y), float(t.yaw)
-
-    result_rows = rows_for(chosen, target_of, cfg.target_pos_tol, cfg.target_yaw_tol_deg)
+    scene = scene_of(chosen)  # refuses a directory of two scenes
+    result_rows = rows_for(chosen, target_for(scene), cfg.target_pos_tol, cfg.target_yaw_tol_deg)
     version = scorer_version(chosen)  # refuses a directory of two scorer versions
+    note = repeats_note(args.out, chunks, args.repeats)
     result: dict[str, Any] = {
         "scorer_version": version,
         "scorer_version_note": UNRECORDED if version is None else None,
+        "task_uid": scene,
+        "repeats": args.repeats,
+        "repeats_note": note,
         "tolerance": {"distance_m": cfg.target_pos_tol, "yaw_error_deg": cfg.target_yaw_tol_deg},
         "missing": missing,
         "groups": groups(result_rows),
@@ -190,6 +244,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.json is not None:
         args.json.write_text(json.dumps(result, indent=1) + "\n")
     print(f"Bộ chấm khay: phiên bản {version}" if version is not None else UNRECORDED)
+    if note is not None:
+        print(note)
     print(
         "| Nhóm | n | Khoảng cách p10 / p50 / p90 (cm) | Sai số góc p10 / p50 / p90 (°) "
         "| Trong dung sai |"
