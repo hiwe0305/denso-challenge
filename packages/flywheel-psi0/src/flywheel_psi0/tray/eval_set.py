@@ -27,6 +27,26 @@ Two smaller sets for the image pipeline check of rule 0 (docs/he/tray.md section
   split train: the scenes C was trained on (T1);
 * `--only 1:1000100:1000120`: the plan's eval conditions of level 1, seeds
   [1000100, 1000120), row for row as in the full set (T2).
+
+DA-47, the fixed-jig scene and plans without an eval section:
+
+* `--scene jig2` records `scene: jig2` in each row's `environment_config.flywheel`
+  (zone1, the default, records nothing, so the rows and sha256 of earlier sets hold);
+  `eval_batch --scene` refuses a set of another scene. The template must be a jig
+  release (its `visuals_revision` ends with `+jig2`). The jig task rebuilds its scene
+  from (level, seed) and its own `configs/sim/tray_jig.yaml`; the recorded `tray.jig`
+  block is not read, so it is dropped with the rest of `tray`;
+* `--levels LEVEL:START:STOP ...` names the eval conditions: required for a `mix_train`
+  plan (`TrayMixPlan`, no eval section; its id is the frozen one of its lock file),
+  refused for a `TrayRunPlan` (its `eval.by_level` is the one source). Seeds must be in
+  the simulator's dev range (`randomize.SEED_RANGES`), the split the rows record;
+* `--exclude-seeds-of <release> ...` refuses conditions whose seed is an episode seed of
+  one of those releases (the train data of the plan):
+
+    python -m flywheel_psi0.tray.eval_set configs/runplans/tray/he-tray-jig-m.yaml \
+        --scene jig2 --levels 1:1000300:1000330 2:1000300:1000330 \
+        --release <level 1 jig release> --exclude-seeds-of <each release of the cut> \
+        --out <dir>
 """
 
 from __future__ import annotations
@@ -40,10 +60,17 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from flywheel_psi0.tray.demo_sets import DemoSets, ReleaseEpisode, rank
-from flywheel_psi0.tray.runplan import REPO, TrayRunPlan, file_sha256, run_plan_id
+import yaml
+
+from flywheel_psi0.tray.demo_sets import DemoSets, ReleaseEpisode, rank, read_release
+from flywheel_psi0.tray.mixplan import TrayMixPlan
+from flywheel_psi0.tray.runplan import REPO, TrayRunPlan, file_sha256, lock_path, run_plan_id
 
 DATA = "data/chunk-000/episode_{:06d}.parquet"
+SCENES = ("zone1", "jig2")  # as eval_batch.SCENES
+DEFAULT_SCENE = "zone1"
+JIG_REVISION = "jig2"  # flywheel_simple.tray.jig.JIG_REVISION, the suffix of visuals_revision
+DEV_SEEDS = range(1_000_000, 1_001_000)  # flywheel_simple.tray.randomize.SEED_RANGES["dev"]
 
 
 def conditions_sha256(rows: list[dict[str, Any]]) -> str:
@@ -58,6 +85,7 @@ def environment_config(
     plan_id: str,
     split: str = "dev",
     purpose: str = "eval",
+    scene: str = DEFAULT_SCENE,
 ) -> dict[str, Any]:
     """The release episode's config with the tray sample of (level, seed) and no recorded report."""
     config = copy.deepcopy(template)
@@ -70,10 +98,17 @@ def environment_config(
         "split": split,
         "run_plan_id": plan_id,
     }
+    if scene != DEFAULT_SCENE:
+        config["flywheel"]["scene"] = scene
     return config
 
 
-def condition_rows(plan: TrayRunPlan, template: dict[str, Any]) -> list[dict[str, Any]]:
+Levels = list[tuple[int, int, int]]  # (level, start, stop) of --levels
+
+
+def condition_rows(
+    plan: TrayRunPlan, template: dict[str, Any], scene: str = DEFAULT_SCENE
+) -> list[dict[str, Any]]:
     """One row per eval episode, levels in the plan's order, seeds ascending."""
     if plan.eval.by_level is None:
         raise ValueError("eval_set needs a version 2 plan (eval.by_level)")
@@ -83,11 +118,74 @@ def condition_rows(plan: TrayRunPlan, template: dict[str, Any]) -> list[dict[str
             "level": c.level,
             "seed": seed,
             "unit": c.unit,
-            "environment_config": environment_config(template, c.level, seed, plan_id),
+            "environment_config": environment_config(template, c.level, seed, plan_id, scene=scene),
         }
         for c in plan.eval.by_level
         for seed in range(c.seeds.start, c.seeds.stop)
     ]
+
+
+def level_rows(
+    levels: Levels, plan_id: str, template: dict[str, Any], scene: str = DEFAULT_SCENE
+) -> list[dict[str, Any]]:
+    """Rows of explicit (level, start, stop) conditions, in the given order.
+
+    Level 0 has one scene, so its seeds are replicates (as `LevelConditions` requires).
+    """
+    seen = [lv for lv, _, _ in levels]
+    if len(set(seen)) != len(seen):
+        raise ValueError(f"--levels repeats a level: {seen}")
+    for level, start, stop in levels:
+        if level not in (0, 1, 2) or not start < stop:
+            raise ValueError(f"--levels {level}:{start}:{stop}: level 0-2 and start < stop")
+        if start < DEV_SEEDS.start or stop > DEV_SEEDS.stop:
+            raise ValueError(
+                f"--levels {level}:{start}:{stop} is outside the dev seeds "
+                f"[{DEV_SEEDS.start}, {DEV_SEEDS.stop}): the env refuses other ranges"
+            )
+    return [
+        {
+            "level": level,
+            "seed": seed,
+            "unit": "replicate" if level == 0 else "condition",
+            "environment_config": environment_config(template, level, seed, plan_id, scene=scene),
+        }
+        for level, start, stop in levels
+        for seed in range(start, stop)
+    ]
+
+
+def frozen_plan_id(plan: TrayMixPlan, plan_path: Path) -> str:
+    """The run_plan_id of a mix plan's lock file; refuses a plan not frozen or changed since."""
+    lock = lock_path(plan_path)
+    if not lock.is_file():
+        raise ValueError(f"{plan_path} is not frozen: no {lock.name}")
+    frozen = str(json.loads(lock.read_text(encoding="utf-8"))["run_plan_id"])
+    if frozen != run_plan_id(plan):
+        raise ValueError(f"{plan_path} changed since it was frozen as {frozen}")
+    return frozen
+
+
+def check_template(template: dict[str, Any], scene: str) -> None:
+    """A jig2 set needs a jig release as its template (visuals_revision ends with +jig2)."""
+    if scene != "jig2":
+        return
+    revision = str((template.get("flywheel") or {}).get("visuals_revision", ""))
+    if not revision.endswith("+" + JIG_REVISION):
+        raise ValueError(f"scene jig2 needs a jig release; template visuals_revision {revision!r}")
+
+
+def check_seeds(rows: list[dict[str, Any]], releases: Sequence[Path]) -> None:
+    """Refuses rows whose seed is an episode seed of one of `releases`, listing the overlap."""
+    seeds = {int(r["seed"]) for r in rows}
+    problems = []
+    for release in releases:
+        _, episodes = read_release(release)
+        overlap = sorted(seeds & {e.seed for e in episodes})
+        if overlap:
+            problems.append(f"{release}: {len(overlap)} seeds, {overlap[:10]}")
+    if problems:
+        raise ValueError("eval seeds are train seeds: " + "; ".join(problems))
 
 
 def only(rows: list[dict[str, Any]], level: int, start: int, stop: int) -> list[dict[str, Any]]:
@@ -99,7 +197,12 @@ def only(rows: list[dict[str, Any]], level: int, start: int, stop: int) -> list[
 
 
 def train_rows(
-    plan: TrayRunPlan, repo: Path, template: dict[str, Any], set_name: str, first: int
+    plan: TrayRunPlan,
+    repo: Path,
+    template: dict[str, Any],
+    set_name: str,
+    first: int,
+    scene: str = DEFAULT_SCENE,
 ) -> list[dict[str, Any]]:
     """The first `first` episodes of a demo set in its hash order, as train conditions."""
     path = repo / plan.demo_sets.file
@@ -121,7 +224,13 @@ def train_rows(
             "seed": seed,
             "unit": "train_condition",
             "environment_config": environment_config(
-                template, level, seed, plan_id, split="train", purpose="pipeline_check"
+                template,
+                level,
+                seed,
+                plan_id,
+                split="train",
+                purpose="pipeline_check",
+                scene=scene,
             ),
         }
         for seed in rank(sets.release_hash, episodes, sets.salt)[:first]
@@ -204,16 +313,32 @@ def build(
     train_set: tuple[str, int] | None = None,
     subset: tuple[int, int, int] | None = None,
     repo: Path = REPO,
+    scene: str = DEFAULT_SCENE,
+    levels: Levels | None = None,
+    exclude: Sequence[Path] = (),
 ) -> str:
     """The conditions' sha256; with `out`, also the datasets and conditions.jsonl."""
-    plan = TrayRunPlan.load(plan_path)
+    if scene not in SCENES:
+        raise ValueError(f"scene {scene!r} is not one of {SCENES}")
     info, template, tasks, stats = read_template(release)
-    if train_set is not None:
-        rows = train_rows(plan, repo, template, *train_set)
+    check_template(template, scene)
+    raw = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
+    if raw.get("purpose") == "mix_train":
+        mix = TrayMixPlan.load(plan_path)
+        if levels is None or train_set is not None:
+            raise ValueError("a mix_train plan has no eval section: give --levels")
+        rows = level_rows(levels, frozen_plan_id(mix, plan_path), template, scene)
     else:
-        rows = condition_rows(plan, template)
-        if subset is not None:
-            rows = only(rows, *subset)
+        plan = TrayRunPlan.load(plan_path)
+        if levels is not None:
+            raise ValueError("this plan's conditions are its eval.by_level: drop --levels")
+        if train_set is not None:
+            rows = train_rows(plan, repo, template, *train_set, scene=scene)
+        else:
+            rows = condition_rows(plan, template, scene)
+    if subset is not None and train_set is None:
+        rows = only(rows, *subset)
+    check_seeds(rows, exclude)
     digest = conditions_sha256(rows)
     if out is None:
         return digest
@@ -245,6 +370,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     kind.add_argument("--train-set", help="demo set of the plan, e.g. C (with --first)")
     kind.add_argument("--only", help="LEVEL:START:STOP of the plan's eval conditions")
     parser.add_argument("--first", type=int, help="episodes of --train-set, in hash order")
+    parser.add_argument("--scene", choices=SCENES, default=DEFAULT_SCENE, help="DA-47")
+    parser.add_argument(
+        "--levels", nargs="+", help="LEVEL:START:STOP eval conditions (mix_train plans)"
+    )
+    parser.add_argument(
+        "--exclude-seeds-of",
+        type=Path,
+        nargs="+",
+        action="extend",
+        default=[],
+        help="release dirs whose episode seeds the conditions must avoid",
+    )
     args = parser.parse_args(argv)
     if (args.train_set is None) != (args.first is None):
         parser.error("--train-set and --first go together")
@@ -253,7 +390,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.only is not None:
         level, start, stop = (int(x) for x in args.only.split(":"))
         subset = (level, start, stop)
-    digest = build(args.plan, args.release, args.out, train_set, subset)
+    levels = None
+    if args.levels is not None:
+        levels = [(lv, a, b) for lv, a, b in (map(int, x.split(":")) for x in args.levels)]
+    digest = build(
+        args.plan,
+        args.release,
+        args.out,
+        train_set,
+        subset,
+        scene=args.scene,
+        levels=levels,
+        exclude=args.exclude_seeds_of,
+    )
     print(digest)
     if args.check is not None and digest != args.check:
         print(f"conditions moved: {digest} != {args.check}", file=sys.stderr)
