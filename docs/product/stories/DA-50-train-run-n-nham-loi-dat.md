@@ -35,13 +35,30 @@ Kết quả run M ([tray-jig.md](../../he/tray-jig.md) mục 5, thực đo 26/11
 | B | Train tiếp từ `ckpt_100000` của M thêm 40 000 bước với tập mới | Khoảng 22 CU | Đổi cùng lúc dữ liệu và số bước; không tách được nguyên nhân |
 | C | Thêm run đối chứng K (498 episode đầy đủ) song song | Đo được phần của dữ liệu bước đặt trong M | Thêm khoảng 56 CU; số dư 151,8 CU không đủ cho N, K và dự phòng |
 
-Dữ liệu thêm, theo thứ tự ưu tiên. Thành phần cuối cùng chốt ở nhiệm vụ 2, sau số đo của nhiệm vụ 1:
+Số đo ban đầu của tập train run M (thực đo 26/11/2026, đọc từ nhật ký sinh và phát lại trên `rtx3060`: `quality.jsonl`, `gen_log.jsonl`, `replay_outcomes.jsonl` của bốn lô; chỉ tính episode trong danh sách giữ):
 
-| Ưu tiên | Dữ liệu | Lý do | Giả thuyết cần đo trước |
+| Phần | Episode | Đỉnh nghiêng khi mang, p50 / p90 / lớn nhất (°) | Lệch đích lúc tới bàn B | Khay cuối không phẳng |
+|---|---|---|---|---|
+| Đầy đủ, mức 1 | 356 | 5,4 / 7,5 / 9,6 | Không lệch | 3 |
+| Đầy đủ, mức 2 | 142 | 5,5 / 7,5 / 9,6 | Không lệch | 3 |
+| Đoạn đặt, mức 1 | 377 | 6,0 / 7,7 / 9,9 | Dọc và ngang, mỗi trục trải đều trong ±10 cm; không lệch góc | 10 |
+| Đoạn đặt, mức 2 | 162 | 6,1 / 8,1 / 9,9 | Như trên | 2 |
+
+- **Nghiêng.** Không demo nào nghiêng quá 10° khi mang. Lỗi `L-TRAY-TILT` của policy (15° trở lên) không phải do bắt chước demo nghiêng; lọc demo theo độ nghiêng không có gì để lọc.
+- **Lệch ngang.** Dữ liệu đoạn đặt đã phủ lệch ngang và dọc tới ±10 cm (539 episode), đúng cỡ lệch của các lượt gác thành (5–10 cm). Policy vẫn đặt lệch, nên đây **không** phải lỗ hổng về khoảng lệch; thêm dữ liệu cùng loại có thể không sửa được.
+- **Lệch góc.** Planner chỉ làm lệch hai trục vị trí (`carry_offset` có 2 giá trị); không có demo nào tới bàn B lệch góc rồi xoay lại. 10/28 lượt `L-PLACE-POSE` của M có lệch góc trên 10°.
+- **Khay phẳng.** 18/1 037 demo (1,7 %) có khay cuối không phẳng theo số phát lại, so với 58/178 lượt của policy.
+- Chưa đo: tư thế khay đúng lúc bắt đầu hạ (nhật ký không ghi quỹ đạo khay; cần chạy lại sim). Tiêu chí 1 mới đạt một phần.
+
+Dữ liệu thêm, theo thứ tự ưu tiên, **đã sửa theo số đo trên** (bản đầu có "bỏ demo có đỉnh nghiêng cao", nay bỏ). Thành phần cuối cùng do Hiếu chốt ở nhiệm vụ 2:
+
+| Ưu tiên | Dữ liệu | Lý do | Điều chưa chắc |
 |---|---|---|---|
-| 1 | Thêm episode mức 2 (đầy đủ và đoạn đặt cắt) | Tập của M có 304/1 037 episode mức 2 (29 %), mức 2 hỏng nhiều nhất | Không |
-| 2 | Đoạn đặt có lệch ngang và lệch góc lúc tới bàn B | 22 lượt gác thành đều lệch ngang hoặc lệch góc | Lô DA-46 (lệch đích CARRY ±10 cm) đã phủ lệch ngang và lệch góc 8–15° tới đâu |
-| 3 | Bỏ demo có đỉnh nghiêng cao khi mang | 11/13 lượt nghiêng chỉ vừa chạm 15° | Phân phối đỉnh nghiêng của demo trong tập M |
+| 1 | Thêm episode mức 2 (đầy đủ và đoạn đặt cắt) | Tập của M có 304/1 037 episode mức 2 (29 %); mức 2 hỏng nhiều nhất (31/44 lượt hỏng) | Không biết tham số nào của mức 2 gây lỗi |
+| 2 | Đoạn đặt có lệch **góc** lúc tới bàn B (thêm trục xoay vào độ lệch của planner) | Chưa có demo nào sửa lệch góc; 10/28 lượt đặt lệch có lệch góc trên 10° | Cần sửa planner (`flywheel_simple/tray/planner.py`, lớp độ lệch CARRY) và đo tỉ lệ thành công của planner khi tới lệch góc |
+| 3 | Thêm đoạn đặt lệch ngang cùng loại | Lỗi lệch ngang là nhiều nhất | Số đo trên cho thấy khoảng lệch đã được phủ; lợi ích là giả thuyết yếu |
+
+**Rủi ro của run N.** Lỗi đặt lệch ngang xảy ra dù dữ liệu đã phủ khoảng lệch đó, nên nguyên nhân có thể nằm ngoài dữ liệu: đồ gá bị khay che trong ảnh camera đầu khi tới gần (design 28/10 mục 3.5, ghi chú 19/11), hoặc policy trôi dần khi đi. Run N có thể không cải thiện bước đặt. Phép thử rẻ trước khi tốn 56 CU: xem video camera đầu của vài lượt gác thành ở run M để biết đồ gá có còn thấy được lúc hạ khay không.
 
 Ngoài phạm vi: demo "gác lên thành rồi nhấc lên đặt lại" (planner chưa có hành vi này); đổi điều kiện thành công thành "khay nằm phẳng trong đồ gá" (cần Decision riêng của Hiếu, xem tray-jig.md mục 5); run K.
 
@@ -84,6 +101,7 @@ Theo 07 mục 3.1. File story luôn được sửa.
 - `packages/flywheel-psi0/src/flywheel_psi0/tray/`
 - `packages/flywheel-psi0/tests/tray/`
 - `scripts/g0/tray/` (chỉ script đo của nhiệm vụ 1)
+- `packages/flywheel-simple/src/flywheel_simple/tray/planner.py` và test của nó (chỉ thêm trục xoay vào độ lệch CARRY, nếu Hiếu chọn ưu tiên 2)
 - `configs/runplans/tray/` (chỉ file mới của run N)
 - `docs/g0/ledger/DA-50.csv`
 - `docs/he/tray-jig.md` (mục 6 trở đi; không sửa khối `jig-m-rules` và, sau khi đóng băng, khối `jig-n-rules`)
@@ -112,3 +130,4 @@ Hiếu (làm cùng Claude), duyệt cuối: Hiếu.
 | Ngày | Nội dung | Người |
 |---|---|---|
 | 26/11/2026 | Tạo từ kết quả eval run M | Hiếu (soạn với Claude) |
+| 26/11/2026 | Thêm số đo ban đầu của tập train run M; sửa bảng dữ liệu thêm (bỏ lọc theo độ nghiêng, thêm lệch góc), thêm mục rủi ro | Hiếu (soạn với Claude) |
