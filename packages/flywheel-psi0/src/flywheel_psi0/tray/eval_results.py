@@ -30,7 +30,8 @@ where the CI lies; reading it is the doc's.
 With `--stage1` (needs `--baseline`), only the first STAGE1_CHUNKS chunks of the run
 order are read, on both sides: stage 1 of branch B's two-stage eval (tray.md 18.2, Hiếu
 10/11/2026), l1-000, l2-000, l1-010, l2-010, l1-020, l2-020, 60 conditions. A missing
-rollout in them is an error. `stage1.outcome` applies the stage 1 stop rule to the
+rollout of repeat 0 in them, the repeat the pairing reads, is an error; missing later
+repeats are only listed. `stage1.outcome` applies the stage 1 stop rule to the
 paired headline: E1 and E3 stop on a clear difference, F stops when B shows no gain,
 `continue` runs the remaining chunks. It is the rule's arithmetic for a run against C;
 against C+ (rule 5) it is not read.
@@ -38,13 +39,19 @@ against C+ (rule 5) it is not read.
 Repeats (DA-42): with `--repeats N` (as given to eval_batch) each condition has N
 rollouts, repeat r of chunk c in `<out>/<c>.r<r>/`. Per level, `n` counts rollouts and
 `conditions` conditions; `per_condition` gives successes and rollouts of each. The
-rollouts of one condition share its scene and are not independent, so `wilson` uses an
-effective sample size (`wilson_n_eff`): rollouts / design effect, the design effect from
-the between-condition variance of a ratio estimator, at least 1; when p is 0 or 1 that
-variance is 0 and n_eff is the number of conditions (conservative). With one rollout per
-condition n_eff is n and `wilson` is the plain Wilson interval of before. The bootstrap CI
-resamples conditions (their mean success) within each level. `paired` and `paired_diff`
-pair repeat 0 of each condition only, the rollout an old one-per-condition run has.
+rollouts of one condition share its scene and are not independent: the statistical unit
+is the condition, and the bootstrap CI, which resamples conditions (their mean success)
+within each level, is the primary CI (docs/he/tray-jig.md 2). `wilson` is descriptive
+only: with more than one rollout per condition it is the Wilson interval of the pooled p
+at n_eff = the number of conditions (`wilson_n_eff`), so it moves continuously with the
+successes. `wilson_design_effect` is the design effect estimated from the
+between-condition variance of a ratio estimator, at least 1, descriptive beside it; null
+when p is 0 or 1 or there are fewer than two conditions. With one rollout per condition
+n_eff is n and `wilson` is the plain Wilson interval of before. `paired` and
+`paired_diff` pair repeat 0 of each condition only, the rollout an old
+one-per-condition run has. `missing` lists (level, seed, repeat) of each rollout not
+found. A directory holding more repeats than `--repeats` reads is named in the summary
+(`repeats_note`), never read silently short.
 
 Scorer version (DA-42): every result names the version of the tray scorer that labelled
 its rollouts (`scorer_version` of the outcome rows, written by `eval_driver` since
@@ -65,7 +72,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 
@@ -104,18 +111,26 @@ class Rollout:
     repeat: int = 0  # DA-42: rollout index of the condition
 
 
+class Missing(NamedTuple):
+    """A rollout `collect` did not find: condition (level, seed) and its repeat."""
+
+    level: int
+    seed: int
+    repeat: int
+
+
 def collect(
     out: Path, chunks: Sequence[Chunk]
-) -> tuple[list[Rollout], dict[tuple[int, int], int], list[tuple[int, int]]]:
+) -> tuple[list[Rollout], dict[tuple[int, int], int], list[Missing]]:
     """(chosen rollouts in chunk order, extra rollouts per (level, seed), missing ones).
 
     One rollout per (condition, repeat): the chunks may include repeats (with_repeats);
-    extra rollouts of all repeats of a condition add up, and a condition is listed in
-    `missing` once per repeat it misses.
+    extra rollouts of all repeats of a condition add up, and `missing` names the repeat
+    of each rollout not found.
     """
     chosen: list[Rollout] = []
     extra: dict[tuple[int, int], int] = {}
-    missing: list[tuple[int, int]] = []
+    missing: list[Missing] = []
     for chunk in chunks:
         runs: dict[int, list[tuple[int, dict[str, Any]]]] = {}
         for attempt in attempts(out, chunk):
@@ -126,7 +141,7 @@ def collect(
             episode = chunk.start + i
             done = sorted(runs.get(episode, []), key=lambda run: run[0])
             if not done:
-                missing.append((chunk.level, seed))
+                missing.append(Missing(chunk.level, seed, chunk.repeat))
                 continue
             k, row = done[0]
             chosen.append(Rollout(chunk.level, seed, episode, chunk.dir_id, k, row, chunk.repeat))
@@ -134,6 +149,25 @@ def collect(
                 key = (chunk.level, seed)
                 extra[key] = extra.get(key, 0) + len(done) - 1
     return chosen, extra, missing
+
+
+def repeats_found(out: Path, chunks: Sequence[Chunk]) -> int:
+    """Repeats on disk: 1 + the largest k of a `<chunk>.r<k>` directory of the chunks."""
+    ids = {c.id for c in chunks}
+    found = 0
+    for folder in out.glob("*.r*") if out.is_dir() else []:
+        chunk_id, _, k = folder.name.rpartition(".r")
+        if folder.is_dir() and chunk_id in ids and k.isdigit():
+            found = max(found, int(k))
+    return found + 1
+
+
+def repeats_note(out: Path, chunks: Sequence[Chunk], repeats: int) -> str | None:
+    """A line for the summary when `out` holds more repeats than are read; else None."""
+    found = repeats_found(out, chunks)
+    if found <= repeats:
+        return None
+    return f"{out} holds {found} repeats per condition, {repeats} read (--repeats {found} for all)"
 
 
 def scorer_version(rollouts: Sequence[Rollout]) -> int | None:
@@ -267,12 +301,14 @@ def by_condition(rollouts: Sequence[Rollout]) -> dict[tuple[int, int], list[int]
 
 
 def clustered_wilson(groups: Sequence[Sequence[int]], z: float = Z95) -> dict[str, Any]:
-    """Wilson interval of the pooled success rate of clustered rollouts (module docstring).
+    """Descriptive Wilson interval of the pooled success rate of clustered rollouts.
 
-    `groups` are the 0/1 successes of each condition. Design effect = the ratio
-    estimator's between-condition variance, C / (C - 1) * sum (k_i - p m_i)^2 / n^2, over
-    the binomial p (1 - p) / n, at least 1; n_eff = n / design effect. p of 0 or 1, or
-    fewer than two conditions: n_eff = conditions.
+    `groups` are the 0/1 successes of each condition. One rollout per condition: the plain
+    Wilson interval, design effect 1. More than one: the condition is the unit, so the
+    interval is Wilson's of the pooled p at n_eff = conditions, whatever p is (continuous
+    in the successes). `design_effect` is descriptive: the ratio estimator's
+    between-condition variance, C / (C - 1) * sum (k_i - p m_i)^2 / n^2, over the binomial
+    p (1 - p) / n, at least 1; None when p is 0 or 1 or C < 2 (not estimable).
     """
     groups = [g for g in groups if g]
     n = sum(len(g) for g in groups)
@@ -281,19 +317,20 @@ def clustered_wilson(groups: Sequence[Sequence[int]], z: float = Z95) -> dict[st
     k = sum(sum(g) for g in groups)
     c = len(groups)
     p = k / n
+    deff: float | None
     if c == n:
-        method, n_eff = "independent: one rollout per condition", float(n)
-    elif c < 2 or p in (0.0, 1.0):
-        method, n_eff = "clustered: no between-condition variance, n_eff = conditions", float(c)
+        method, n_eff, deff = "independent: one rollout per condition", float(n), 1.0
     else:
-        between = c / (c - 1) * sum((sum(g) - p * len(g)) ** 2 for g in groups) / n**2
-        deff = max(1.0, between / (p * (1 - p) / n))
-        method, n_eff = "clustered: n_eff = rollouts / design effect", n / deff
+        method, n_eff = "clustered: n_eff = conditions, descriptive (CI: bootstrap)", float(c)
+        deff = None
+        if c >= 2 and 0.0 < p < 1.0:
+            between = c / (c - 1) * sum((sum(g) - p * len(g)) ** 2 for g in groups) / n**2
+            deff = max(1.0, between / (p * (1 - p) / n))
     low, high = wilson(p * n_eff, n_eff, z)
     return {
         "interval": (low, high),
         "n_eff": round(n_eff, 3),
-        "design_effect": round(n / n_eff, 3),
+        "design_effect": None if deff is None else round(deff, 3),
         "method": method,
     }
 
@@ -357,6 +394,7 @@ def level_summary(rollouts: Sequence[Rollout]) -> dict[str, Any]:
         "wilson": interval["interval"] if interval else None,
         "wilson_n_eff": interval["n_eff"] if interval else None,
         "wilson_method": interval["method"] if interval else None,
+        "wilson_design_effect": interval["design_effect"] if interval else None,
         "failures": dict(Counter(r.row["failure"] for r in rollouts if not r.row["success"])),
         "step_pass": {
             name: (sum(bool(s[k]) for s in known) / len(known) if known else None)
@@ -429,7 +467,7 @@ def summarize(
     plan: TrayRunPlan,
     chosen: Sequence[Rollout],
     extra: dict[tuple[int, int], int],
-    missing: Sequence[tuple[int, int]],
+    missing: Sequence[Missing],
     yaw: dict[tuple[int, int, int], dict[str, float]] | None = None,
     full: bool = True,
 ) -> dict[str, Any]:
@@ -438,7 +476,7 @@ def summarize(
     if plan.eval.by_level is None:
         raise ValueError("eval_results reads a version 2 plan (eval.by_level)")
     stats = plan.stats
-    present = {r.level for r in chosen} | {level for level, _ in missing}
+    present = {r.level for r in chosen} | {m.level for m in missing}
     by_level_cfg = [c for c in plan.eval.by_level if full or c.level in present]
     by_level = {c.level: [r for r in chosen if r.level == c.level] for c in by_level_cfg}
     levels = {}
@@ -610,8 +648,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--repeats must be at least 1")
     chunks = with_repeats(chunks, args.repeats)
     chosen, extra, missing = collect(args.out, chunks)
-    if args.stage1 and missing:
-        raise ValueError(f"stage 1 misses {missing}: do not read it (tray.md 18.2)")
+    unread = [m for m in missing if m.repeat == 0]  # stage 1 pairs repeat 0 only
+    if args.stage1 and unread:
+        raise ValueError(f"stage 1 misses {unread}: do not read it (tray.md 18.2)")
     full = not args.stage1 and sorted((int(r["level"]), int(r["seed"])) for r in rows) == sorted(
         plan.eval_conditions()
     )
@@ -622,6 +661,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if (steps := trace_of(args.out, r)) is not None:
                 yaw[(r.level, r.seed, r.repeat)] = yaw_errors(steps)
     result = summarize(plan, chosen, extra, missing, yaw, full)
+    result["repeats_note"] = repeats_note(args.out, chunks, args.repeats)
     if args.baseline is not None:
         first = [c for c in chunks if c.repeat == 0]
         base, _, base_missing = collect(args.baseline, first)
@@ -650,10 +690,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.json is not None:
         args.json.write_text(json.dumps(result, indent=1) + "\n")
     print(table(result))
+    if result["repeats_note"] is not None:
+        print(result["repeats_note"])
     counts: dict[str, Any] = {
         "scorer_version": result["scorer_version"],
         "scorer_v1_vs_v2": result["scorer_v1_vs_v2"],
         "missing": len(result["missing"]),
+        "repeats_note": result["repeats_note"],
         "yaw": result.get("yaw"),
     }
     if "paired" in result:

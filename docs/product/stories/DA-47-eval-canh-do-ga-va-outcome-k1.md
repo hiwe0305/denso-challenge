@@ -64,7 +64,7 @@ Tên số đo K1 đề xuất (hợp đồng yêu cầu hậu tố đơn vị):
 - [ ] 6. Thử trên laptop và runbook (AC 6, 7)
   - [ ] 6.1 Cổng phát lại trên `jig2`, xuất K1, ghi kết quả
   - [ ] 6.2 Runbook eval checkpoint trên `jig2`
-- [ ] 8. Sửa theo review PR 221: Wilson mô tả dùng n_eff = số điều kiện; `missing` ghi lượt; `--stage1` chỉ kiểm lượt 0; báo khi thư mục có nhiều lượt hơn số đọc; `evidence` từ chối lô có `.rN`
+- [x] 8. Sửa theo review PR 221: Wilson mô tả dùng n_eff = số điều kiện; `missing` ghi lượt; `--stage1` chỉ kiểm lượt 0; báo khi thư mục có nhiều lượt hơn số đọc; `evidence` từ chối lô có `.rN`
 - [ ] 7. Kiểm tra đủ, `pr_guard`, mở PR (AC 8)
 
 Thứ tự: 2.1, 3 và 4 làm được ngay sau khi DA-42 merge. 5 và 6.2 cần plan của nhóm B.
