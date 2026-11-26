@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Đang làm (mở ngày 25/11/2026; code chờ DA-42 merge) |
+| Trạng thái | Xong 27/11/2026, chờ Hiếu duyệt PR 228 (lô eval run M đã chạy 26/11/2026) |
 | Người làm | Hiếu |
 | Làn | Ngoài ba làn: adapter `flywheel-psi0` và `flywheel-simple` (task bê khay), không sửa nhân hay làn |
 | Nguồn yêu cầu | Kế hoạch vòng chung kết ngày 19/11/2026, nhóm A (task, bộ chấm, eval), việc 2 và 3. Hiếu giao ngày 25/11/2026 |
@@ -66,7 +66,7 @@ Tên số đo K1 đề xuất (hợp đồng yêu cầu hậu tố đơn vị):
   - [x] 6.1 Cổng phát lại trên `jig2`, xuất K1, ghi kết quả
   - [x] 6.2 Runbook eval checkpoint trên `jig2` (scorer-v2.md mục 9.2; lô run M thật ở 9.3)
 - [x] 8. Sửa theo review PR 221: Wilson mô tả dùng n_eff = số điều kiện; `missing` ghi lượt; `--stage1` chỉ kiểm lượt 0; báo khi thư mục có nhiều lượt hơn số đọc; `evidence` từ chối lô có `.rN`
-- [ ] 7. Kiểm tra đủ, `pr_guard`, mở PR (AC 8)
+- [x] 7. Kiểm tra đủ, `pr_guard`, mở PR (AC 8)
 
 Thứ tự: 2.1, 3 và 4 làm được ngay sau khi DA-42 merge. 5 và 6.2 cần plan của nhóm B.
 
@@ -114,6 +114,7 @@ Theo 07 mục 3.1. File story luôn được sửa.
 | Ngày | Thay đổi | Người |
 |---|---|---|
 | 25/11/2026 | Viết story từ kế hoạch vòng chung kết, nhóm A việc 2 và 3 | Claude (chờ PO xem) |
+| 27/11/2026 | 6.2 và 7 xong: runbook ba làn và lô run M thật ở scorer-v2.md mục 9.2–9.3, dòng ledger thực đo; AC 7 đổi theo quyết định của Hiếu ngày 26/11/2026 (chạy eval run M trong story này) | Hiếu (soạn với Claude) |
 
 ## Ghi chép khi làm
 
