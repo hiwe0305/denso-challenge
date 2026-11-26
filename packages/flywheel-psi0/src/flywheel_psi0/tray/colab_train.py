@@ -70,11 +70,16 @@ says. The data is `MyDrive/<plan drive.cuts>/M.tar` (`mixplan pack`), checked by
 `mixplan.cut_problems` before any install; job `da48-ft-m-s0`, recipe, step count, train
 seed and parent are the plan's. Use `--work /content/da48`.
 
+Run N (DA-50, `--branch N`) is a copy of run M with another dataset: same code path, its
+own plan (`configs/runplans/tray/he-tray-jig-n.yaml`) and approval (`MIX_N_FROZEN`). The
+data is `MyDrive/<plan drive.cuts>/N.tar`; job `da50-ft-n-s0` (the job prefix is the
+plan's story). Use `--work /content/da50`.
+
 `restore` (any branch) copies `<durable>/<job id>` back to `<work>/runs/<job id>` on a new
 VM, after `setup` and before `train`, so Psi0Trainer resumes the run where the last
 complete checkpoint `persist` copied left it (same job id, so the same run folder and
-the next attempt number). The durable folder is `MyDrive/<plan drive.runs>` for M and
-`--from` for the others; it refuses when the source is missing or empty (Drive not
+the next attempt number). The durable folder is `MyDrive/<plan drive.runs>` for M and N
+and `--from` for the others; it refuses when the source is missing or empty (Drive not
 mounted) and when the VM already holds that run.
 
     python3 -m flywheel_psi0.tray.colab_train restore --branch M --work /content/da48
@@ -168,6 +173,11 @@ MIX_PLAN = "configs/runplans/tray/he-tray-jig-m.yaml"
 # M plan that runs, whatever the plan file says.
 MIX_FROZEN: str | None = "rp_a410d01efa62"
 MIX = "M"
+MIX_N_PLAN = "configs/runplans/tray/he-tray-jig-n.yaml"
+# he-tray-jig-n.lock.json's id, set by DA-50's freeze (task 4.2, 27/11/2026): the only N
+# plan that runs, whatever the plan file says.
+MIX_N_FROZEN: str | None = "rp_23b25206d96e"
+MIX_N = "N"
 DRIVE = Path("/content/drive/MyDrive")  # `colab drivemount -s <session> /content/drive`
 STAGE1_DIR = "cache/checkpoints/stage1"  # under Psi0, beside the psi-model snapshot
 WEIGHTS = "model.safetensors"  # the one file a stage 1 VLM folder changes
@@ -345,26 +355,37 @@ def load_pair_round(repo: Path = REPO) -> tuple[TrayPairPlan, pairround.TrayPair
     return pair, plan, ROUND_C70_FROZEN
 
 
-def load_mix(repo: Path = REPO) -> tuple[TrayMixPlan, str]:
-    """The frozen plan of run M and its id, or SystemExit with every reason not to run."""
-    path = repo / MIX_PLAN
+def _mix_approval(branch: str) -> tuple[str, str | None, str, str]:
+    """(plan file, approved id, name of that constant, task setting it) of a mix branch.
+
+    Read at call time, so a test can unset or change an approval with monkeypatch."""
+    if branch == MIX_N:
+        return MIX_N_PLAN, MIX_N_FROZEN, "MIX_N_FROZEN", "DA-50 task 4.2"
+    return MIX_PLAN, MIX_FROZEN, "MIX_FROZEN", "DA-48 task 3.2"
+
+
+def load_mix(repo: Path = REPO, branch: str = MIX) -> tuple[TrayMixPlan, str]:
+    """The frozen plan of run M (or N) and its id, or SystemExit with every reason not to run."""
+    file, frozen, constant, task = _mix_approval(branch)
+    path = repo / file
     plan = TrayMixPlan.load(path)
     problems = mixplan.check(plan, repo) + mixplan.launch_problems(plan, path)
-    if MIX_FROZEN is None:
-        problems.append("no M plan is approved yet: MIX_FROZEN is unset (DA-48 task 3.2)")
-    elif run_plan_id(plan) != MIX_FROZEN:
-        problems.append(f"{MIX_PLAN} is {run_plan_id(plan)}; only {MIX_FROZEN} is approved")
-    if list(plan.branches) != [MIX]:
-        problems.append(f"the M plan's branches are {list(plan.branches)}, not [{MIX}]")
+    if frozen is None:
+        problems.append(f"no {branch} plan is approved yet: {constant} is unset ({task})")
+    elif run_plan_id(plan) != frozen:
+        problems.append(f"{file} is {run_plan_id(plan)}; only {frozen} is approved")
+    if list(plan.branches) != [branch]:
+        problems.append(f"the {branch} plan's branches are {list(plan.branches)}, not [{branch}]")
     if problems:
-        raise SystemExit("M plan does not hold, no training:\n  " + "\n  ".join(problems))
-    assert MIX_FROZEN is not None
-    return plan, MIX_FROZEN
+        raise SystemExit(f"{branch} plan does not hold, no training:\n  " + "\n  ".join(problems))
+    assert frozen is not None
+    return plan, frozen
 
 
-def mix_job_id(branch: str, seed: int = 0) -> str:
-    """`da48-ft-m-s0`: Colab session and run folder of run M (DA-48)."""
-    return f"da48-ft-{branch.lower().replace('_', '-')}-s{seed}"
+def mix_job_id(branch: str, seed: int = 0, story: str = "DA-48") -> str:
+    """`da48-ft-m-s0` (DA-48), `da50-ft-n-s0` (DA-50): Colab session and run folder."""
+    prefix = story.lower().replace("-", "")
+    return f"{prefix}-ft-{branch.lower().replace('_', '-')}-s{seed}"
 
 
 def pair_job_id(branch: str, seed: int = 0) -> str:
@@ -395,7 +416,7 @@ class Job:
     @property
     def job_id(self) -> str:
         if isinstance(self.plan, TrayMixPlan):
-            return mix_job_id(self.branch, self.plan.train_seeds[0])
+            return mix_job_id(self.branch, self.plan.train_seeds[0], self.plan.story)
         if self.pair_round is not None:
             return round_job_id(self.branch, self.plan.train_seeds[0])
         if self.data_name is not None:
@@ -417,12 +438,12 @@ class Job:
 
     @property
     def drive_cuts(self) -> str:
-        """Folder under MyDrive holding `<data_name>.tar`: the plan's for M, DA-34's else."""
+        """Folder under MyDrive holding `<data_name>.tar`: the plan's for M/N, DA-34's else."""
         return self.plan.drive.cuts if isinstance(self.plan, TrayMixPlan) else pair_cut.DRIVE_CUTS
 
     @property
     def drive_runs(self) -> str | None:
-        """Folder under MyDrive `persist` copies runs to, when the plan names one (M)."""
+        """Folder under MyDrive `persist` copies runs to, when the plan names one (M, N)."""
         return self.plan.drive.runs if isinstance(self.plan, TrayMixPlan) else None
 
     def cut_problems(self, data: Path, repo: Path = REPO) -> list[str]:
@@ -505,19 +526,19 @@ def load_job(branch: str = BRANCH, repo: Path = REPO) -> Job:
             data_name=ROUND_C70,
             pair_round=pair_round,
         )
-    if branch == MIX:
-        mix, run_plan = load_mix(repo)
+    if branch in (MIX, MIX_N):
+        mix, run_plan = load_mix(repo, branch)
         parts = mix.cut.parts
         return Job(
             mix,
             run_plan,
-            MIX,
+            branch,
             mix.cut.name,
             canonical_sha256(
                 [p.demo_sets.hashes[p.set_name] for p in parts if p.demo_sets and p.set_name]
             ),
             "+".join(p.release_id for p in parts),
-            plan_branch=MIX,
+            plan_branch=branch,
             data_name=mix.cut.name,
         )
     raise SystemExit(f"no fine-tune for branch {branch}")
@@ -1083,7 +1104,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("phase", choices=["setup", "train", "check", "manifest", "restore"])
     parser.add_argument("--work", type=Path, default=WORK)
     parser.add_argument(
-        "--branch", choices=[BRANCH, CPLUS, B, *PAIR, ROUND_C70, MIX], default=BRANCH
+        "--branch", choices=[BRANCH, CPLUS, B, *PAIR, ROUND_C70, MIX, MIX_N], default=BRANCH
     )
     parser.add_argument("--folder", type=Path, help="manifest: a stage 1 VLM folder")
     parser.add_argument(

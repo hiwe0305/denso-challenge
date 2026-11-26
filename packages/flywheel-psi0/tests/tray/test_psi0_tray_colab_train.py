@@ -996,3 +996,155 @@ def test_restore_of_a_da34_branch_needs_a_source_and_the_old_branches_keep_da34(
     assert {j.drive_cuts for j in jobs} == {pair_cut.DRIVE_CUTS} == {"denso/da34/cuts"}
     assert {j.drive_runs for j in jobs} == {None}
     assert colab_train.load_job("C70_R1").job_id == "da34-t7-ft-c70-r1-s0"
+
+
+# --- run N of DA-50 (he-tray-jig-n.yaml, mixplan): a copy of M with another dataset ---
+
+
+EVAL_SEEDS = range(1000100, 1000130)  # the 60 eval conditions of M and N (two levels)
+
+
+def _frozen_n(tmp_path: Path) -> tuple[Path, str, Path]:
+    """(repo, run_plan_id, drive): a frozen N plan on the fake parts, N.tar on drive."""
+    import yaml
+    from flywheel_psi0.tray import pair_cut
+    from flywheel_psi0.tray.cplus_cut import join_cuts
+    from flywheel_psi0.tray.mixplan import freeze
+    from flywheel_psi0.tray.runplan import rules_sha256
+    from test_psi0_tray_mixplan import DOC, ENV, PARTS, RECIPE, _part, _raw_plan
+
+    repo = tmp_path / "repo"
+    (repo / "configs/runplans/tray").mkdir(parents=True)
+    (repo / "configs/models").mkdir(parents=True)
+    shutil.copy(REPO / RECIPE, repo / RECIPE)
+    parts = [_part(tmp_path / f"part{i}" / ENV, i) for i in range(len(PARTS))]
+    cut = tmp_path / "sets" / "N" / ENV
+    join_cuts(parts, cut, "N")
+    raw = _raw_plan(repo, cut)
+    raw.pop("status")
+    raw["story"] = "DA-50"
+    raw["cut"]["name"] = "N"
+    raw["branches"] = {"N": {"parent": "psi0-baseline-egodex-he", "role": "run N"}}
+    raw["budget"]["runs"] = ["N"]
+    raw["drive"] = {"cuts": "denso/da50/cuts", "runs": "denso/da50/runs"}
+    rules = "\n<!-- jig-n-rules -->\n\n(n1) N is read at ckpt 100000.\n\n<!-- /jig-n-rules -->\n"
+    (repo / DOC).parent.mkdir(parents=True, exist_ok=True)
+    (repo / DOC).write_text("# N\n" + rules)
+    raw["interpretation"] = {
+        "doc": DOC,
+        "rules_marker": "jig-n-rules",
+        "rules_sha256": rules_sha256(rules, "jig-n-rules"),
+    }
+    path = repo / colab_train.MIX_N_PLAN
+    path.write_text(yaml.safe_dump(raw, allow_unicode=True, sort_keys=False))
+    freeze(path, repo)
+    frozen = json.loads(path.with_name("he-tray-jig-n.lock.json").read_text())["run_plan_id"]
+    drive = tmp_path / "drive"
+    (drive / "denso/da50/cuts").mkdir(parents=True)
+    pair_cut.pack(cut, "N", drive / "denso/da50/cuts/N.tar")
+    return repo, frozen, drive
+
+
+def test_n_plan_is_frozen_and_a_copy_of_m_but_for_the_data(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from flywheel_psi0.tray import mixplan
+    from flywheel_psi0.tray.runplan import plan_json
+
+    # task 4.2 (27/11/2026): pins in, frozen as MIX_N_FROZEN; M keeps its own approval
+    assert colab_train.MIX_N_FROZEN == "rp_23b25206d96e"
+    assert colab_train.MIX_FROZEN == "rp_a410d01efa62"
+    m = mixplan.TrayMixPlan.load(REPO / colab_train.MIX_PLAN)
+    n = mixplan.TrayMixPlan.load(REPO / colab_train.MIX_N_PLAN)
+    assert mixplan.check(n, REPO) == [] and mixplan.pending(n) == []
+    assert mixplan.launch_problems(n, REPO / colab_train.MIX_N_PLAN) == []
+    # the same run as M: recipe, parent, steps, seed, checkpoints, code, task
+    same = ("recipe", "parents", "train_seeds", "checkpoints", "code", "psi_model", "task")
+    mj, nj = plan_json(m), plan_json(n)
+    assert {k: nj[k] for k in (*same, "embodiment")} == {k: mj[k] for k in (*same, "embodiment")}
+    assert [b.parent for b in n.branches.values()] == [b.parent for b in m.branches.values()]
+    # the data: M's four parts in M's order, the same demo-set files, then two new parts
+    assert n.cut.parts[:4] == m.cut.parts
+    assert [p.release_id for p in n.cut.parts[4:]] == [
+        "tray_s1place_e793fb05a9df",
+        "tray_s1place_6a7b780fb66b",
+    ]
+    assert (n.cut.episodes, n.cut.frames) == (1591, 1230839)
+    assert n.interpretation.rules_marker == "jig-n-rules"
+    job = colab_train.load_job("N")
+    assert (job.job_id, job.run_plan_id, job.data_name) == ("da50-ft-n-s0", "rp_23b25206d96e", "N")
+    assert (job.drive_cuts, job.drive_runs) == ("denso/da50/cuts", "denso/da50/runs")
+    assert colab_train.load_job("M").job_id == "da48-ft-m-s0"
+    monkeypatch.setattr(colab_train, "MIX_N_FROZEN", None)
+    with pytest.raises(SystemExit, match="MIX_N_FROZEN is unset"):
+        colab_train.load_job("N")
+    assert colab_train.load_job("M").run_plan_id == "rp_a410d01efa62"  # M does not need N's
+    monkeypatch.setattr(colab_train, "MIX_N_FROZEN", colab_train.MIX_FROZEN)
+    with pytest.raises(SystemExit, match="only rp_a410d01efa62 is approved"):
+        colab_train.load_job("N")  # M's approval does not run N's plan
+
+
+def test_n_seeds_are_new_unique_and_outside_the_eval_set() -> None:
+    from flywheel_psi0.tray import mixplan
+
+    def seeds(plan: mixplan.TrayMixPlan) -> list[list[int]]:
+        out = []
+        for part in plan.cut.parts:
+            assert part.demo_sets is not None and part.set_name is not None
+            sets = DemoSets.model_validate_json((REPO / part.demo_sets.file).read_text())
+            out.append(sets.sets[part.set_name].seeds)
+        return out
+
+    m = seeds(mixplan.TrayMixPlan.load(REPO / colab_train.MIX_PLAN))
+    n = seeds(mixplan.TrayMixPlan.load(REPO / colab_train.MIX_N_PLAN))
+    new = {s for part in n[4:] for s in part}
+    every = [s for part in n for s in part]
+    assert len(new) == 554 and len(every) == len(set(every)) == 1591
+    assert not new & {s for part in m for s in part}
+    assert not set(every) & set(EVAL_SEEDS)
+
+
+def test_n_runs_only_its_approved_plan_from_its_own_drive_folders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import flywheel_psi0.trainer as trainer_package
+    from test_psi0_tray_mixplan import JIG_ENV_NAME
+
+    repo, frozen, drive = _frozen_n(tmp_path)
+    monkeypatch.setattr(colab_train, "MIX_N_FROZEN", "rp_000000000000")
+    with pytest.raises(SystemExit, match="only rp_000000000000 is approved"):
+        colab_train.load_job("N", repo)
+    monkeypatch.setattr(colab_train, "MIX_N_FROZEN", frozen)
+    job = colab_train.load_job("N", repo)
+    assert (job.job_id, job.data_name, job.plan_branch) == ("da50-ft-n-s0", "N", "N")
+    work = tmp_path / "work"
+    assert job.data(work) == work / "sets" / "N" / JIG_ENV_NAME
+
+    class Installed(Exception):
+        pass
+
+    def install_env(work: Path) -> float:
+        raise Installed
+
+    monkeypatch.setattr(colab_train, "install_env", install_env)
+    monkeypatch.setattr(colab_train, "DRIVE", drive)
+    with pytest.raises(Installed):  # N.tar from denso/da50/cuts, checked, then the install
+        colab_train.setup(work, "N", repo)
+    assert job.cut_problems(job.data(work), repo) == []
+    monkeypatch.setattr(trainer_package, "Psi0Trainer", _FakeTrainer)
+    colab_train.train(work, "N", repo)
+    seen = _FakeTrainer.seen
+    assert (seen["spec"].job_id, seen["spec"].seed) == ("da50-ft-n-s0", 0)
+    assert seen["spec"].parent.checkpoint_id == "psi0-baseline-egodex-he"
+    assert seen["overrides"] == {"train.validation_steps": 2000, "train.max_training_steps": 100000}
+    assert seen["run_plan_id"] == frozen and "#N:" in seen["release_id"]
+    # restore reads runs/da50-ft-n-s0 from the plan's Drive folder, not M's
+    persisted = drive / "denso/da50/runs/da50-ft-n-s0"
+    (drive / "denso/da48/runs/da50-ft-n-s0").mkdir(parents=True)
+    with pytest.raises(SystemExit, match="missing or empty"):
+        colab_train.restore(tmp_path / "vm2", "N", repo)
+    persisted.mkdir(parents=True)
+    (persisted / "metrics.jsonl").write_text('{"step": 10000}\n')
+    target = colab_train.restore(tmp_path / "vm2", "N", repo)
+    assert target == tmp_path / "vm2" / "runs" / "da50-ft-n-s0"
+    assert (target / "metrics.jsonl").is_file()

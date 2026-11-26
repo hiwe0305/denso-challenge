@@ -1,0 +1,217 @@
+{
+ "frozen_at": "2026-11-26T21:57:53+00:00",
+ "plan": {
+  "branches": {
+   "N": {
+    "parent": "psi0-baseline-egodex-he",
+    "role": "run N: the four parts of M and two yaw-offset place cuts joined"
+   }
+  },
+  "budget": {
+   "cap_cu_per_run": 70.0,
+   "ceiling_cu": 70.0,
+   "round_runs": [],
+   "runs": [
+    "N"
+   ],
+   "watcher": "scripts/colab/cu_watch.py session --gpu L4 --cap 70 --floor 14, under one guard"
+  },
+  "checkpoints": {
+   "primary": 100000,
+   "reads": [
+    60000,
+    80000
+   ]
+  },
+  "code": {
+   "psi0": {
+    "commit": "cda3fdfafe47cb6fa75400d013de1bd36e3cea05",
+    "repo": "physical-superintelligence-lab/Psi0"
+   },
+   "simple": {
+    "commit": "b75c6786f87b4a7f43b52b0ac5b83a1d9ea62e11",
+    "repo": "physical-superintelligence-lab/SIMPLE"
+   }
+  },
+  "cut": {
+   "episodes": 1591,
+   "frames": 1230839,
+   "name": "N",
+   "parts": [
+    {
+     "demo_sets": {
+      "file": "configs/runplans/tray/demo_sets-jig-m-tray_s1_bfbdcbcf719e.json",
+      "file_sha256": "bf5287fd85ecf11bfdab10be0d756e53df18cd072968c8aa0a2c488185586a4a",
+      "hashes": {
+       "Q": "012d5120f2a8cd3dc5d0c8e9a07ef94a94cc7e1c4e50edf53976f5dc2c491490"
+      },
+      "salt": "DA-34/demo-sets/v1"
+     },
+     "n": 356,
+     "release": {
+      "data_class": "public",
+      "id": "tray_s1_bfbdcbcf719e",
+      "location": "rtx3060:~/fwdata/datasets/tray-s1-jig2-20261122/releases/tray_s1_bfbdcbcf719e",
+      "release_hash": "bfbdcbcf719e9a7f7363c73694647210b16f86d4d53a289beed2dc7c33f32bda"
+     },
+     "release_id": "tray_s1_bfbdcbcf719e",
+     "set_name": "Q"
+    },
+    {
+     "demo_sets": {
+      "file": "configs/runplans/tray/demo_sets-jig-m-tray_s1_8631ace9b1b3.json",
+      "file_sha256": "db6d83db463a84c785efe6928f867fb671721d5688aa9cd1fc49255fac706a2f",
+      "hashes": {
+       "Q": "6bed7561e34f3e17d39e6ccf5862705f0079307875347b6b3802ea253cc74e77"
+      },
+      "salt": "DA-34/demo-sets/v1"
+     },
+     "n": 142,
+     "release": {
+      "data_class": "public",
+      "id": "tray_s1_8631ace9b1b3",
+      "location": "rtx3060:~/fwdata/datasets/tray-s1-jig2-20261122/releases/tray_s1_8631ace9b1b3",
+      "release_hash": "8631ace9b1b31c2febe93d5fd6a974f0c4d87a853040f94bdcecb66558f0e7b1"
+     },
+     "release_id": "tray_s1_8631ace9b1b3",
+     "set_name": "Q"
+    },
+    {
+     "demo_sets": {
+      "file": "configs/runplans/tray/demo_sets-jig-m-tray_s1place_a1797e480160.json",
+      "file_sha256": "0ba11dc1faeb8ce2834fdecf10594e1abd83ec3fe745ce8f842b704f6feea276",
+      "hashes": {
+       "Q": "07aa6707bd44a662a5717d0649dd038c2070870bbe76a53d0bcf4d6f3641de6f"
+      },
+      "salt": "DA-34/demo-sets/v1"
+     },
+     "n": 377,
+     "release": {
+      "data_class": "public",
+      "id": "tray_s1place_a1797e480160",
+      "location": "rtx3060:~/fwdata/datasets/tray-s1place-jig2-20261124/releases/tray_s1place_a1797e480160",
+      "release_hash": "a1797e480160e4fcbc3115de3e63a2b4e429bb6e07f40f059efde5a42e069c64"
+     },
+     "release_id": "tray_s1place_a1797e480160",
+     "set_name": "Q"
+    },
+    {
+     "demo_sets": {
+      "file": "configs/runplans/tray/demo_sets-jig-m-tray_s1place_56e6d006d8d1.json",
+      "file_sha256": "c2d16f02fa0b183c9f6eb0d397857e30f83a4c8b1d82ab33e95d2c614610769e",
+      "hashes": {
+       "Q": "d0ce06e8e14723905fdecd137d4746c56b943fe4429b7cf756de3f833eab3459"
+      },
+      "salt": "DA-34/demo-sets/v1"
+     },
+     "n": 162,
+     "release": {
+      "data_class": "public",
+      "id": "tray_s1place_56e6d006d8d1",
+      "location": "rtx3060:~/fwdata/datasets/tray-s1place-jig2-20261124/releases/tray_s1place_56e6d006d8d1",
+      "release_hash": "56e6d006d8d16fc7054a324a909fad3bedf9a5cadc5d21060923bf8be24a1c7c"
+     },
+     "release_id": "tray_s1place_56e6d006d8d1",
+     "set_name": "Q"
+    },
+    {
+     "demo_sets": {
+      "file": "configs/runplans/tray/demo_sets-jig-n-tray_s1place_e793fb05a9df.json",
+      "file_sha256": "62d352853adf1652debbc5b18299c1012556cf96aa2e3b9edb30b6e59c4d55ee",
+      "hashes": {
+       "Q": "2433a58de14ed31910b33860d948be8005516ebf3bed4c0048d1139b8aace825"
+      },
+      "salt": "DA-34/demo-sets/v1"
+     },
+     "n": 227,
+     "release": {
+      "data_class": "public",
+      "id": "tray_s1place_e793fb05a9df",
+      "location": "rtx3060:~/fwdata/datasets/tray-s1yaw-jig2-20261126/releases/tray_s1place_e793fb05a9df",
+      "release_hash": "e793fb05a9df503d4522bc411bd9339d1eff1f213aa898bb77b5bd6321b2874f"
+     },
+     "release_id": "tray_s1place_e793fb05a9df",
+     "set_name": "Q"
+    },
+    {
+     "demo_sets": {
+      "file": "configs/runplans/tray/demo_sets-jig-n-tray_s1place_6a7b780fb66b.json",
+      "file_sha256": "a29e77cfbead6b4ffc5f5231bb51d226b53265a43d3b90179bd3909fce3f44d5",
+      "hashes": {
+       "Q": "b252f9b8325ac871df2d4f0380ddb9b5f2c155a443f2181372921d56935ff059"
+      },
+      "salt": "DA-34/demo-sets/v1"
+     },
+     "n": 327,
+     "release": {
+      "data_class": "public",
+      "id": "tray_s1place_6a7b780fb66b",
+      "location": "rtx3060:~/fwdata/datasets/tray-s1yaw-jig2-20261126/releases/tray_s1place_6a7b780fb66b",
+      "release_hash": "6a7b780fb66b1e29ca3ce5a0c33955db9e7090f1ff0b9b30497e07ccf417ab84"
+     },
+     "release_id": "tray_s1place_6a7b780fb66b",
+     "set_name": "Q"
+    }
+   ],
+   "rule": "From each release, every episode whose final placement error is within 3 cm and 5 degrees of the jig target (Hi\u1ebfu 25/11/2026), as listed in that release's keep file; no ranking, no cap. First the four parts of run M in M's order (full episodes level 1, level 2, then the place cuts), then the two new parts: the place cuts of the yaw-offset batch (\u00b115 degrees of yaw at CARRY, planner da41-planner-8+cfg.bee61399+cj.a000s000y150, Hi\u1ebfu 26/11/2026 \"Ch\u1ed1t nh\u01b0 \u0111\u1ec1 xu\u1ea5t\"), level 1 then level 2, same 3 cm / 5 degree keep rule. Stats computed once on the joined set (own_train_set).",
+   "stats_sha256": "3dae55d7e6d58c262aa38b4c7a6e5f4c201e26e63c2a1e53e25ec05e0f57bb6c"
+  },
+  "drive": {
+   "cuts": "denso/da50/cuts",
+   "runs": "denso/da50/runs"
+  },
+  "embodiment": "g1_sonic_dwbc@1",
+  "interpretation": {
+   "doc": "docs/he/tray-jig.md",
+   "rules_marker": "jig-n-rules",
+   "rules_sha256": "7ba9df310fa24e4e90c14ef8f3c08621a759d5b41aa828f59b68a6c41023992d"
+  },
+  "name": "he-tray-psi0-jig-n",
+  "parents": {
+   "psi0-baseline-egodex-he": {
+    "action_header": {
+     "path": "psi0/postpre.1by1.pad36.2601131206.ckpt.he30k/action_header.safetensors",
+     "sha256": "238b4d95862b0eb44bffa75a2ae69e120aeda3d159fd6f29802dd9338019e14d"
+    },
+    "clean_for_main_task": true,
+    "note": "Pretrained on EgoDex 200k + HE 30k steps; no tray data in pretraining. The parent of C, C+, C_ALL and C_70.",
+    "vlm": {
+     "path": "psi0/pre.fast.1by1.2601091803.ckpt.ego200k.he30k/model.safetensors",
+     "sha256": "6e63da17bdd22430bc07c40e4b14ebb96c9d124d014c532449142862c186d3f9"
+    }
+   }
+  },
+  "pricebook": "assumption: Colab 100 CU pack, 0.0999 USD per CU (docs/g0/ledger/DA-19.csv)",
+  "psi_model": {
+   "repo": "USC-PSI-Lab/psi-model",
+   "revision": "cb1480f50d9764ab2f6261bc2e651a67ad54da17"
+  },
+  "purpose": "mix_train",
+  "recipe": {
+   "dataset_stats": "own_train_set",
+   "file": "configs/models/psi0-stage3.yaml",
+   "nproc_per_node": 1,
+   "overrides": {
+    "train.max_training_steps": 100000,
+    "train.validation_steps": 2000
+   },
+   "sha256": "71ba5de8ef22a11432a829e86e93b7e662f5f38f453cca27f73d6fbe777a1dbd"
+  },
+  "schedule": {
+   "floor_cu": 14.0,
+   "mode": "sequential",
+   "persist": "he1_colab.py persist --watch 600 --pid <train pid> --to /content/drive/MyDrive/denso/da50/runs: every complete ckpt_<step> (trainer/colab.py sync_job, no --delete); colab_train restore --branch N brings runs/da50-ft-n-s0 back on a new VM"
+  },
+  "site_id": "local",
+  "story": "DA-50",
+  "task": {
+   "config": "configs/sim/tray_jig.yaml",
+   "env_id": "simple/G1WholebodyTrayTransferJigTeleop-v0",
+   "id": "g1_wholebody_tray_transfer_jig_teleop"
+  },
+  "train_seeds": [
+   0
+  ]
+ },
+ "run_plan_id": "rp_23b25206d96e"
+}
