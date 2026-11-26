@@ -348,6 +348,10 @@ def smoke(work: Path, steps: int, every: int, kill_at: int) -> None:
 DRIVE = Path("/content/drive/MyDrive/denso/da19")
 
 
+def _step(checkpoint: Path) -> int:
+    return int(checkpoint.name.split("_")[1])
+
+
 def completed_checkpoints(job_dir: Path) -> list[Path]:
     """Psi0's `ckpt_<step>` directories that are fully written.
 
@@ -359,8 +363,8 @@ def completed_checkpoints(job_dir: Path) -> list[Path]:
     done = json.loads(result.read_text()).get("checkpoint_step") if result.exists() else None
     if done is None:
         return []
-    found = sorted(job_dir.glob("psi0/*/*/checkpoints/ckpt_*"), key=lambda p: p.name)
-    return [path for path in found if int(path.name.split("_")[1]) <= int(done)]
+    found = sorted(job_dir.glob("psi0/*/*/checkpoints/ckpt_*"), key=_step)
+    return [path for path in found if _step(path) <= int(done)]
 
 
 def sync_job(job_dir: Path, target: Path) -> None:

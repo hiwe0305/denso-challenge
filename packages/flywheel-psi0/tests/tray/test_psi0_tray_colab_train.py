@@ -967,6 +967,24 @@ def test_restore_brings_the_run_back_with_its_latest_whole_checkpoint(
     assert (seen["branch"], seen["durable"]) == ("C_70", Path("/d/runs"))
 
 
+def test_restore_skips_symlinks_on_drive_and_still_copies_the_checkpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, frozen, drive = _frozen_m(tmp_path)
+    monkeypatch.setattr(colab_train, "MIX_FROZEN", frozen)
+    monkeypatch.setattr(colab_train, "DRIVE", drive)
+    persisted = drive / "denso/da48/runs/da48-ft-m-s0"
+    (persisted / "wandb").mkdir(parents=True)
+    (persisted / "wandb" / "latest-run").symlink_to(persisted / "wandb" / "gone-run")
+    (persisted / "wandb" / "debug.log").write_text("log")
+    _ckpt(persisted, 40000)
+    target = colab_train.restore(tmp_path / "work", "M", repo)
+    assert (target / "wandb" / "debug.log").read_text() == "log"
+    assert not (target / "wandb" / "latest-run").is_symlink()
+    assert not (target / "wandb" / "latest-run").exists()
+    assert [p.name for p in target.glob("psi0/*/*/checkpoints/ckpt_*")] == ["ckpt_40000"]
+
+
 def test_restore_of_a_da34_branch_needs_a_source_and_the_old_branches_keep_da34(
     tmp_path: Path,
 ) -> None:

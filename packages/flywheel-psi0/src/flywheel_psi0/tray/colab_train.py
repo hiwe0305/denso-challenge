@@ -1055,9 +1055,15 @@ def restore(
         if p.is_dir() and p.name.removeprefix("ckpt_").isdigit()
     ]
     chosen = latest_whole_checkpoint(found)
-    shutil.copytree(
-        source, target, ignore=shutil.ignore_patterns("checkpoints"), dirs_exist_ok=True
-    )
+    skip_checkpoints = shutil.ignore_patterns("checkpoints")
+
+    def skip_checkpoints_and_symlinks(directory: str, names: list[str]) -> set[str]:
+        # Drive has no usable symlinks (wandb/latest-run); wandb recreates them on resume.
+        return skip_checkpoints(directory, names) | {
+            n for n in names if (Path(directory) / n).is_symlink()
+        }
+
+    shutil.copytree(source, target, ignore=skip_checkpoints_and_symlinks, dirs_exist_ok=True)
     if chosen is not None:
         shutil.copytree(chosen, target / chosen.relative_to(source))
     Report(work).phase(
