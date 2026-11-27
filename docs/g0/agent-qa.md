@@ -716,3 +716,73 @@ Số ở dòng `paired_compare` là số sơ bộ trong sim, cùng nguồn với
 - Máy chủ chỉ chạy được từ gốc repo (10.1); chạy ở thư mục khác thì thoát mã 2 với một dòng lỗi.
 - Lệnh chưa có `--store` như dòng lệnh trong story: không công cụ nào đọc store lúc gọi, và phiên máy chủ chưa ghi `LedgerEntry`. Cần Hiếu quyết phiên máy chủ có tính là một job hay không.
 - Test tương đương với bước `measure` chạy trên gói giả chỉ có `scores`: 7 công cụ chạy thật, 6 công cụ chỉ được kiểm ở nhánh thiếu dữ liệu.
+
+## 11. Vỏ hội thoại DeepSeek Harness (DA-54)
+
+Bản thử ngày 27/11/2026. Harness lo vòng lặp, phiên và nén ngữ cảnh; Agent QA/QC giữ phần số từ code và kiểm câu trả lời. Mọi số đo ở mục này là **sơ bộ**, từ vài phiên trên một gói.
+
+### 11.1 Cài và chạy
+
+Harness không nằm trong repo và không vào `uv.lock`. Cài trong một môi trường riêng:
+
+```bash
+uv venv --python 3.12 <thư mục>/venv
+uv pip install --python <thư mục>/venv/bin/python "deepseek-harness-sdk==0.2.2rc2"
+```
+
+Gói kéo theo `deepseek-harness-runtime-bin` (lệnh `dsh`, kèm sẵn Node). Dung lượng đo thật: 188 MB. `dsh --version` trả `0.2.2-rc.2`. Hiếu duyệt việc cài ngày 27/11/2026.
+
+Chạy từ gốc repo:
+
+```bash
+export AGENTQA_DSH_BIN=<thư mục>/venv/bin/dsh
+export AGENTQA_DSH_HOME=<thư mục>/home
+uv run --env-file <.env có CKEY_API_KEY> fw agentqa chat \
+  --pack <pack.json> --record <thư mục ghi nhận> "<câu hỏi>"
+# hỏi tiếp trong cùng phiên, cùng --record:
+uv run --env-file <.env> fw agentqa chat --pack <pack.json> --record <thư mục ghi nhận> \
+  --session <id in ở lượt trước> "<câu hỏi tiếp>"
+```
+
+Lệnh in các công cụ đã gọi, rồi khối `CHECKED ANSWER` (văn bản `answer_submit` đã nhận, số do code điền), rồi khối `UNCHECKED` nếu model viết thêm lời tự do. Mã thoát 0 chỉ khi lượt hoàn tất và có câu trả lời đã kiểm.
+
+### 11.2 Ba phần
+
+| Phần | Ở đâu | Làm gì |
+|---|---|---|
+| Profile harness | `configs/eval/agentqa/harness/agentqa.patch.yml` | Tắt mọi công cụ có sẵn chạm máy (shell, file, web, sub-agent, workflow, lịch, plugin), tắt nạp `CLAUDE.md`/`AGENTS.md`, tắt telemetry, đồng hồ và lời gọi đặt tên phiên; đặt prompt hệ thống riêng; cắm `fw agentqa mcp` qua stdio |
+| Công cụ ghi nhận | `fw agentqa mcp --record <thư mục>` | Thêm `hypothesis_propose`, `hypothesis_drop`, `answer_submit` bên cạnh 15 công cụ phân tích. Chúng dùng luật của bước `investigate` và hàm chấm của `verify`; từ chối thì trả lỗi công cụ và không ghi gì |
+| Lệnh chat | `fw agentqa chat` | Chạy harness cho một lượt với môi trường tối thiểu, chế độ chỉ đọc, thư mục làm việc tên trung tính; tách câu trả lời đã kiểm khỏi lời tự do của model |
+
+Thư mục ghi nhận chứa `answers.jsonl`, `investigated.jsonl`, `verdicts_live.jsonl`, `dropped.jsonl`, `investigation_facts.jsonl`, `investigation_calls.jsonl`, `record.json`, `server.log`.
+
+### 11.3 Đã kiểm trên bản cài
+
+- `dsh --profile sdk --patch <profile> --dump-config` và bản `headless` đều ghép được.
+- Yêu cầu harness gửi model, bắt bằng một máy chủ model giả trên máy: 17 công cụ (15 công cụ `agentqa`, `todo_write`, `ask_user_question`; không có công cụ shell hay file), `enum` của tham số còn nguyên, prompt hệ thống là của mình cộng phần mô tả máy chủ MCP.
+- Harness khởi động máy chủ MCP hai lần mỗi phiên (một lần dò); lần dò không ghi gì.
+- Đường kiểu Anthropic của cổng ckey hỏng trong harness (luồng trả về không có khối usage); đường kiểu OpenAI của cùng cổng chạy được.
+- Tiếp tục phiên gắn với thư mục làm việc lúc tạo; lệnh chat dùng một thư mục cố định theo thư mục ghi nhận.
+
+### 11.4 Phiên thật trên gói run M
+
+Model `claude-opus-5-5` qua cổng ckey (bên bán lại; số token là số cổng báo, phần "đọc từ cache" không kiểm được).
+
+| Phiên | Câu hỏi | Lời gọi model | Lời gọi công cụ | Token vào không cache / cache | Giây | Kết quả |
+|---|---|---|---|---|---|---|
+| A (qua SDK, có công cụ ghi nhận) | cụm lớn nhất: tìm thứ tách biệt, ghi một nguyên nhân, nộp câu trả lời | 12 | 20 | 18 738 / 180 864 | 296 | Giả thuyết nhắc lại nhãn bị đánh dấu chưa đủ bằng chứng; giả thuyết "khay dừng ở độ cao lớn hơn" được nhận; câu trả lời bị từ chối một lần (số gõ tay, fact chưa dẫn) rồi được nhận |
+| B lượt 1 (`fw agentqa chat`) | cụm lớn nhất: so bốn số đo, nộp câu trả lời | 10 bước | 12 | 5 816 / 85 632 | 232 | Câu trả lời đã kiểm: khoảng cách đặt, sai số góc, độ nghiêng tách biệt; vị trí x không |
+| B lượt 2 (hỏi tiếp) | so thêm độ cao cuối của khay | 3 bước | 2 | 207 / 29 952 | 158 | Câu trả lời đã kiểm: độ cao tách biệt, 8 lượt nằm trên khoảng của lượt thành công |
+
+So với vòng lặp tự viết (mục 9.10): ở đó mỗi bước gửi lại toàn bộ trạng thái (16 000 đến 25 000 token vào) và gọi một công cụ; ở đây model gộp sáu phép so vào một bước và lượt hỏi tiếp dùng lại ngữ cảnh. Hai phạm vi khác nhau (một cụm so với năm cụm), nên chưa so được tổng chi phí của một cuộc điều tra.
+
+### 11.5 Giới hạn
+
+- **Mọi lượt thật đều kết thúc bằng lỗi cổng.** Sau khi `answer_submit` đã nhận, lời gọi model cuối nhận HTTP 503 từ cổng ckey ở cả bốn lượt đã chạy. Câu trả lời đã kiểm vẫn được ghi, nhưng lệnh thoát mã 1. Chưa rõ đây là lỗi ngẫu nhiên của cổng hay do hình dạng yêu cầu của harness.
+- **Phép kiểm bắt số, không bắt nghĩa.** Một câu trả lời được nhận có đoạn "with 11 rollouts 0.06436 m": model đặt placeholder sai chỗ, từng số vẫn đúng với fact của nó.
+- **Luật chặn tiêu dữ liệu chưa áp** trong máy chủ MCP: máy chủ không có giả thuyết của luật để biết cụm nào đang bị giả thuyết hệ thống chặn.
+- **Chưa nối vào trang kết quả.** `verify` chấm lại được bản ghi của thư mục ghi nhận và cho cùng phán quyết, nhưng `assemble` và `render` chưa đọc thư mục này; id fact của một phiên chat bắt đầu lại từ F1 nên chưa gộp được vào một thư mục lần chạy.
+- **Harness vẫn cho model thấy một dòng về máy:** đường dẫn thư mục làm việc. Lệnh chat dùng thư mục tên trung tính dưới thư mục tạm của hệ thống; thư mục này mất khi máy khởi động lại, và phiên cũ khi đó không tiếp tục được.
+- **Lớp dữ liệu.** Chỉ gói `admit` xác nhận `public`; lệnh chat và máy chủ MCP đều từ chối gói khác lớp. Chưa có tuyến model tự host.
+- **Harness là bản preview**, tài liệu của nó ghi chưa qua kiểm toán bảo mật. Bản cài (0.2.2-rc.2) cũ hơn bản đã đọc mã (0.2.3-alpha.2). Web UI của harness không qua phép kiểm của mình và chỉ nên dùng để thử.
+- Lời tự do của model (khối `UNCHECKED`) không qua luật nào. Đầu ra chỉ hiện khi lượt kết thúc, chưa stream.

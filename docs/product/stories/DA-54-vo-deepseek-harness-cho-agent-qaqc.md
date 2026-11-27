@@ -135,8 +135,8 @@ Danh sách đầy đủ các dòng cần tắt, cấu hình nhà cung cấp (ki�
 - [x] 2.1 Cài harness (sau khi Hiếu duyệt), viết profile `agentqa`, kiểm lại các điểm khảo sát trên bản cài (AC 1, 2)
 - [x] 2.2 Ba công cụ ghi nhận trên máy chủ MCP, dùng lại luật của DA-52, có test (AC 3, 7)
 - [x] 2.3 Lệnh `fw agentqa chat` qua SDK Python của harness, có test với harness giả (AC 5)
-- [ ] 3.1 Phiên thật trên run M: hỏi, hỏi tiếp, tiếp tục phiên; đo và so với mục 9.10 (AC 4, 6)
-- [ ] 3.2 Mục tài liệu trong `docs/g0/agent-qa.md`; chạy đủ kiểm tra (AC 8)
+- [ ] 3.1 Phiên thật trên run M: hỏi, hỏi tiếp, tiếp tục phiên; đo và so với mục 9.10 (AC 4, 6). Ngày 27/11/2026: AC 6 đã đo (`docs/g0/agent-qa.md` mục 11.4); AC 4 còn thiếu phần `assemble` và `render` đọc thư mục ghi nhận
+- [x] 3.2 Mục tài liệu trong `docs/g0/agent-qa.md`; chạy đủ kiểm tra (AC 8)
 
 ## Phạm vi file
 
