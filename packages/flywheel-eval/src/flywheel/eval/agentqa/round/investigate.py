@@ -83,15 +83,14 @@ from flywheel.eval.agentqa.round.records import (
     ToolCallRecord,
 )
 from flywheel.eval.agentqa.round.reply_rules import strip_trailing_commas, unwrap
+from flywheel.eval.agentqa.round.verify import INVESTIGATED_FILE, INVESTIGATION_FACTS_FILE
 from flywheel.eval.agentqa.tools.meanings import meaning_of
 from flywheel.eval.agentqa.tools.registry import REGISTRY
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 ROLE = "investigate"
 INVESTIGATION_FILE = "investigation.jsonl"
-INVESTIGATION_FACTS_FILE = "investigation_facts.jsonl"
 INVESTIGATION_CALLS_FILE = "investigation_calls.jsonl"
-INVESTIGATED_FILE = "investigated.jsonl"
 FILES = (INVESTIGATION_FILE, INVESTIGATION_FACTS_FILE, INVESTIGATION_CALLS_FILE,
          INVESTIGATED_FILE)
 PROMPT = Path("configs") / "eval" / "agentqa" / "prompts" / "investigate.md"

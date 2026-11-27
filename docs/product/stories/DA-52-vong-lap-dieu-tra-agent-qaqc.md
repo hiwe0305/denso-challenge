@@ -103,7 +103,7 @@ Giới hạn của phép thử 1, nói trước: người thiết kế hai công
 - [x] 2.2 Công tắc `disabled_rules`, có test (AC 2)
 - [x] 2.3 Bản ghi và schema của vòng lặp; kiểm giả thuyết của model vừa `RoundHypothesis`; vai `investigate` trong `roles.yaml`, prompt (AC 3, 8)
 - [x] 2.4 Bước `investigate`: vòng lặp, trần ngân sách, rơi về sàn code, có test (AC 3, 4, 7)
-- [ ] 2.5 Luật giữ giả thuyết của model và `verify` cho kết luận; trang kết quả đánh dấu lời của model, có test (AC 5, 6)
+- [x] 2.5 Luật giữ giả thuyết của model và `verify` cho kết luận; trang kết quả đánh dấu lời của model, có test (AC 5, 6)
 - [ ] 3.1 Phép thử trên run M với ba luật tắt, ba lần; ghi kết quả (AC 9)
 - [ ] 3.2 Chạy đủ kiểm tra (AC 10)
 - [ ] 4.1 Run N: chạy trước, đối chiếu sau; ghi kết quả (khi nhóm A có outcome)

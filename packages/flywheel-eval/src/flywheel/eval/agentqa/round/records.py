@@ -267,6 +267,22 @@ class HypothesisView(Record):
     explanation: str = ""
     refutes: list[Diagnosis] = Field(
         default_factory=list, description="Ruled out by this hypothesis's support.")
+    # DA-52: a hypothesis of the investigate role. Each field is left out of the JSON at its
+    # default, so an assembly without one is what it was before.
+    origin: Literal["rule", "model"] = Field(
+        default="rule", exclude_if=lambda v: v == "rule",
+        description='"model": proposed by the investigate role, not by a rule.')
+    evidence: Literal["", "kept", "insufficient"] = Field(
+        default="", exclude_if=lambda v: not v,
+        description="kept: verify accepted it; insufficient: no comparison evidence.")
+    intervention: str = Field(default="", exclude_if=lambda v: not v,
+                              description="The model's intervention kind for it.")
+    data_content: str = Field(default="", exclude_if=lambda v: not v,
+                              description="The model's words: the data to collect.")
+    first_check: str = Field(default="", exclude_if=lambda v: not v,
+                             description="The model's words: the cheapest check first.")
+    cites: list[str] = Field(default_factory=list, exclude_if=lambda v: not v,
+                             description="Every fact id its texts cite.")
 
 
 class OfferedFact(Record):
