@@ -13,10 +13,12 @@
         [--investigate]
                                                            run a round into index.html (DA-43)
     fw agentqa mcp --pack <pack.json> [--log <file>]       the tools over MCP on stdio (DA-49)
-        [--record <dir>]                                   with the record tools (DA-54)
-    fw agentqa chat --pack <pack.json> --record <dir> [--session <id>] [TASK | -]
-        [--dsh <path>] [--harness-home <dir>] [--patch <file>] [--key-env NAME ...]
-        [--timeout S] [--json]                             one turn through the harness (DA-54)
+        [--record <dir> [--run <run dir>]]                 with the record tools (DA-54)
+    fw agentqa chat --pack <pack.json> --record <dir> [--run <run dir>] [--session <id>]
+        [TASK | -] [--dsh <path>] [--harness-home <dir>] [--patch <file>]
+        [--key-env NAME ...] [--timeout S] [--json]        one turn through the harness (DA-54)
+    fw agentqa chat-page --run <run dir> --record <dir> --out <dir>
+                                                           a chat record on the run's page
 
 Errors exit 2 with one line, as `fw eval` does. A run whose model part broke a
 report still writes everything and exits 1.
@@ -34,6 +36,7 @@ from flywheel.contracts.agentqa import AgentReport, AgentReview
 from flywheel.eval.agentqa import estimates as est
 from flywheel.eval.agentqa.agent import load_agent_config
 from flywheel.eval.agentqa.chat import harness as chat_harness
+from flywheel.eval.agentqa.chat.page import PageRefused, record_page
 from flywheel.eval.agentqa.endpoint import (
     DEFAULT_AGENT_CONFIG,
     ChatModel,
@@ -49,6 +52,7 @@ from flywheel.eval.agentqa.round.hypotheses import RulesRefused
 from flywheel.eval.agentqa.round.measure import PlanRefused
 from flywheel.eval.agentqa.round.pack import PackRefused, build_pack, write_pack
 from flywheel.eval.agentqa.round.pipeline import RunRefused, failure, run_round
+from flywheel.eval.agentqa.round.records import Assembly
 from flywheel.eval.agentqa.round.render import INDEX_FILE
 from flywheel.eval.agentqa.run import read_dropped
 from flywheel.eval.agentqa.run import run as run_agentqa
@@ -270,12 +274,13 @@ def mcp_command(
     pack: Path = typer.Option(..., "--pack", help="The pack.json of the round."),
     log: Path | None = typer.Option(None, "--log", help=mcp_server.LOG_HELP),
     record: Path | None = typer.Option(None, "--record", help=mcp_server.RECORD_HELP),
+    run: Path | None = typer.Option(None, "--run", help=mcp_server.RUN_HELP),
 ) -> None:
     """Serve the analysis tools of one round pack to a chat shell over MCP on stdio.
 
     Only a pack that admit confirms public is served; no option overrides this check.
     """
-    raise typer.Exit(mcp_server.run(pack, log, record))
+    raise typer.Exit(mcp_server.run(pack, log, record, run))
 
 
 def _chat_lines(result: chat_harness.ChatTurn) -> list[str]:
@@ -306,6 +311,9 @@ def chat_command(
     task: str = typer.Argument("-", help="The task; - or nothing reads it from stdin."),
     pack: Path = typer.Option(..., "--pack", help="The pack.json of the round."),
     record: Path = typer.Option(..., "--record", help="The record directory of the session."),
+    run: Path | None = typer.Option(
+        None, "--run", help="Bind the record directory to this run directory of the same "
+        "pack (its fact ids continue the run's), so chat-page can show it on the run's page."),
     session: str | None = typer.Option(None, "--session", help="Continue this session."),
     dsh: Path | None = typer.Option(
         None, "--dsh", help="The harness executable (default: env AGENTQA_DSH_BIN)."),
@@ -335,7 +343,7 @@ def chat_command(
     try:
         result = chat_harness.turn(text, pack=pack, record=record, dsh=dsh_path,
                                 harness_home=home, patch=patch, repo=Path.cwd(),
-                                session=session, key_env=key_env, timeout=timeout)
+                                session=session, key_env=key_env, timeout=timeout, run=run)
     except chat_harness.ChatRefused as error:
         _fail(str(error))
         return
@@ -344,3 +352,25 @@ def chat_command(
     else:
         typer.echo("\n".join(_chat_lines(result)))
     raise typer.Exit(0 if result.completed and result.answers else 1)
+
+
+@app.command("chat-page")
+def chat_page_command(
+    run: Path = typer.Option(..., "--run", help="The run directory the record is bound to."),
+    record: Path = typer.Option(..., "--record", help="The record directory of the chat."),
+    out: Path = typer.Option(..., "--out", help="New directory for the page."),
+) -> None:
+    """Show a chat record's hypotheses and checked answers on a copy of the run's page.
+
+    verify, assemble and render of the round run again on the copy; the run and the
+    record directories are only read.
+    """
+    try:
+        index = record_page(run, record, out)
+    except PageRefused as error:
+        _fail(str(error))
+        return
+    assembly = Assembly.model_validate_json((out / "assembly.json").read_text(encoding="utf-8"))
+    model = sum(1 for c in assembly.clusters for h in c.hypotheses if h.origin == "model")
+    typer.echo(f"{assembly.run_id}: {model} model hypotheses shown, "
+               f"{len(assembly.chat_answers)} checked answers -> {index}")

@@ -155,6 +155,14 @@ class RunRecord(Record):
     investigate: bool = Field(
         default=False, exclude_if=lambda on: not on,
         description="The investigate step ran (fw agentqa round --investigate).")
+    # DA-54 task 3.1: left out of run.json when empty, so a run of `fw agentqa round`
+    # writes what it wrote before; old files parse.
+    derived_from: str = Field(
+        default="", exclude_if=lambda v: not v,
+        description="Set by fw agentqa chat-page: this directory is a copy of the run of "
+                    "this id with the model hypotheses of a chat record laid over it "
+                    "(record_source.json); its steps are the base run's, then verify, "
+                    "assemble and render ran again here.")
 
 
 class ModelRequest(Record):
@@ -359,6 +367,16 @@ class NotJudged(Record):
     fact_id: str = ""
 
 
+class ChatAnswer(Record):
+    """An answer `answer_submit` accepted in a chat session (DA-54 task 3.1), as recorded:
+    its text with the values filled in by code, never computed again here."""
+
+    answer_id: str = Field(min_length=1)
+    question: str = Field(default="", exclude_if=lambda v: not v)
+    rendered: str = Field(min_length=1)
+    cites: list[str] = Field(default_factory=list)
+
+
 class Assembly(Record):
     """`assembly.json` (step B6): everything the page shows, with no new number."""
 
@@ -374,6 +392,8 @@ class Assembly(Record):
     headline: ClusterView | None = None
     not_judged: list[NotJudged] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+    # DA-54 task 3.1: left out when empty, so the assembly of a round is what it was.
+    chat_answers: list[ChatAnswer] = Field(default_factory=list, exclude_if=lambda v: not v)
 
 
 # The investigate step (DA-52 tasks 2.3, 2.4): its log, its facts and what it hands on.

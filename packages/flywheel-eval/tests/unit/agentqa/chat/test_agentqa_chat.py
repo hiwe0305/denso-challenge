@@ -26,9 +26,14 @@ sys.path.insert(0, str(_HERE.parent / "round"))
 sys.path.insert(0, str(_HERE.parent / "mcp"))
 from flywheel.eval.agentqa.chat import harness as chat_harness  # noqa: E402
 from flywheel.eval.agentqa.cli import app  # noqa: E402
-from flywheel.eval.agentqa.mcp.records import ANSWERS_FILE, VERDICTS_LIVE_FILE  # noqa: E402
+from flywheel.eval.agentqa.mcp.records import (  # noqa: E402
+    ANSWERS_FILE,
+    RECORD_FILE,
+    VERDICTS_LIVE_FILE,
+)
+from flywheel.eval.agentqa.round.pipeline import run_round  # noqa: E402
 from helpers_mcp import REPO, internal, repacked  # noqa: E402
-from helpers_round import isolated_store, pack_maker  # noqa: E402, F401
+from helpers_round import NOW, isolated_store, pack_maker  # noqa: E402, F401
 
 KEY = "sk-test-NOT-A-REAL-KEY-7f3a9c"
 OTHER = "other-secret-value-5521"
@@ -401,3 +406,47 @@ def test_no_key_value_appears_in_any_output(
         assert KEY not in result.stdout and KEY not in result.stderr
         assert OTHER not in result.stdout and OTHER not in result.stderr
         assert "[redacted]" in result.stdout
+
+
+# -- a record bound to a run (DA-54 task 3.1) --------------------------------------------------
+
+
+def _floor(pack: Path, out: Path) -> Path:
+    run_round(pack, out, now=NOW, store=out.parent / "store", no_model=True)
+    return out
+
+
+def test_run_binds_the_record_before_the_harness_starts(
+        pack: Path, tmp_path: Path, dsh: Path, home: Path) -> None:
+    run = _floor(pack, tmp_path / "run")
+    record = tmp_path / "rec"
+    _script(home, stdout=_events())
+    result = _chat(pack, record, dsh, home, "--run", str(run), "why?")
+    assert result.exit_code == 1, result.output  # the fake submitted no answer
+    head = json.loads((record / RECORD_FILE).read_text())
+    assert head["run_id"] == json.loads((run / "run.json").read_text())["run_id"]
+    assert head["run_dir"] == str(run.resolve())
+    assert len(_starts(home)) == 1
+    _turn(pack, record, dsh, home)  # later turns need no --run: the head holds it
+    assert json.loads((record / RECORD_FILE).read_text()) == head
+
+
+def test_a_run_that_cannot_bind_starts_nothing(
+        pack: Path, tmp_path: Path, dsh: Path, home: Path) -> None:
+    other = _floor(pack_maker(tmp_path)("other"), tmp_path / "other-run")
+    _script(home, stdout=_events())
+    with pytest.raises(chat_harness.ChatRefused, match="another pack"):
+        _turn(pack, tmp_path / "rec", dsh, home, run=other)
+    assert _starts(home) == [] and not (tmp_path / "rec").exists()
+    result = _chat(pack, tmp_path / "rec", dsh, home, "--run", str(tmp_path / "nope"), "why?")
+    assert result.exit_code == 2 and "not a run directory" in result.stderr
+    assert _starts(home) == [] and not (tmp_path / "rec").exists()
+
+
+def test_a_pack_not_public_is_refused_before_any_binding(
+        pack: Path, tmp_path: Path, dsh: Path, home: Path) -> None:
+    run = _floor(pack, tmp_path / "run")
+    refused = repacked(pack, "internal", internal)
+    with pytest.raises(chat_harness.ChatRefused, match="internal"):
+        _turn(refused, tmp_path / "rec", dsh, home, run=run)
+    assert not (tmp_path / "rec").exists()

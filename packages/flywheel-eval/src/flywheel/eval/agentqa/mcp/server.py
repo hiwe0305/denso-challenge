@@ -29,6 +29,8 @@ whether the model behind the chat shell is hosted. Nothing bypasses this check.
 DA-54: with `--record <dir>` it also serves the record tools of `records.py`
 (`hypothesis_propose`, `hypothesis_drop`, `answer_submit`) and writes the analysis calls'
 facts and the accepted records into `<dir>`. Without it nothing differs from DA-49.
+With `--run <run dir>` as well (DA-54 task 3.1) the record is bound to that run of the
+same pack and its fact ids continue the run's; a bound record needs no `--run` later.
 """
 
 from __future__ import annotations
@@ -67,6 +69,8 @@ CallLog = Callable[[dict[str, Any]], None]
 LOG_HELP = "append one JSON line per tool call here (default: stderr)"
 RECORD_HELP = ("also serve the record tools (hypothesis_propose, hypothesis_drop, "
                "answer_submit) and write the facts and accepted records into this directory")
+RUN_HELP = ("bind the record directory to this run directory of the same pack: its fact ids "
+            "continue the run's (needs --record; a bound record follows its binding)")
 
 INSTRUCTIONS = (
     "These tools compute facts about one admitted eval round pack; every number in an "
@@ -333,6 +337,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--pack", type=Path, required=True, help="the pack.json of the round")
     parser.add_argument("--log", type=Path, default=None, help=LOG_HELP)
     parser.add_argument("--record", type=Path, default=None, help=RECORD_HELP)
+    parser.add_argument("--run", type=Path, default=None, help=RUN_HELP)
     return parser
 
 
@@ -357,18 +362,22 @@ def _drop_stdout() -> None:
         pass
 
 
-def run(pack: Path, log: Path | None = None, record: Path | None = None) -> int:
+def run(pack: Path, log: Path | None = None, record: Path | None = None,
+        run_dir: Path | None = None) -> int:
     """Serve `pack` on stdin and stdout until EOF; 2 (one `error:` line) when refused.
 
     Shared by `python -m flywheel.eval.agentqa.mcp` and `fw agentqa mcp`. The log (the
     started record, then one record per tool call) goes to `log`, appended, or to stderr.
     `record`: the record directory (DA-54); opened only after the pack passed the public
-    check, so a refused pack writes nothing there.
+    check, so a refused pack writes nothing there. `run_dir`: the run to bind it to.
     """
     if hasattr(sys.stdout, "reconfigure"):  # replies are ASCII; UTF-8 is the transport's
         sys.stdout.reconfigure(encoding="utf-8")
     if hasattr(sys.stderr, "reconfigure"):  # an `error:` line may hold any path: never fail
         sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
+    if run_dir is not None and record is None:
+        print("error: --run binds a record directory: give --record too", file=sys.stderr)
+        return 2
     try:
         opened = open_public_session(pack)
     except (PackRefused, PackNotPublic, PlanRefused, OSError) as error:
@@ -379,7 +388,7 @@ def run(pack: Path, log: Path | None = None, record: Path | None = None) -> int:
     if record is not None:
         try:
             recorder = Recorder.open(record, opened.session, opened.admission.pack_id,
-                                     opened.admission.pack_sha256)
+                                     opened.admission.pack_sha256, run=run_dir)
         except (RecordRefused, OSError) as error:
             print(f"error: {_first_line(error)}", file=sys.stderr)
             return 2
@@ -401,4 +410,4 @@ def run(pack: Path, log: Path | None = None, record: Path | None = None) -> int:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    return run(args.pack, args.log, args.record)
+    return run(args.pack, args.log, args.record, args.run)

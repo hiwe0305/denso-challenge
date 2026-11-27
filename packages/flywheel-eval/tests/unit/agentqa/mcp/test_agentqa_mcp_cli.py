@@ -115,12 +115,12 @@ def test_a_missing_pack_is_one_error_line(tmp_path: Path) -> None:
     assert "Traceback" not in result.stderr and not log.exists()
 
 
-def test_the_command_has_no_option_but_pack_log_and_record() -> None:
+def test_the_command_has_no_option_but_pack_log_record_and_run() -> None:
     group = typer.main.get_command(app)
     assert isinstance(group, typer.core.TyperGroup)
     command = group.commands["mcp"]
     options = {o for p in command.params for o in p.opts}
-    assert options == {"--pack", "--log", "--record"}  # --record: DA-54
+    assert options == {"--pack", "--log", "--record", "--run"}  # --record, --run: DA-54
     pack_option = next(p for p in command.params if "--pack" in p.opts)
     assert pack_option.required
 

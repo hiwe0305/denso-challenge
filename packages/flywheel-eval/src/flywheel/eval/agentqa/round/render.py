@@ -11,6 +11,11 @@ DA-52: facts are read from `facts.jsonl` and `investigation_facts.jsonl` (the fa
 investigate role's tool calls made). A hypothesis of the model shows its statement, the
 data to collect and the first check each under a "Model's words" label; one kept without
 comparison evidence is flagged "not enough evidence".
+
+DA-54 task 3.1: a chat page's assembly carries the checked answers of the chat sessions;
+they are shown as recorded (the model's words with the values filled in by code at the
+time `answer_submit` accepted them), under their own heading. A round has none and its
+page is unchanged.
 """
 
 from __future__ import annotations
@@ -208,6 +213,23 @@ def _clusters(a: Assembly, facts: dict[str, FactRecord]) -> str:
     return "".join(out)
 
 
+def _answers(a: Assembly) -> str:
+    """The checked answers of a chat record, as recorded; "" when there are none."""
+    if not a.chat_answers:
+        return ""
+    parts = ["<h2>Checked answers (chat)</h2>"]
+    for answer in a.chat_answers:
+        parts.append(f"<h4>{_e(answer.answer_id)} <span class='badge model'>model</span></h4>")
+        if answer.question:
+            parts.append(f"<p><strong>Question:</strong> {_e(answer.question)}</p>")
+        text = "<br>".join(_e(line) for line in answer.rendered.splitlines())
+        label = _e("Model's words, values filled in by code:")
+        parts.append(f"<p class=words><strong>{label}</strong><br>{text}</p>")
+        cited = ", ".join(answer.cites) if answer.cites else "none"
+        parts.append(f"<p class=muted>Cited facts: {_e(cited)}</p>")
+    return "".join(parts)
+
+
 def _tables(out: Path) -> str:
     parts = ["<h2>Tool tables</h2>"]
     for path in sorted((out / TABLES_DIR).glob("*.json")):
@@ -238,7 +260,8 @@ def render(out: Path) -> Path:
         lines += path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
     facts = {f.fact_id: f for f in map(FactRecord.model_validate_json, lines)}
     body = "".join([_header(assembly), _top(assembly), _not_judged(assembly),
-                    _clusters(assembly, facts), _tables(out), _facts(facts)])
+                    _clusters(assembly, facts), _answers(assembly), _tables(out),
+                    _facts(facts)])
     page = (f"<!doctype html><html lang=en><head><meta charset=utf-8>"
             f"<meta name=viewport content='width=device-width,initial-scale=1'>"
             f"<title>Agent QA/QC round {_e(assembly.pack_id)}</title><style>{STYLE}</style>"

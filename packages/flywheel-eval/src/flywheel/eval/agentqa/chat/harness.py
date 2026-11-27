@@ -27,6 +27,10 @@ What the child gets, and nothing more:
 
 A pack that admit does not confirm public is refused before anything is spawned, with
 the check `fw agentqa mcp` applies; the MCP server checks again at its own start.
+
+With `run` (DA-54 task 3.1) the record directory is bound to that run before spawning
+(`bind_record` writes the binding into `record.json`), so the server the patch starts
+finds it there; the patch needs no new flag.
 """
 
 from __future__ import annotations
@@ -43,11 +47,17 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from flywheel.eval.agentqa.mcp.records import ANSWERS_FILE, VERDICTS_LIVE_FILE, live_verdict
+from flywheel.eval.agentqa.mcp.records import (
+    ANSWERS_FILE,
+    VERDICTS_LIVE_FILE,
+    RecordRefused,
+    bind_record,
+    live_verdict,
+)
 from flywheel.eval.agentqa.mcp.server import PackNotPublic, open_public_session
 from flywheel.eval.agentqa.round.measure import PlanRefused
 from flywheel.eval.agentqa.round.pack import PackRefused
-from flywheel.eval.agentqa.round.records import VerdictRecord
+from flywheel.eval.agentqa.round.records import Admission, VerdictRecord
 
 PROFILE = "headless"
 FIXED_FLAGS = ("--json", "--approval-policy", "never", "--permission-mode", "read-only")
@@ -112,10 +122,11 @@ def _first_line(error: BaseException) -> str:
     return text.splitlines()[0] if text else type(error).__name__
 
 
-def refuse_non_public(pack: Path) -> None:
-    """`ChatRefused` unless admit confirms `pack` public (the check of `fw agentqa mcp`)."""
+def refuse_non_public(pack: Path) -> Admission:
+    """`ChatRefused` unless admit confirms `pack` public (the check of `fw agentqa mcp`);
+    the admission when it does."""
     try:
-        open_public_session(pack)
+        return open_public_session(pack).admission
     except (PackRefused, PackNotPublic, PlanRefused, OSError) as error:
         raise ChatRefused(_first_line(error)) from error
 
@@ -321,8 +332,11 @@ def _run(argv: list[str], task: str, env: dict[str, str], cwd: Path,
 def turn(task: str, *, pack: Path, record: Path, dsh: Path, harness_home: Path,
          patch: Path, repo: Path, session: str | None = None,
          key_env: Sequence[str] = DEFAULT_KEY_ENV, timeout: float = DEFAULT_TIMEOUT,
-         environ: Mapping[str, str] | None = None) -> ChatTurn:
-    """Run one task through the harness; `ChatRefused` before spawning when it cannot run."""
+         environ: Mapping[str, str] | None = None, run: Path | None = None) -> ChatTurn:
+    """Run one task through the harness; `ChatRefused` before spawning when it cannot run.
+
+    `run`: bind `record` to this run directory first (a bound record keeps its binding).
+    """
     parent = os.environ if environ is None else environ
     if not dsh.is_file() or not os.access(dsh, os.X_OK):
         raise ChatRefused(f"harness executable not found or not executable: {dsh} "
@@ -334,7 +348,12 @@ def turn(task: str, *, pack: Path, record: Path, dsh: Path, harness_home: Path,
         raise ChatRefused(f"harness patch not found: {patch} (set --patch)")
     if not task.strip():
         raise ChatRefused("the task is empty")
-    refuse_non_public(pack)
+    admission = refuse_non_public(pack)
+    if run is not None:
+        try:
+            bind_record(record, admission.pack_id, admission.pack_sha256, run)
+        except (RecordRefused, OSError) as error:
+            raise ChatRefused(_first_line(error)) from error
     paths = {name: p.resolve() for name, p in (("dsh", dsh), ("home", harness_home),
                                                ("patch", patch), ("repo", repo),
                                                ("pack", pack), ("record", record))}

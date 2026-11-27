@@ -16,10 +16,16 @@ when no rule has it). One rejected only for lack of comparison evidence (verify'
 not threshold; being beyond the threshold behind its label restates the label) is shown
 last, flagged; any other rejected one is not shown. When one ends first in its cluster, the
 cluster's intervention, data content and first check are the model's.
+
+DA-54 task 3.1: `fw agentqa chat-page` lays a chat record's hypotheses over a run, a
+no-model one included, so the investigate role's verdicts are read and placed in both
+modes (the rank role's only in a model run, as before); it passes its own notes and the
+record's checked answers, which a round leaves out.
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
 
@@ -38,6 +44,7 @@ from flywheel.eval.agentqa.round.pack import PACK_FILE
 from flywheel.eval.agentqa.round.records import (
     Admission,
     Assembly,
+    ChatAnswer,
     ClusterView,
     FactRecord,
     Group,
@@ -64,6 +71,8 @@ ASSEMBLY_FILE = "assembly.json"
 __all__ = ["ASSEMBLY_FILE", "NO_RULE_TITLE", "assemble"]
 FLOOR_REASON = "code floor, the model did not judge this cluster: {reason}"
 NO_MODEL_NOTE = "No model was called: every hypothesis, rank and choice is the code floor."
+NO_RANK_NOTE = ("No model ranked this round: every rule hypothesis, rank and choice is the "
+                "code floor.")  # a no-model run with the investigate role's hypotheses
 NO_COST_NOTE = "Costs are not attached yet (cost lookup, task 3.4)."
 MODEL_TITLE = "Hypothesis of the model"
 MODEL_RULE = "model"  # the rule id a model hypothesis is shown with
@@ -237,8 +246,12 @@ def _place_model(out: Path, clusters: list[ClusterView], verdicts: list[VerdictR
                         thin.get(c.cluster.cluster_id, []), system_rules) for c in clusters]
 
 
-def assemble(out: Path, run: RunRecord, no_model: bool = True) -> Assembly:
-    """Build `out/assembly.json` from the files of the earlier steps."""
+def assemble(out: Path, run: RunRecord, no_model: bool = True, *,
+             notes: Sequence[str] = (), answers: Sequence[ChatAnswer] = ()) -> Assembly:
+    """Build `out/assembly.json` from the files of the earlier steps.
+
+    `notes` go before the cost note; `answers` are shown as recorded (a chat page's).
+    """
     pack = Pack.model_validate_json((out / PACK_FILE).read_text(encoding="utf-8"))
     admission = Admission.model_validate_json((out / ADMISSION_FILE).read_text("utf-8"))
     hypotheses = [HypothesisRecord.model_validate_json(x)
@@ -248,8 +261,9 @@ def assemble(out: Path, run: RunRecord, no_model: bool = True) -> Assembly:
     rules = load_rules()
     titles = {r.id: r.title for r in rules}
     system_rules = frozenset(r.id for r in rules if r.system)
-    every = ([] if no_model else
-             [VerdictRecord.model_validate_json(x) for x in _lines(out / VERDICTS_FILE)])
+    every = [VerdictRecord.model_validate_json(x) for x in _lines(out / VERDICTS_FILE)]
+    if no_model:  # no rank role ran: only the investigate role's verdicts may stand
+        every = [v for v in every if v.role == INVESTIGATE_ROLE]
     verdicts = [v for v in every if v.role != INVESTIGATE_ROLE]
     inquired = [v for v in every if v.role == INVESTIGATE_ROLE]
     by_unit = {v.unit: v for v in verdicts if v.role == "rank"}
@@ -268,10 +282,11 @@ def assemble(out: Path, run: RunRecord, no_model: bool = True) -> Assembly:
         clusters = _place_model(out, clusters, inquired, rules, system_rules)
 
     not_judged = _not_judged(facts, calls, admission)
-    notes = [NO_MODEL_NOTE] if no_model else [_counts(verdicts)]
+    shown = ([NO_RANK_NOTE if inquired else NO_MODEL_NOTE] if no_model
+             else [_counts(verdicts)])
     if inquired:
-        notes.append(_model_counts(inquired))
-    notes.append(NO_COST_NOTE)
+        shown.append(_model_counts(inquired))
+    shown += [*notes, NO_COST_NOTE]
     rejected = any(v.verdict in ("rejected", "not_ranked") for v in verdicts)
     answered = sorted({c.model for c in model_calls.values() if c.status in ("ok", "cut")})
     assembly = Assembly(
@@ -281,7 +296,7 @@ def assemble(out: Path, run: RunRecord, no_model: bool = True) -> Assembly:
         agent_version=run.agent_version, agent_hash=run.agent_hash,
         model=", ".join(answered),
         clusters=clusters, headline=clusters[0] if clusters else None,
-        not_judged=not_judged, notes=notes)
+        not_judged=not_judged, notes=shown, chat_answers=list(answers))
     (out / ASSEMBLY_FILE).write_text(assembly.model_dump_json(indent=2) + "\n",
                                      encoding="utf-8")
     return assembly

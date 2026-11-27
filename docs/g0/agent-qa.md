@@ -791,9 +791,25 @@ So với vòng lặp tự viết (mục 9.10): ở đó mỗi bước gửi lạ
 
 - **Mọi lượt thật với `claude-opus-5-5` đều kết thúc bằng lỗi cổng.** Sau khi `answer_submit` đã nhận, lời gọi model cuối nhận HTTP 503 từ cổng ckey ở cả bốn lượt đã chạy; bốn lượt với model mặc định mới thì không. Câu trả lời đã kiểm vẫn được ghi, nhưng lệnh thoát mã 1. Chưa rõ đây là lỗi ngẫu nhiên của cổng hay do hình dạng yêu cầu của harness.
 - **Phép kiểm bắt số, không bắt nghĩa.** Một câu trả lời được nhận có đoạn "with 11 rollouts 0.06436 m": model đặt placeholder sai chỗ, từng số vẫn đúng với fact của nó.
-- **Luật chặn tiêu dữ liệu chưa áp** trong máy chủ MCP: máy chủ không có giả thuyết của luật để biết cụm nào đang bị giả thuyết hệ thống chặn.
-- **Chưa nối vào trang kết quả.** `verify` chấm lại được bản ghi của thư mục ghi nhận và cho cùng phán quyết, nhưng `assemble` và `render` chưa đọc thư mục này; id fact của một phiên chat bắt đầu lại từ F1 nên chưa gộp được vào một thư mục lần chạy.
+- **Luật chặn tiêu dữ liệu chỉ áp khi thư mục ghi nhận gắn với một lần chạy** (`--run`, mục 11.6): khi đó máy chủ đọc giả thuyết của luật từ lần chạy. Thư mục không gắn thì không chặn cụm nào.
+- **Trang kết quả chỉ nhận thư mục ghi nhận đã gắn với lần chạy.** Các thư mục ghi nhận trước ngày 27/11/2026 (id fact bắt đầu từ F1) không dựng được trang. Câu hỏi của người dùng chưa được ghi cùng câu trả lời.
 - **Harness vẫn cho model thấy một dòng về máy:** đường dẫn thư mục làm việc. Lệnh chat dùng thư mục tên trung tính dưới thư mục tạm của hệ thống; thư mục này mất khi máy khởi động lại, và phiên cũ khi đó không tiếp tục được.
 - **Lớp dữ liệu.** Chỉ gói `admit` xác nhận `public`; lệnh chat và máy chủ MCP đều từ chối gói khác lớp. Chưa có tuyến model tự host.
 - **Harness là bản preview**, tài liệu của nó ghi chưa qua kiểm toán bảo mật. Bản cài (0.2.2-rc.2) cũ hơn bản đã đọc mã (0.2.3-alpha.2). Web UI của harness không qua phép kiểm của mình và chỉ nên dùng để thử.
 - Lời tự do của model (khối `UNCHECKED`) không qua luật nào. Đầu ra chỉ hiện khi lượt kết thúc, chưa stream.
+
+### 11.6 Kết quả chat lên trang kết quả
+
+Thêm ngày 27/11/2026 (DA-54 nhiệm vụ 3.1, AC 4).
+
+- `fw agentqa chat --run <thư mục lần chạy>` (và `fw agentqa mcp --run`) gắn thư mục ghi nhận vào một lần chạy của cùng gói. Sổ fact của phiên mở sẵn `facts.jsonl` của lần chạy, nên fact mới đánh số tiếp, giả thuyết đánh số tiếp sau giả thuyết của luật, đúng như bước `investigate` của vòng. `record.json` giữ id lần chạy và sha256 của `facts.jsonl`; lần mở sau không cần `--run`, và bị từ chối nếu fact của lần chạy đã đổi.
+- `fw agentqa chat-page --run … --record … --out <thư mục mới>` chép lần chạy sang thư mục mới, đặt ba file điều tra và `answers.jsonl` của thư mục ghi nhận vào, rồi chạy `verify`, `assemble`, `render` sẵn có. Lần chạy gốc và thư mục ghi nhận chỉ được đọc. `verdicts_live.jsonl` không được tin: `verify` chấm lại. Một câu trả lời chỉ hiện khi văn bản đã ghi vẫn khớp với fact nó dẫn.
+- Lần chạy nền có thể là sàn mã (`--no-model`) hoặc có model, miễn chưa có giả thuyết của model. `run.json` của thư mục mới ghi `derived_from`.
+
+Một lượt thật trên run M, model mặc định, thư mục ghi nhận gắn với lần chạy sàn mã (247 fact, 16 giả thuyết của luật):
+
+| Kết thúc | Giây | Bước | Lời gọi công cụ (bị từ chối) | Token vào không cache | Kết quả |
+|---|---|---|---|---|---|
+| hoàn tất | 97 | 7 | 12 (1) | 90 978 | Fact mới từ F248, giả thuyết H17 được giữ, một câu trả lời đã kiểm dẫn cả fact của lần chạy (F16, F52) |
+
+`chat-page` dựng được trang: `verify` cho H17 cùng phán quyết với lúc ghi, H17 nằm trong cụm lớn nhất dưới nhãn lời của model, mục "Checked answers (chat)" có một câu trả lời, không còn placeholder nào trên trang. Đây là một lượt, một câu hỏi; lỗi đặt placeholder sai chỗ (mục 11.5) vẫn thấy trong câu trả lời này ("44 rollouts failures").
