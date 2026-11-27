@@ -303,6 +303,63 @@ def _base(run: str, key: Key, tool: str, ref: MeasureRef, other: str) -> str:
     return f"{run}_cluster_{slug(key)}_{tool}__{ref.slug}__vs__{other}"
 
 
+# Suffixes `measure_compare` and `measure_tally` put after `_base` (the module docstring); a
+# reference is `successes_same_level`, `successes_all_levels` or a cluster slug, which ends
+# in `_l<level>`, so the split between reference and suffix is unambiguous.
+_LEVEL = r"_l(?:-?[0-9]+|None)"
+_SUFFIX = (r"_(?:ref_)?(?:members|judged|lacking)|_(?:ref_)?median|_ref_p[0-9]+(?:_[0-9]+)?"
+           r"|_outside_(?:below|above|total)|_separated|_(?:ref_)?beyond_threshold"
+           r"|_(?:bounds_|separated_)?not_judged|_values(?:_left_out)?|_(?:ref_)?mode"
+           r"|_v[1-9][0-9]*_(?:value|count|ref_count)|_other_(?:ref_)?count")
+_FACT_NAME = re.compile(
+    rf"^(?P<run>.+?)_cluster_(?P<cluster>.+?{_LEVEL})_(?P<kind>cmp|tally)__(?P<measure>.+?)"
+    rf"__vs__(?P<reference>{SAME_LEVEL}|{ALL_LEVELS}|.+{_LEVEL})(?P<suffix>{_SUFFIX})$")
+
+
+@dataclass(frozen=True)
+class FactName:
+    """The parts of a fact name of the two tools, as `_base` and a suffix spell them."""
+
+    run: str
+    cluster: str  # the slug of the cluster's key, as `cluster_slug` gives it
+    kind: str  # "cmp" (measure_compare) or "tally" (measure_tally)
+    measure: str  # the measure's slug (`MeasureRef.slug`)
+    reference: str  # successes_same_level, successes_all_levels, or a cluster slug
+    suffix: str  # what follows the prefix, its leading "_" included
+
+    @property
+    def base(self) -> str:
+        """The prefix every fact of the same call shares."""
+        return (f"{self.run}_cluster_{self.cluster}_{self.kind}__{self.measure}"
+                f"__vs__{self.reference}")
+
+    @property
+    def tool(self) -> str:
+        return COMPARE if self.kind == "cmp" else TALLY
+
+
+def parse_fact_name(name: str) -> FactName | None:
+    """The parts of a `measure_compare` or `measure_tally` fact name; None for any other.
+
+    A `..._not_judged` name of the tools (`measure_compare_<base>_bounds_not_judged`) is
+    read without its tool prefix.
+    """
+    for prefix in (f"{COMPARE}_", f"{TALLY}_"):
+        if name.startswith(prefix) and name.endswith("_not_judged"):
+            name = name[len(prefix):]
+            break
+    hit = _FACT_NAME.match(name)
+    if hit is None:
+        return None
+    return FactName(hit["run"], hit["cluster"], hit["kind"], hit["measure"], hit["reference"],
+                    hit["suffix"])
+
+
+def cluster_slug(step: str, label: str, level: int | None) -> str:
+    """The slug of a cluster in the two tools' fact names (`clusters.slug` of its key)."""
+    return slug((step, label, level))
+
+
 def _group_facts(book: FactBook, base: str, ref: str, members: int, judged: int,
                  ref_members: int, ref_judged: int) -> list[str]:
     """Members, judged and lacking (members without the measure) of the cluster and reference."""
@@ -474,6 +531,6 @@ def measure_tally(book: FactBook, task: TaskView, runs: Mapping[str, RunScores],
     return ToolResult(TALLY, tuple(facts), tuple(rows))
 
 
-__all__ = ["ALL_LEVELS", "COMPARE", "REFERENCES", "SAME_LEVEL", "TALLY", "Domains",
-           "MeasureRef", "cluster_id", "domains", "measure_compare", "measure_tally",
-           "parse_ref"]
+__all__ = ["ALL_LEVELS", "COMPARE", "REFERENCES", "SAME_LEVEL", "TALLY", "Domains", "FactName",
+           "MeasureRef", "cluster_id", "cluster_slug", "domains", "measure_compare",
+           "measure_tally", "parse_fact_name", "parse_ref"]

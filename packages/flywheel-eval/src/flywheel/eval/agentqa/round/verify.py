@@ -9,12 +9,28 @@ current rules for free.
     repaired    attempt 1 fails, attempt 2 passes
     rejected    otherwise, a failed or budget-stopped call included: the code floor stands
     not_ranked  the cluster was beyond the cap of roles.yaml: the code floor stands
+
+DA-52: a hypothesis the investigate role kept (`investigated.jsonl`) gets a verdict too,
+`role="investigate"`, from the record's own `offered` block (no prompt is rebuilt):
+
+    numbers     no bare number; every `{F#}` of a text is among its cites; every cite offered
+    comparison  a comparison word over cited facts of two or more units needs a cited
+                comparison fact (the rank role's `rule_comparison`)
+    provenance  its support may not be `vision` facts only (the rank role's `rule_provenance`)
+    evidence    its support cites a `measure_compare` fact of its own cluster that compared:
+                `_separated` true, or `_beyond_threshold` over half the call's `_members`
+
+    accepted    every rule passes
+    rejected    otherwise; `failed_rules == ["evidence"]` alone is "not enough evidence"
 """
 
 from __future__ import annotations
 
+import re
+from collections.abc import Sequence
 from pathlib import Path
 
+from flywheel.contracts.agentqa import bare_numbers
 from flywheel.eval.agentqa.round.gateway import MODEL_CALLS_FILE
 from flywheel.eval.agentqa.round.hypotheses import HYPOTHESES_FILE, RulesRefused, load_rules
 from flywheel.eval.agentqa.round.judge import (
@@ -28,13 +44,22 @@ from flywheel.eval.agentqa.round.measure import FACTS_FILE
 from flywheel.eval.agentqa.round.records import (
     FactRecord,
     HypothesisRecord,
+    InvestigatedHypothesis,
     JudgedItem,
     ModelCallRecord,
     VerdictRecord,
 )
-from flywheel.eval.agentqa.round.reply_rules import Failure, check_rank, failed_rules
+from flywheel.eval.agentqa.round.reply_rules import _COMPARISON, Failure, check_rank, failed_rules
+from flywheel.eval.agentqa.tools.clusters import NO_LEVEL
+from flywheel.eval.agentqa.tools.measures import COMPARE, cluster_slug, parse_fact_name
 
 VERDICTS_FILE = "verdicts.jsonl"
+# Written by the investigate step (round/investigate.py imports the names from here).
+INVESTIGATED_FILE = "investigated.jsonl"
+INVESTIGATION_FACTS_FILE = "investigation_facts.jsonl"
+INVESTIGATE_ROLE = "investigate"
+_PLACEHOLDER = re.compile(r"\{(F[0-9]+)\}")
+EVIDENCE = "evidence"
 
 
 def _lines(path: Path) -> list[str]:
@@ -116,8 +141,100 @@ def verdict_of(item: JudgedItem, calls: dict[str, ModelCallRecord]) -> VerdictRe
                 reason=f"rejected: {reason}")
 
 
+def _texts(h: InvestigatedHypothesis) -> list[tuple[str, list[str], str]]:
+    """(where, cites, text) of the three texts of a model hypothesis."""
+    return [("statement", [*h.support, *h.contra], h.statement),
+            ("data_content", list(h.data_content.cites), h.data_content.text),
+            ("first_check", list(h.first_check.cites), h.first_check.text)]
+
+
+def _numbers(h: InvestigatedHypothesis) -> list[str]:
+    out = []
+    for where, cites, text in _texts(h):
+        bare = bare_numbers(text)
+        if bare:
+            out.append(f"{where} writes the number(s) {bare}")
+        missing = [f for f in _PLACEHOLDER.findall(text) if f not in cites]
+        if missing:
+            out.append(f"{where} uses {missing} without citing them")
+        unknown = [f for f in dict.fromkeys(cites) if f not in h.offered]
+        if unknown:
+            out.append(f"{where} cites {unknown}, which were not offered")
+    return out
+
+
+def _comparison(h: InvestigatedHypothesis, flags: dict[str, bool]) -> list[str]:
+    """As `reply_rules.rule_comparison`: uncited or unknown facts are `numbers`'s."""
+    out = []
+    for where, cites, text in _texts(h):
+        units = {h.offered[f].unit for f in cites if f in h.offered}
+        compared = any(flags.get(f, False) for f in cites if f in h.offered)
+        if _COMPARISON.search(text) and len(units) >= 2 and not compared:
+            out.append(f"{where} compares facts of different units {sorted(units)} without "
+                       "citing a comparison fact")
+    return out
+
+
+def _provenance(h: InvestigatedHypothesis) -> list[str]:
+    """As `reply_rules.rule_provenance`, for the hypothesis's support."""
+    cited = [f for f in h.support if f in h.offered]
+    if cited and all(h.offered[f].provenance == "vision" for f in cited):
+        return [f"{h.hypothesis_id} rests on vision facts only"]
+    return []
+
+
+def _evidence(h: InvestigatedHypothesis, by_name: dict[str, FactRecord]) -> list[str]:
+    """The keep rule (AC 5): comparison evidence the code computed about its own cluster."""
+    c = h.cluster
+    own = cluster_slug(c.step, c.label, None if c.level == NO_LEVEL else c.level)
+    for fid in h.support:
+        fact = h.offered.get(fid)
+        parts = None if fact is None else parse_fact_name(fact.name)
+        if fact is None or parts is None or parts.tool != COMPARE:
+            continue
+        if parts.run != c.run or parts.cluster != own:
+            continue
+        if parts.suffix == "_separated" and fact.value is True:
+            return []
+        if parts.suffix == "_beyond_threshold" and _count(fact.value) is not None:
+            members = by_name.get(f"{parts.base}_members")
+            size = None if members is None else _count(members.value)
+            if size is not None and 2 * (_count(fact.value) or 0) > size:
+                return []
+    return [f"{h.hypothesis_id}: its support cites no measure_compare fact of its own cluster "
+            "that separates it (separated true, or beyond the threshold for more than half "
+            "its members)"]
+
+
+def _count(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def investigated_verdict(h: InvestigatedHypothesis, by_name: dict[str, FactRecord],
+                         markers: Sequence[str]) -> VerdictRecord:
+    """The verdict of one hypothesis the investigate role kept."""
+    flags = {fid: is_comparison_fact(f.name, f.value, tuple(markers))
+             for fid, f in h.offered.items()}
+    failures = [(rule, m) for rule, found in (
+        ("numbers", _numbers(h)), ("comparison", _comparison(h, flags)),
+        ("provenance", _provenance(h)), (EVIDENCE, _evidence(h, by_name))) for m in found]
+    rules = list(dict.fromkeys(rule for rule, _ in failures))
+    item_id = f"{INVESTIGATE_ROLE}:{h.hypothesis_id}"
+    if not failures:
+        return VerdictRecord(item_id=item_id, role=INVESTIGATE_ROLE, unit=h.hypothesis_id,
+                             verdict="accepted",
+                             reason="accepted: the model's hypothesis passed every rule")
+    if rules == [EVIDENCE]:
+        reason = "rejected: not enough evidence: " + failures[0][1]
+    else:
+        reason = "rejected: " + "; ".join(m for _, m in failures)
+    return VerdictRecord(item_id=item_id, role=INVESTIGATE_ROLE, unit=h.hypothesis_id,
+                         verdict="rejected", failed_rules=rules, reason=reason[:300])
+
+
 def verify(out: Path) -> list[VerdictRecord]:
-    """Verdicts of every item of `out/judged.jsonl`; writes `verdicts.jsonl`."""
+    """Verdicts of every item of `out/judged.jsonl`, then of every hypothesis of
+    `investigated.jsonl` (DA-52); writes `verdicts.jsonl`."""
     items = [JudgedItem.model_validate_json(x) for x in _lines(out / JUDGED_FILE)]
     calls = read_calls(out)
     facts = {f.fact_id: f for f in
@@ -129,6 +246,12 @@ def verify(out: Path) -> list[VerdictRecord]:
     system_of = _system_flags(out)
     verdicts = [verdict_of(_with_system(_with_comparison(item, facts, markers), system_of), calls)
                 for item in items]
+    kept = [InvestigatedHypothesis.model_validate_json(x) for x in _lines(out / INVESTIGATED_FILE)]
+    if kept:
+        found = [FactRecord.model_validate_json(x)
+                 for x in _lines(out / INVESTIGATION_FACTS_FILE)]
+        by_name = {f.name: f for f in [*facts.values(), *found]}
+        verdicts += [investigated_verdict(h, by_name, markers) for h in kept]
     (out / VERDICTS_FILE).write_text("".join(v.model_dump_json() + "\n" for v in verdicts),
                                      encoding="utf-8")
     return verdicts

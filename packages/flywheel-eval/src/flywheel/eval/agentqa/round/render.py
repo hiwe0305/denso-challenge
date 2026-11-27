@@ -6,6 +6,11 @@ A model sentence carries `{F#}` placeholders; each is replaced by that fact's va
 unit from `facts.jsonl`, and a placeholder no fact fills stops the page (`ValueError`).
 Every string that comes from an artifact or a config is data and goes through
 `html.escape` before it enters the page.
+
+DA-52: facts are read from `facts.jsonl` and `investigation_facts.jsonl` (the facts the
+investigate role's tool calls made). A hypothesis of the model shows its statement, the
+data to collect and the first check each under a "Model's words" label; one kept without
+comparison evidence is flagged "not enough evidence".
 """
 
 from __future__ import annotations
@@ -17,7 +22,13 @@ from pathlib import Path
 
 from flywheel.eval.agentqa.round.assemble import ASSEMBLY_FILE
 from flywheel.eval.agentqa.round.measure import FACTS_FILE, TABLES_DIR
-from flywheel.eval.agentqa.round.records import Assembly, ClusterView, FactRecord
+from flywheel.eval.agentqa.round.records import (
+    Assembly,
+    ClusterView,
+    FactRecord,
+    HypothesisView,
+)
+from flywheel.eval.agentqa.round.verify import INVESTIGATION_FACTS_FILE
 
 INDEX_FILE = "index.html"
 _PLACEHOLDER = re.compile(r"\{(F[0-9]+)\}")
@@ -33,6 +44,7 @@ th{background:#f6f8fa}caption{text-align:left;font-weight:600;padding:.3rem 0}
 background:#ddf4ff;border:1px solid #54aeff}
 .badge.model{background:#fff8c5;border-color:#d4a72c}
 .blocked{color:#9a3412;font-weight:600}.muted{color:#57606a}
+.words{border-left:3px solid #d4a72c;padding-left:.6rem}.thin{color:#9a3412}
 details.cluster{border:1px solid #d0d7de;border-radius:6px;margin:.5rem 0;padding:.4rem .8rem}
 @media (prefers-color-scheme:dark){body{background:#0d1117;color:#e6edf3}
 th{background:#161b22}th,td,details.cluster,h2{border-color:#30363d}
@@ -49,7 +61,8 @@ def fill(text: str, facts: dict[str, FactRecord]) -> str:
     def one(match: re.Match[str]) -> str:
         fact = facts.get(match.group(1))
         if fact is None:
-            raise ValueError(f"placeholder {match.group(0)} names no fact of facts.jsonl")
+            raise ValueError(f"placeholder {match.group(0)} names no fact of facts.jsonl or "
+                             f"{INVESTIGATION_FACTS_FILE}")
         return f"{fact.value} {fact.unit}".strip()
 
     return _e(_PLACEHOLDER.sub(one, text))
@@ -108,6 +121,38 @@ def _not_judged(a: Assembly) -> str:
     return f"<h2>Not judged</h2><ul>{items}</ul>"
 
 
+def _fact_rows(h: HypothesisView, facts: dict[str, FactRecord],
+               extra: tuple[tuple[str, list[str]], ...] = ()) -> str:
+    rows: list[list[object]] = []
+    for side, ids in (("support", h.support), ("contra", h.contra), *extra):
+        for fid in ids:
+            fact = facts.get(fid)
+            rows.append([side, fid, *(
+                [fact.name, fact.value, fact.unit, fact.source_ref] if fact
+                else ["not in facts.jsonl", "", "", ""])])
+    if not rows:
+        return ""
+    return _table("Facts", ["role", "fact id", "name", "value", "unit", "source"], rows)
+
+
+def _model_hypothesis(h: HypothesisView, facts: dict[str, FactRecord]) -> str:
+    """A hypothesis of the investigate role: every text is labelled as the model's words."""
+    thin = h.evidence == "insufficient"
+    flag = (" <span class=thin>not enough evidence: no comparison fact the code computed "
+            "separates its cluster; shown below the rules</span>" if thin else "")
+    parts = [f"<h4>{_e(h.rank)}. {_e(h.title)} <span class='badge model'>model</span>{flag}"
+             f"</h4><p>{_e(h.diagnosis)}, intervention {_e(h.intervention or 'none')}</p>"]
+    for label, text in (("Model's words, hypothesis", h.explanation),
+                        ("Model's words, data to collect", h.data_content),
+                        ("Model's words, first check", h.first_check)):
+        if text:
+            parts.append(f"<p class=words><strong>{_e(label)}:</strong> "
+                         f"{fill(text, facts)}</p>")
+    cited = [f for f in h.cites if f not in (*h.support, *h.contra)]
+    parts.append(_fact_rows(h, facts, (("cited", cited),)))
+    return "".join(parts)
+
+
 def _cluster(c: ClusterView, facts: dict[str, FactRecord]) -> str:
     parts = [f"<details class=cluster><summary>{_e(c.cluster.cluster_id)}, "
              f"size {_e(c.cluster.size)}"
@@ -120,6 +165,9 @@ def _cluster(c: ClusterView, facts: dict[str, FactRecord]) -> str:
     if c.floor_reason:
         parts.append(f"<p class=muted>{_e(c.floor_reason)}</p>")
     for h in c.hypotheses:
+        if h.origin == "model":
+            parts.append(_model_hypothesis(h, facts))
+            continue
         parts.append(
             f"<h4>{_e(h.rank)}. {_e(h.title)} <span class='badge {_e(h.source)}'>"
             f"{_e(h.source)}</span></h4><p>{_e(h.diagnosis)}: {_e(h.note)}</p>")
@@ -128,16 +176,7 @@ def _cluster(c: ClusterView, facts: dict[str, FactRecord]) -> str:
                          "below)</p>")
         if h.explanation:
             parts.append(f"<p>{fill(h.explanation, facts)}</p>")
-        rows: list[list[object]] = []
-        for side, ids in (("support", h.support), ("contra", h.contra)):
-            for fid in ids:
-                fact = facts.get(fid)
-                rows.append([side, fid, *(
-                    [fact.name, fact.value, fact.unit, fact.source_ref] if fact
-                    else ["not in facts.jsonl", "", "", ""])])
-        if rows:
-            parts.append(_table("Facts", ["role", "fact id", "name", "value", "unit",
-                                          "source"], rows))
+        parts.append(_fact_rows(h, facts))
     top = c.hypotheses[0] if c.hypotheses else None
     if c.check is not None and top is not None:
         parts.append(f"<p>Check: {_e(c.check.check_id)} (cost {_e(c.check.cost_key)})</p>")
@@ -193,8 +232,9 @@ def _facts(facts: dict[str, FactRecord]) -> str:
 def render(out: Path) -> Path:
     """Write `out/index.html` and return its path."""
     assembly = Assembly.model_validate_json((out / ASSEMBLY_FILE).read_text(encoding="utf-8"))
-    path = out / FACTS_FILE
-    lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
+    lines: list[str] = []
+    for path in (out / FACTS_FILE, out / INVESTIGATION_FACTS_FILE):
+        lines += path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
     facts = {f.fact_id: f for f in map(FactRecord.model_validate_json, lines)}
     body = "".join([_header(assembly), _top(assembly), _not_judged(assembly),
                     _clusters(assembly, facts), _tables(out), _facts(facts)])
