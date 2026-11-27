@@ -139,7 +139,8 @@ def _model_hypothesis(h: HypothesisView, facts: dict[str, FactRecord]) -> str:
     """A hypothesis of the investigate role: every text is labelled as the model's words."""
     thin = h.evidence == "insufficient"
     flag = (" <span class=thin>not enough evidence: no comparison fact the code computed "
-            "separates its cluster; shown below the rules</span>" if thin else "")
+            "separates its cluster on a measure the scorer does not threshold; shown below "
+            "the rules</span>" if thin else "")
     parts = [f"<h4>{_e(h.rank)}. {_e(h.title)} <span class='badge model'>model</span>{flag}"
              f"</h4><p>{_e(h.diagnosis)}, intervention {_e(h.intervention or 'none')}</p>"]
     for label, text in (("Model's words, hypothesis", h.explanation),

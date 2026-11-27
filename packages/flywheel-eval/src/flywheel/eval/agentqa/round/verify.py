@@ -17,8 +17,10 @@ DA-52: a hypothesis the investigate role kept (`investigated.jsonl`) gets a verd
     comparison  a comparison word over cited facts of two or more units needs a cited
                 comparison fact (the rank role's `rule_comparison`)
     provenance  its support may not be `vision` facts only (the rank role's `rule_provenance`)
-    evidence    its support cites a `measure_compare` fact of its own cluster that compared:
-                `_separated` true, or `_beyond_threshold` over half the call's `_members`
+    evidence    its support cites a `measure_compare` `_separated` fact, true, of its own
+                cluster, on a measure the scorer does not threshold (the call wrote no
+                `_beyond_threshold` fact). Beyond the threshold of the measure behind the
+                label restates the label; such facts may stand next to the evidence only
 
     accepted    every rule passes
     rejected    otherwise; `failed_rules == ["evidence"]` alone is "not enough evidence"
@@ -183,10 +185,25 @@ def _provenance(h: InvestigatedHypothesis) -> list[str]:
     return []
 
 
+NO_SEPARATION = ("its support cites no comparison of its own cluster that separates it "
+                 "(a measure_compare separated fact, true, on a measure the scorer does not "
+                 "threshold)")
+RESTATES_LABEL = ("its only comparison evidence is on a measure the scorer already "
+                  "thresholds (it restates the failure label)")
+
+
 def _evidence(h: InvestigatedHypothesis, by_name: dict[str, FactRecord]) -> list[str]:
-    """The keep rule (AC 5): comparison evidence the code computed about its own cluster."""
+    """The keep rule (AC 5, tightened 27/11/2026): its support cites a `measure_compare`
+    `_separated` fact, true, of its own cluster, on a measure with no scorer threshold.
+
+    A measure has a scorer threshold when the same call wrote `{base}_beyond_threshold`
+    (`measure_compare` writes it exactly for the measures of `measures.thresholds`). Being
+    beyond the threshold of the measure behind the label restates the label, so neither
+    that count nor separation on such a measure keeps a hypothesis on its own.
+    """
     c = h.cluster
     own = cluster_slug(c.step, c.label, None if c.level == NO_LEVEL else c.level)
+    thresholded = False
     for fid in h.support:
         fact = h.offered.get(fid)
         parts = None if fact is None else parse_fact_name(fact.name)
@@ -194,20 +211,13 @@ def _evidence(h: InvestigatedHypothesis, by_name: dict[str, FactRecord]) -> list
             continue
         if parts.run != c.run or parts.cluster != own:
             continue
-        if parts.suffix == "_separated" and fact.value is True:
-            return []
-        if parts.suffix == "_beyond_threshold" and _count(fact.value) is not None:
-            members = by_name.get(f"{parts.base}_members")
-            size = None if members is None else _count(members.value)
-            if size is not None and 2 * (_count(fact.value) or 0) > size:
+        if parts.suffix == "_beyond_threshold":
+            thresholded = True
+        elif parts.suffix == "_separated" and fact.value is True:
+            if f"{parts.base}_beyond_threshold" not in by_name:
                 return []
-    return [f"{h.hypothesis_id}: its support cites no measure_compare fact of its own cluster "
-            "that separates it (separated true, or beyond the threshold for more than half "
-            "its members)"]
-
-
-def _count(value: object) -> int | None:
-    return value if isinstance(value, int) and not isinstance(value, bool) else None
+            thresholded = True
+    return [f"{h.hypothesis_id}: {RESTATES_LABEL if thresholded else NO_SEPARATION}"]
 
 
 def investigated_verdict(h: InvestigatedHypothesis, by_name: dict[str, FactRecord],
