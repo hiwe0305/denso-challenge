@@ -150,6 +150,11 @@ class RunRecord(Record):
     disabled_rules: list[str] = Field(
         default_factory=list, exclude_if=lambda ids: not ids,
         description="Rule ids switched off for this run: agent.yaml's, then --disable-rule.")
+    # DA-52: left out of run.json when false, so a run without --investigate writes what
+    # it wrote before; old files parse.
+    investigate: bool = Field(
+        default=False, exclude_if=lambda on: not on,
+        description="The investigate step ran (fw agentqa round --investigate).")
 
 
 class ModelRequest(Record):
@@ -353,3 +358,80 @@ class Assembly(Record):
     headline: ClusterView | None = None
     not_judged: list[NotJudged] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+
+
+# The investigate step (DA-52 tasks 2.3, 2.4): its log, its facts and what it hands on.
+
+Ending = Literal["concluded", "max_steps", "max_calls", "max_input_tokens", "max_usd",
+                 "gateway_budget", "gateway_failed", "rejected_in_a_row", "error"]
+StepOutcome = Literal["ok", "rejected"]
+
+
+class InvestigationStep(Record):
+    """One line of `investigation.jsonl`: one step of the loop, as a reader follows it."""
+
+    kind: Literal["step"] = "step"
+    step: int = Field(ge=1)
+    call_ids: list[str] = Field(default_factory=list, description="Model calls, attempt order.")
+    action: str = Field(default="", description='The parsed action; "" when none parsed.')
+    parsed: dict[str, Any] | None = Field(
+        default=None, description="The parsed reply without its thought; None if unparseable.")
+    raw: str = Field(default="", description="The last reply, cut, when it did not parse.")
+    thought: str = ""
+    outcome: StepOutcome
+    reason: str = ""
+    tool_call_id: str = ""
+    fact_ids: list[str] = Field(default_factory=list, description="Facts the tool call gave.")
+    hypothesis_id: str = Field(default="", description="Proposed or dropped hypothesis.")
+
+
+class InvestigationEnd(Record):
+    """The last line of `investigation.jsonl`: how the loop ended and what it used."""
+
+    kind: Literal["end"] = "end"
+    ending: Ending
+    steps: int = Field(ge=0)
+    calls: int = Field(ge=0, description="Gateway requests of this step, replays included.")
+    tokens_in: int = Field(ge=0)
+    tokens_out: int = Field(ge=0)
+    usd: float = Field(ge=0)
+    kept: int = Field(default=0, ge=0, description="Hypotheses handed on (concluded only).")
+    detail: str = Field(default="", description="The cap, or `<Type>: <line>` of an error.")
+
+
+class CitedText(Record):
+    """A sentence of the model: no bare number, only `{F#}` of the facts it cites."""
+
+    text: str = Field(min_length=1)
+    cites: list[str] = Field(default_factory=list)
+
+
+class InvestigatedFact(Record):
+    """A fact a kept hypothesis cites, as it was offered: enough for `verify` to check it."""
+
+    name: str = Field(min_length=1)
+    value: float | int | str | bool
+    unit: str = ""
+    provenance: Literal["code", "vision", "history"]
+    comparison: bool = Field(description="The code did the comparison (a boolean, a marker).")
+
+
+class InvestigatedHypothesis(Record):
+    """One line of `investigated.jsonl`: a hypothesis of the model kept at `conclude`.
+
+    It fits `flywheel.contracts.agentqa.RoundHypothesis` with `rule_id=None` and
+    `source="model"` (`statement` is its explanation). Whether it stands is `verify`'s rule.
+    """
+
+    hypothesis_id: str = Field(pattern=r"^H[1-9][0-9]*$")
+    cluster: ClusterRef
+    statement: str = Field(min_length=1)
+    diagnosis: Diagnosis
+    intervention: InterventionKind
+    support: list[str] = Field(default_factory=list)
+    contra: list[str] = Field(default_factory=list)
+    data_content: CitedText
+    first_check: CitedText
+    offered: dict[str, InvestigatedFact] = Field(
+        default_factory=dict, description="Every fact id the hypothesis cites -> the fact.")
+    proposed_at: int = Field(ge=1, description="The step of the loop that proposed it.")

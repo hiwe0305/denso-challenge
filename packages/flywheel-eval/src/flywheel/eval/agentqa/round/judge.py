@@ -73,6 +73,9 @@ class Roles(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     rank: RankLimits = Field(default_factory=RankLimits)
+    # DA-52: the investigate role's block, checked by `investigate.load_limits`; carried
+    # here unread so this file still validates.
+    investigate: dict[str, Any] | None = None
 
 
 def load_roles(path: Path | None = None) -> Roles:

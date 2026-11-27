@@ -101,7 +101,7 @@ Giới hạn của phép thử 1, nói trước: người thiết kế hai công
 - [x] 1.1 Viết story và thiết kế (file này)
 - [x] 2.1 Công cụ `measure_compare` và `measure_tally`, đăng ký, có test (AC 1)
 - [x] 2.2 Công tắc `disabled_rules`, có test (AC 2)
-- [ ] 2.3 Bản ghi và schema của vòng lặp; kiểm giả thuyết của model vừa `RoundHypothesis`; vai `investigate` trong `roles.yaml`, prompt (AC 3, 8)
+- [x] 2.3 Bản ghi và schema của vòng lặp; kiểm giả thuyết của model vừa `RoundHypothesis`; vai `investigate` trong `roles.yaml`, prompt (AC 3, 8)
 - [ ] 2.4 Bước `investigate`: vòng lặp, trần ngân sách, rơi về sàn code, có test (AC 3, 4, 7)
 - [ ] 2.5 Luật giữ giả thuyết của model và `verify` cho kết luận; trang kết quả đánh dấu lời của model, có test (AC 5, 6)
 - [ ] 3.1 Phép thử trên run M với ba luật tắt, ba lần; ghi kết quả (AC 9)
@@ -112,13 +112,13 @@ Giới hạn của phép thử 1, nói trước: người thiết kế hai công
 
 Theo 07 mục 3.1. File story luôn được sửa.
 
-- `packages/flywheel-eval/src/flywheel/eval/agentqa/round/` (bước mới `investigate.py`; `pipeline.py`, `records.py`, `hypotheses.py`, `verify.py`, `assemble.py`, `render.py` chỉ ở chỗ nối bước mới; `version.py` cho mã băm agent; `judge.py` chỉ danh sách dấu hiệu fact so sánh)
+- `packages/flywheel-eval/src/flywheel/eval/agentqa/round/` (bước mới `investigate.py`; `pipeline.py`, `records.py`, `hypotheses.py`, `verify.py`, `assemble.py`, `render.py` chỉ ở chỗ nối bước mới; `version.py` cho mã băm agent; `judge.py` chỉ danh sách dấu hiệu fact so sánh và một trường chở khối `investigate` của `roles.yaml`; `gateway.py`, `gateway_config.py` chỉ cho vai tùy chọn `investigate`)
 - `packages/flywheel-eval/src/flywheel/eval/agentqa/tools/` (hai công cụ mới, `registry.py`)
 - `packages/flywheel-eval/src/flywheel/eval/agentqa/cli.py` (chỉ cờ `--investigate` và `--disable-rule`)
-- `configs/eval/agentqa/` (`roles.yaml`, `agent.yaml`, `prompts/investigate.md`, `tasks/tray.yaml`)
+- `configs/eval/agentqa/` (`roles.yaml`, `agent.yaml`, `routing.yaml` cho route và ngân sách của vai mới, `prompts/investigate.md`, `tasks/tray.yaml`)
 - `packages/flywheel-eval/tests/unit/agentqa/round/`, `packages/flywheel-eval/tests/unit/agentqa/tools/`
 - `docs/g0/agent-qa.md` (chỉ thêm mục kết quả)
-- `packages/flywheel-eval/src/flywheel/eval/agentqa/mcp/bridge.py`: **chờ Hiếu chấp nhận khi merge PR 239**. Chỉ ba chỗ `DOMAIN_SCHEMAS`, `_PARAM_HELP`, `DESCRIPTIONS` và dòng import đi kèm, cho bốn miền tham số và hai công cụ mới; thiếu thì test của lớp nối DA-49 hỏng khi gộp với master
+- `packages/flywheel-eval/src/flywheel/eval/agentqa/mcp/bridge.py`: Hiếu đồng ý ba chỗ ngày 27/11/2026 (PR 239 đã merge). Chỉ ba chỗ `DOMAIN_SCHEMAS`, `_PARAM_HELP`, `DESCRIPTIONS` và dòng import đi kèm, cho bốn miền tham số và hai công cụ mới; thiếu thì test của lớp nối DA-49 hỏng khi gộp với master
 
 ## Ghi chú cho người làm
 

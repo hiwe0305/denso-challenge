@@ -5,6 +5,9 @@
     configs/eval/agentqa/hosted.yaml    the separate `hosted` block: off by default,
                                         hosted profiles and the names of their key variables
 
+`investigate` (DA-52) is an optional role: a `routing.yaml` without its route still loads,
+and the investigate step refuses with a one-line error.
+
 A local profile names an endpoint of `agent.yaml` (`models.<endpoint>`), so the local
 model, its revision and its URL keep one source, and `check_local_url` still guards it.
 A hosted profile can only be declared in `hosted.yaml`; a profile in the wrong file, a
@@ -26,8 +29,11 @@ CONFIG_ROOT = Path("configs") / "eval" / "agentqa"  # from the repo root
 ROUTING_FILE = "routing.yaml"
 HOSTED_FILE = "hosted.yaml"
 
-Role = Literal["adjudicate", "rank", "look"]
-ROLES: tuple[Role, ...] = ("adjudicate", "rank", "look")
+Role = Literal["adjudicate", "rank", "look", "investigate"]
+ROLES: tuple[Role, ...] = ("adjudicate", "rank", "look")  # every route cell is required
+# Roles a routing.yaml may leave out (DA-52): a config written before the role still loads,
+# and the role's step refuses when it runs. A role that is present needs every cell.
+OPTIONAL_ROLES: tuple[Role, ...] = ("investigate",)
 CLASSES: tuple[DataClass, ...] = ("public", "internal", "restricted")
 ProviderKind = Literal["local_openai", "openai_compatible", "anthropic"]
 HOSTED_KINDS: frozenset[str] = frozenset({"openai_compatible", "anthropic"})
@@ -123,7 +129,7 @@ class GatewayConfig(_Config):
 
     @model_validator(mode="after")
     def _routes_complete_and_safe(self) -> GatewayConfig:
-        for role in ROLES:
+        for role in (*ROLES, *(r for r in OPTIONAL_ROLES if r in self.routes)):
             table = self.routes.get(role, {})
             for data_class in CLASSES:
                 name = table.get(data_class)
