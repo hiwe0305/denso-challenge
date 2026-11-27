@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import IO, Any
 
 import pytest
+from flywheel.eval.agentqa.tools.registry import REGISTRY
 
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE.parent / "round"))
@@ -115,7 +116,7 @@ def test_each_reply_leaves_before_the_next_request(pack: Path) -> None:
         assert ask({"jsonrpc": "2.0", "id": "p", "method": "ping"}) == {
             "jsonrpc": "2.0", "id": "p", "result": {}}  # the notification made no line
         tools = ask({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
-        assert tools["id"] == 2 and len(tools["result"]["tools"]) == 13
+        assert tools["id"] == 2 and len(tools["result"]["tools"]) == len(REGISTRY)
         call = ask({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
                     "params": {"name": "paired_compare", "arguments": PAIRED}})
         assert call["id"] == 3 and call["result"]["isError"] is False
