@@ -74,7 +74,8 @@
         command: uv
         args: !!js >-
           ['run', 'fw', 'agentqa', 'mcp', '--pack', process.env.AGENTQA_PACK,
-           '--record', process.env.AGENTQA_RECORD]
+           '--record', process.env.AGENTQA_RECORD,
+           '--log', process.env.AGENTQA_RECORD + '/server.log']
         cwd: !!js process.env.AGENTQA_REPO
         toolLoading: eager
         startupTimeoutMs: 60000
