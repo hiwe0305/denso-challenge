@@ -3,9 +3,11 @@
 The end-to-end run uses a small pack with outcomes, so that `measure_compare` really runs:
 one run R, twelve successes of level 1, a place cluster of six near misses on level 1 (the
 `near_miss_placement` rule matches it; half of its members tilted at the failure) and one
-of four members on level 2. The investigate script calls the tool four times, proposes
-seven hypotheses on the level-1 cluster and keeps them all; only two cite evidence that
-separates it.
+of four members on level 2. Both failure clusters are off the successes on `offset_m`, a
+measure the scorer does not threshold. The investigate script calls the tool five times,
+proposes nine hypotheses on the level-1 cluster and keeps them all; only the two that
+cite separation on `offset_m` keep (the evidence rule, tightened 27/11/2026: being beyond
+the scorer's threshold restates the failure label).
 """
 
 from __future__ import annotations
@@ -52,6 +54,7 @@ PLACE = "L-PLACE-POSE"
 HEAD = f"R/place/{PLACE}/l1"
 OTHER = f"R/place/{PLACE}/l2"
 DIST, YAW, TILT = "final.place_distance_m", "final.place_yaw_error_deg", "at_failure.tilt_deg"
+OFFSET = "final.offset_m"  # a measure the scorer does not threshold; both clusters separate
 SAME, ALL = "successes_same_level", "successes_all_levels"
 
 
@@ -66,11 +69,12 @@ def _score(name: str, ok: bool, level: int = 1) -> Score:
                  ["pass"] * 5 + ["fail", "not_attempted"])  # type: ignore[arg-type]
 
 
-def _outcome(name: str, ok: bool, d: float, tilt: float, level: int = 1) -> RolloutOutcome:
+def _outcome(name: str, ok: bool, d: float, tilt: float, level: int = 1,
+             offset: float = 0.0) -> RolloutOutcome:
     return RolloutOutcome.model_validate({
         "episode_id": f"R/{name}", "run_plan_id": "rp-1", "task_id": "tray", "run": "R",
         "seed": 1, "level": level, "sim_time_s": 10.0, "control_steps": 500,
-        "final": {**POSE, "place_distance_m": d},
+        "final": {**POSE, "place_distance_m": d, "offset_m": offset},
         "verdict": {"scorer_version": "2", "step_names": ["place"], "step_latched": [ok],
                     "success": ok, "failure_label": None if ok else PLACE,
                     "failure_t": None if ok else 2.0,
@@ -84,10 +88,10 @@ def small_pack(root: Path) -> Path:
         outs.append(_outcome(f"ok{k}", True, 0.01, 1.0))
     for k in range(6):  # near misses of the target; half of them tilted at the failure
         scores.append(_score(f"h{k}", False))
-        outs.append(_outcome(f"h{k}", False, 0.1, 20.0 if k < 3 else 1.0))
+        outs.append(_outcome(f"h{k}", False, 0.1, 20.0 if k < 3 else 1.0, offset=0.05))
     for k in range(4):
         scores.append(_score(f"o{k}", False, 2))
-        outs.append(_outcome(f"o{k}", False, 0.3, 1.0, 2))
+        outs.append(_outcome(f"o{k}", False, 0.3, 1.0, 2, offset=0.05))
     return outcome_pack(root, {"R": (scores, outs)})
 
 
@@ -116,32 +120,41 @@ def cmp_fact(cluster: str, measure: str, suffix: str) -> Callable[[str, object],
     return test
 
 
-# Each proposal on HEAD: (name, a test picking its single support fact). The first two are
-# evidence about HEAD itself; the other five are not (AC 5).
 def own_near_miss(name: str, value: object) -> bool:
     """The `relaxed_sweep` fact that the level-1 cluster is a near miss, and it is true:
     a true boolean about the cluster itself, of another tool than `measure_compare`."""
     return value is True and name == f"R_cluster_{cluster_slug('place', PLACE, 1)}_near_miss"
 
 
-PROPOSALS: list[tuple[str, Callable[[str, object], bool]]] = [
-    ("separated", cmp_fact(HEAD, DIST, "_separated")),
-    ("beyond_most", cmp_fact(HEAD, DIST, "_beyond_threshold")),
-    ("median_only", cmp_fact(HEAD, DIST, "_median")),
-    ("other_tool_true", own_near_miss),
-    ("other_cluster", cmp_fact(OTHER, DIST, "_separated")),
-    ("not_separated", cmp_fact(HEAD, YAW, "_separated")),
-    ("beyond_half", cmp_fact(HEAD, TILT, "_beyond_threshold")),
+Test = Callable[[str, object], bool]
+# Each proposal on HEAD: (name, tests picking its support facts). The first two cite
+# separation of HEAD on a measure the scorer does not threshold (the second also cites a
+# beyond-threshold count next to it); the other seven are not evidence (AC 5).
+PROPOSALS: list[tuple[str, list[Test]]] = [
+    ("separated_free", [cmp_fact(HEAD, OFFSET, "_separated")]),
+    ("with_beyond", [cmp_fact(HEAD, OFFSET, "_separated"),
+                     cmp_fact(HEAD, DIST, "_beyond_threshold")]),
+    ("separated_thresholded", [cmp_fact(HEAD, DIST, "_separated")]),
+    ("beyond_most", [cmp_fact(HEAD, DIST, "_beyond_threshold")]),
+    ("beyond_half", [cmp_fact(HEAD, TILT, "_beyond_threshold")]),
+    ("median_only", [cmp_fact(HEAD, OFFSET, "_median")]),
+    ("other_tool_true", [own_near_miss]),
+    ("other_cluster", [cmp_fact(OTHER, OFFSET, "_separated")]),
+    ("not_separated", [cmp_fact(HEAD, YAW, "_separated")]),
 ]
-KEPT, THIN = ["H3", "H4"], ["H5", "H6", "H7", "H8", "H9"]  # H1, H2 are the rules' placeholders
+KEPT = ["H3", "H4"]  # H1, H2 are the rules' hypotheses
+RESTATES = ["H5", "H6", "H7"]  # evidence only on a thresholded measure
+NOTHING = ["H8", "H9", "H10", "H11"]  # no separation of its own cluster at all
+THIN = [*RESTATES, *NOTHING]
 
 
-def proposer(test: Callable[[str, object], bool]) -> Callable[[dict[str, Any]], str]:
+def proposer(tests: list[Test]) -> Callable[[dict[str, Any]], str]:
     def reply(payload: dict[str, Any]) -> str:
-        fid = fact_named(payload, test)
+        fids = [fact_named(payload, t) for t in tests]
+        cited = " ".join(f"{{{f}}}" for f in fids)
         return act(action="propose", cluster_id=HEAD,
-                   statement=f"The cluster stands apart from the successes: {{{fid}}}.",
-                   diagnosis="perception", intervention="report_only", support=[fid],
+                   statement=f"The cluster stands apart from the successes: {cited}.",
+                   diagnosis="perception", intervention="report_only", support=fids,
                    contra=[])
     return reply
 
@@ -158,10 +171,11 @@ def keep_all(payload: dict[str, Any]) -> str:
 @pytest.fixture
 def investigated_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path, Path]:
     """(pack, out, store) of a model run with `--investigate` on the small pack."""
-    with_limits(tmp_path, monkeypatch, max_steps=20)
+    with_limits(tmp_path, monkeypatch, max_steps=30)
     pack, out, store = small_pack(tmp_path / "pack"), tmp_path / "out", tmp_path / "store"
     script: list[Any] = [compare(HEAD, DIST, SAME), compare(HEAD, YAW, SAME),
-                         compare(HEAD, TILT, SAME), compare(OTHER, DIST, ALL),
+                         compare(HEAD, TILT, SAME), compare(HEAD, OFFSET, SAME),
+                         compare(OTHER, OFFSET, ALL),
                          *(proposer(t) for _, t in PROPOSALS), keep_all]
     record = run(pack, out, Bot(script), store, investigate=True)
     assert [s.status for s in record.steps if s.name == "investigate"] == ["ok"]
@@ -210,6 +224,11 @@ def test_only_evidence_about_its_own_cluster_keeps_a_hypothesis(
         assert verdicts[hid].failed_rules == ["evidence"], verdicts[hid].reason
         assert verdicts[hid].reason.startswith("rejected: not enough evidence")
         assert verdicts[hid].item_id == f"investigate:{hid}"
+    for hid in RESTATES:  # beyond the threshold, or separated on a thresholded measure
+        assert "restates the failure label" in verdicts[hid].reason, verdicts[hid].reason
+    for hid in NOTHING:
+        assert "cites no comparison of its own cluster that separates it" in \
+            verdicts[hid].reason, verdicts[hid].reason
 
 
 def test_accepted_ones_rank_first_and_thin_ones_last(
@@ -236,7 +255,7 @@ def test_accepted_ones_rank_first_and_thin_ones_last(
     other = cluster_of(a, OTHER)
     assert [h.origin for h in other.hypotheses] == ["rule"]
     assert other.intervention_for == "H2"  # the rank model's choice, not a model hypothesis
-    assert "Model investigation: 2 kept, 5 not enough evidence, 0 rejected." in a.notes
+    assert "Model investigation: 2 kept, 7 not enough evidence, 0 rejected." in a.notes
 
 
 def test_with_nothing_kept_the_assembly_is_the_plain_one(

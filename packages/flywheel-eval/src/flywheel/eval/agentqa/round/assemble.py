@@ -11,8 +11,10 @@ DA-52: a hypothesis of the investigate role that B5 accepted is shown ABOVE the 
 hypotheses of its group (Hiếu 27/11/2026), never above a system rule's hypothesis, which
 still blocks data spend; the "no rule explains this cluster" placeholder stays below it.
 Its group is the one of the rules with its diagnosis (the last in the group order; `data`
-when no rule has it). One rejected only for lack of comparison evidence is shown last,
-flagged; any other rejected one is not shown. When one ends first in its cluster, the
+when no rule has it). One rejected only for lack of comparison evidence (verify's
+`evidence` rule: a `_separated` fact, true, of its own cluster on a measure the scorer does
+not threshold; being beyond the threshold behind its label restates the label) is shown
+last, flagged; any other rejected one is not shown. When one ends first in its cluster, the
 cluster's intervention, data content and first check are the model's.
 """
 

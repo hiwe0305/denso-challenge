@@ -56,7 +56,7 @@ Model không bao giờ truyền con số: ngưỡng lấy từ dữ liệu (phâ
 ### Các chốt giữ nguyên
 
 - **Số từ code.** Mọi con số trong kết luận là fact do công cụ sinh, dẫn bằng `{F#}`; bước `verify` kiểm lại như với vai `rank`.
-- **Giả thuyết của model phải có bằng chứng tách biệt.** Một giả thuyết của model chỉ được giữ khi dẫn ít nhất một fact so sánh do code tính (cờ "tách biệt", hoặc số lượt vượt ngưỡng chiếm quá nửa cụm). Thiếu thì ghi là "chưa đủ bằng chứng" và xếp dưới sàn code.
+- **Giả thuyết của model phải có bằng chứng tách biệt.** Một giả thuyết của model chỉ được giữ khi dẫn ít nhất một fact so sánh do code tính (cờ "tách biệt", hoặc số lượt vượt ngưỡng chiếm quá nửa cụm). Thiếu thì ghi là "chưa đủ bằng chứng" và xếp dưới sàn code. Sửa 27/11/2026 (Hiếu đồng ý sau lần chạy đầu trên run M): số đo mà bộ chấm đã đặt ngưỡng chính là số đo định nghĩa nhãn lỗi, nên "vượt ngưỡng" hay "tách biệt" trên số đo đó chỉ nhắc lại nhãn và không còn tự nó đủ. Bằng chứng giữ giả thuyết là cờ "tách biệt" đúng, của chính cụm đó, trên một số đo bộ chấm không đặt ngưỡng.
 - **Không thấp hơn sàn code.** Giả thuyết của luật không bị xoá hay sửa. Bước `investigate` hỏng, hết ngân sách hay bị loại thì kết quả đúng bằng lần chạy không có nó.
 - **Lớp dữ liệu.** Gói không được xác nhận `public` không tới model hosted; cùng phép kiểm của cổng model.
 - **Không sửa `flywheel.contracts`.** Giả thuyết của model phải vừa `RoundHypothesis` hiện có. Việc đầu tiên của nhiệm vụ 2.3 là kiểm điều này; nếu không vừa thì dừng và báo Hiếu.
