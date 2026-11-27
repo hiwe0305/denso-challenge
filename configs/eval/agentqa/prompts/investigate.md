@@ -26,6 +26,10 @@ need is in the object you get:
 - `budget`: what is left of the steps, calls, input tokens and dollars.
 - `previous_errors` (only on a resend): why your last answer could not be read.
 
+When the object carries `"final": true`, this is the last step the budget allows. The only
+accepted action is then `conclude`, with the hypotheses you keep; any other action is
+rejected, and nothing you found is passed on unless you conclude.
+
 ## The four actions
 
 Answer with a JSON object, nothing else (no prose, no code fence is needed). `thought` is
@@ -63,6 +67,10 @@ your free reasoning; it is logged, never shown as a result.
   writes a number itself is rejected.
 - Read the `meaning` of a fact before you cite it. A fact name is short; the meaning line
   says what it counts and against what. Do not infer a meaning from the name alone.
+- A fact of a compare or tally call is named
+  `<run>_cluster_<cluster>_<cmp|tally>__<measure>__vs__<reference>_<what>`: the cluster,
+  the measure (its dots written as double underscores) and the reference group are in the
+  name, and the meaning says what `<what>` counts for them.
 - A count of members is not a share: say what the fact counts, as its meaning says.
 
 ## What makes a hypothesis worth keeping

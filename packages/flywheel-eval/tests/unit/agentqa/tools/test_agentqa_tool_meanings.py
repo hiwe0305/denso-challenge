@@ -36,6 +36,18 @@ def test_compare_names_read_as_their_documented_structure() -> None:
                                           "measure_compare").lower()
 
 
+def test_the_short_meaning_drops_only_the_tail_the_name_spells() -> None:
+    for suffix in ("_median", "_separated", "_ref_p95", "_bounds_not_judged"):
+        full = meaning_of(f"{BASE}{suffix}", "measure_compare")
+        short = meaning_of(f"{BASE}{suffix}", "measure_compare", short=True)
+        assert short and short.endswith(".") and not short.endswith("..")
+        assert "; cluster " in full and "; cluster " not in short
+        assert full.startswith(short.rstrip("."))
+    # facts of other tools keep their line
+    assert meaning_of("threshold_x", "task_lookup", short=True) == \
+        meaning_of("threshold_x", "task_lookup")
+
+
 def test_tally_names_read_as_their_documented_structure() -> None:
     base = f"{BASE_A}_tally__final__table__vs__{SAME}"
     assert meaning_of(f"{base}_v2_value", "measure_tally").startswith(

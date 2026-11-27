@@ -108,8 +108,11 @@ def _reference(text: str) -> str:
     return f"the failure cluster {text} of the same run"
 
 
-def _measured(name: str) -> str | None:
-    """The meaning of a fact of `measure_compare` or `measure_tally`; None if not one."""
+def _measured(name: str, short: bool = False) -> str | None:
+    """The meaning of a fact of `measure_compare` or `measure_tally`; None if not one.
+
+    `short` leaves out the tail naming the cluster, run, measure and reference, which the
+    name itself spells (the investigate role resends every fact at every step)."""
     match = _SLUG.match(name.removeprefix(f"{COMPARE}_").removeprefix(f"{TALLY}_"))
     if match is None:
         return None
@@ -134,7 +137,10 @@ def _measured(name: str) -> str | None:
     if found is None:
         return None
     reference, meaning = found
-    return (f"{meaning[0].upper()}{meaning[1:]}; cluster {match['cluster']} of run "
+    head = f"{meaning[0].upper()}{meaning[1:]}"
+    if short:
+        return head if head.endswith(".") else f"{head}."
+    return (f"{head.rstrip('.')}; cluster {match['cluster']} of run "
             f"{match['run']}, measure {_measure_text(match['measure'])}, reference "
             f"{_reference(reference)}.")
 
@@ -162,15 +168,17 @@ def _described(tool: str) -> str:
             else f"A fact of the tool {tool}; its name says what it counts.")
 
 
-def meaning_of(name: str, tool: str) -> str:
-    """One generic line saying what the fact `name` of `tool` means; never empty."""
+def meaning_of(name: str, tool: str, *, short: bool = False) -> str:
+    """One generic line saying what the fact `name` of `tool` means; never empty.
+
+    `short`: for a compare or tally fact, without the tail the name already spells."""
     if name in _CONFIG:
         return f"{_CONFIG[name][0].upper()}{_CONFIG[name][1:]}."
     if name.startswith("threshold_"):
         return (f"The scorer threshold {name.removeprefix('threshold_')} of the task view, "
                 "as the task maps it to a measure.")
     if tool in (COMPARE, TALLY):
-        found = _measured(name)
+        found = _measured(name, short)
         if found is not None:
             return found
     if tool == CLUSTERS:

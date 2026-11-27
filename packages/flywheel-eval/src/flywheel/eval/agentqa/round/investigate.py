@@ -16,7 +16,10 @@ artifacts enter only as JSON values, cut to `FACT_TEXT_CHARS`. The reply is one 
 A reply that does not parse gets one resend (attempt 2, `previous_errors`); a second bad
 reply, or an action the code refuses (unknown tool, a value outside its domain, an unknown
 fact id, a bare number, a rule hypothesis dropped...), is a rejected step: logged with its
-reason and told to the model in the next step's history. The caps of `roles.yaml`
+reason and told to the model in the next step's history. The last step the caps allow,
+with a margin (one step or two calls left, or two more requests of the current size over
+the input-token or dollar cap), carries `"final": true` and accepts only `conclude`, so a
+loop near its budget can still hand its hypotheses on. The caps of `roles.yaml`
 (`investigate:`) are checked before every request, from the costs `model_calls.jsonl`
 records for this step's calls (a replayed request costs what its line says, so a resumed
 run sends the same requests and replays them). The loop also stops on the gateway's own
@@ -96,6 +99,7 @@ FILES = (INVESTIGATION_FILE, INVESTIGATION_FACTS_FILE, INVESTIGATION_CALLS_FILE,
 PROMPT = Path("configs") / "eval" / "agentqa" / "prompts" / "investigate.md"
 RAW_CHARS = 2000  # an unparseable reply, as the log keeps it
 TEXT_CHARS = 1000  # a statement or a conclude text of the model
+FINAL_ONLY = "the budget is at its end: only conclude is accepted"
 ANSWERED = ("ok", "cut")
 CALL_PREFIX = "I"  # investigation tool calls; the plan's are T1.. in tool_calls.jsonl
 _PLACEHOLDER = re.compile(r"\{(F[0-9]+)\}")
@@ -321,6 +325,7 @@ class _Investigation:
         self.history: list[dict[str, Any]] = []
         self.spent = _Spent()
         self.concluded: Conclude | None = None
+        self.final = False  # the current step is the last the caps allow: conclude only
         # Tools whose artifact kind the pack lacks are left out of the requests.
         self.tools: list[dict[str, Any]] = [
             {"name": t.name, "description": t.description, "input_schema": t.input_schema}
@@ -353,7 +358,8 @@ class _Investigation:
             out.append({"id": fid, "name": fact.name[:FACT_TEXT_CHARS],
                         "value": _cut(fact.value), "unit": fact.unit,
                         "provenance": self.provenance.get(fid, "code"),
-                        "meaning": meaning_of(fact.name, self.tool_of.get(fid, ""))})
+                        "meaning": meaning_of(fact.name, self.tool_of.get(fid, ""),
+                                              short=True)})
         return out
 
     def _budget(self, step: int) -> dict[str, Any]:
@@ -400,12 +406,28 @@ class _Investigation:
 
     # -- one request through the gateway ------------------------------------------------
 
-    def _check_caps(self, user: str) -> None:
-        lim, used = self.limits, self.spent
+    def _estimate(self, user: str) -> tuple[int, float]:
+        """(input tokens, dollars) one request of this user message is estimated to cost."""
         est_in = math.ceil((len(self.system) + len(user)) / self.gateway.budget.chars_per_token)
-        reply_cap = min(lim.max_reply_tokens, self.profile.max_tokens)
+        reply_cap = min(self.limits.max_reply_tokens, self.profile.max_tokens)
         est_usd = (est_in * self.profile.usd_per_mtok_in
                    + reply_cap * self.profile.usd_per_mtok_out) / 1e6
+        return est_in, est_usd
+
+    def _is_final(self, step: int, payload: dict[str, Any]) -> bool:
+        """Whether this step is the last the caps allow, with a margin: one step left, two
+        calls left (a request and its resend), or two more requests of this size would
+        pass the input-token or dollar cap. The hard caps of `_check_caps` stay as they are."""
+        lim, used = self.limits, self.spent
+        if lim.max_steps - step + 1 <= 1 or lim.max_calls - used.requests <= 2:
+            return True
+        est_in, est_usd = self._estimate(_dump({**payload, "final": True}))
+        return (2 * est_in > lim.max_input_tokens - used.tokens_in
+                or 2 * est_usd > lim.max_usd - used.usd)
+
+    def _check_caps(self, user: str) -> None:
+        lim, used = self.limits, self.spent
+        est_in, est_usd = self._estimate(user)
         if used.requests + 1 > lim.max_calls:
             raise _Stop("max_calls", f"max_calls {lim.max_calls}")
         if used.tokens_in + est_in > lim.max_input_tokens:
@@ -596,6 +618,9 @@ class _Investigation:
     def _read(self, step: int) -> tuple[CallTool | Propose | Drop | Conclude | None, list[str]]:
         """The parsed action of this step (one resend at most), or None when rejected."""
         payload = self._payload(step)
+        self.final = self._is_final(step, payload)
+        if self.final:  # only then: earlier requests (and their replay) stay byte for byte
+            payload["final"] = True
         calls: list[str] = []
         reply = self._ask(step, 1, payload)
         calls.append(reply.call_id)
@@ -627,7 +652,9 @@ class _Investigation:
             return False
         tool_call_id, hypothesis_id = "", ""
         fact_ids: list[str] = []
-        if isinstance(action, CallTool):
+        if self.final and not isinstance(action, Conclude):
+            reason = FINAL_ONLY
+        elif isinstance(action, CallTool):
             tool_call_id, fact_ids, reason = self._call_tool(action)
         elif isinstance(action, Propose):
             hypothesis_id, reason = self._propose(action, step)
