@@ -10,6 +10,7 @@
     fw agentqa pack --round <round.yaml> [--store <dir>]   freeze a round into pack.json (DA-43)
     fw agentqa round --pack <pack.json> --out <dir> [--no-model] [--from <step>]
         [--plan <yaml>] [--store <dir>] [--gateway-config <dir>] [--disable-rule <id> ...]
+        [--investigate]
                                                            run a round into index.html (DA-43)
     fw agentqa mcp --pack <pack.json> [--log <file>]       the tools over MCP on stdio (DA-49)
 
@@ -102,6 +103,10 @@ def round_command(
     disable_rule: list[str] = typer.Option(
         [], "--disable-rule", help="Switch a rule off by id for this run (repeatable); "
         "added to agent.yaml's disabled_rules, recorded in run.json and the agent hash."),
+    investigate: bool = typer.Option(
+        False, "--investigate", help="Run the investigate loop after hypothesize (DA-52; a "
+        "model run only). With --from, the run directory's recorded choice is used when "
+        "this is not given."),
 ) -> None:
     """Run a round: pack, admit, measure, hypothesize, adjudicate, judge, verify, assemble,
     render."""
@@ -109,7 +114,9 @@ def round_command(
     try:
         record = run_round(pack, out, plan_path=plan, from_step=from_step,
                            command="fw agentqa round", no_model=mode, store=store,
-                           gateway_root=gateway_config, disable_rules=disable_rule)
+                           gateway_root=gateway_config, disable_rules=disable_rule,
+                           investigate=True if investigate else (
+                               None if from_step is not None else False))
     except (PackRefused, PlanRefused, RulesRefused, RunRefused, FileExistsError) as error:
         _fail(str(error))
         return
