@@ -640,7 +640,7 @@ Cả lần chạy (mọi vai) mất 5 đến 8 phút và 0,008 đến 0,018 USD 
 |---|---|
 | Khay nằm cao hơn mặt đặt | Một phần. Lần 3 dẫn cả độ cao cuối và độ nghiêng cuối của cụm lớn nhất, cả hai tách biệt với lượt thành công cùng mức. Lần 6 chỉ dẫn độ nghiêng cuối. Nối "khay nằm nghiêng" với "khay gác cao" là suy luận của người đọc, chưa kiểm |
 | Lệch góc khi đặt | Có nêu ở lần 4 và lần 6, nhưng bị xếp "chưa đủ bằng chứng": sai số góc là số đo bộ chấm đã đặt ngưỡng, luật bằng chứng mới không nhận nó một mình |
-| Khay nghiêng khi còn trong tay | Không lần nào. Cụm `L-TRAY-TILT` mức 2 được so tới chín số đo ở lần 6, không số nào tách biệt |
+| Khay nghiêng khi còn trong tay | Không lần nào. Cụm `L-TRAY-TILT` mức 2 được so tám số đo ở lần 6, không số nào tách biệt |
 
 Điều sai và giới hạn:
 
