@@ -617,6 +617,39 @@ Giới hạn:
 - Lượt `M/l2-s1000100-r1` tới bàn B mà không bước nào được chốt; agent xếp vào lỗi bộ chấm, cần nhóm A xem.
 - Agent chỉ đề xuất loại dữ liệu (`teleop_correction`), chưa nói nội dung demo (sửa góc, hạ khay vào lòng đồ gá) và chưa có chi phí.
 
+### 9.10 Vòng lặp điều tra trên run M với ba luật tắt, 27/11/2026
+
+Phép thử 1 của DA-52: `fw agentqa round --investigate` trên gói run M của mục 9.9, tắt ba luật cơ chế (`place_rests_raised`, `place_yaw_miss`, `tilt_while_carried`), model `claude-opus-5-5` qua cổng ckey (bên bán lại; không xác minh được model sau tên, số token là số cổng báo). Mọi số là **sơ bộ**. Đây **không phải phép thử mù**: người thiết kế công cụ và người sửa prompt đã biết đáp án của run M; chỉ run N là ca mù.
+
+Sáu lần chạy, ba cấu hình. Luật bằng chứng và prompt đổi sau lần 1, cơ chế dành lời gọi cuối cho kết luận thêm sau lần 2, trần nâng sau lần 5, nên mã băm agent khác nhau giữa các nhóm.
+
+| Lần | Mã băm agent | Trần token của vai | Kết thúc | Bước / lời gọi của vai | Token vào của vai | Giả thuyết của model | Hướng agent đi |
+|---|---|---|---|---|---|---|---|
+| 1 | `9037b927fe01` | 400 000 | tự kết luận | 13 / 15 | 232 544 | 4 qua kiểm | nhắc lại nhãn lỗi (vượt ngưỡng nghiêng, vượt ngưỡng vị trí) |
+| 2 | `1fd5fd6b4cd6` | 400 000 | chạm trần token | 18 / 21 | 376 152 | 0 (không trao) | độ nghiêng cuối của khay; chưa kịp kết luận |
+| 3 | `7786f5a85120` | 400 000 | tự kết luận | 19 / 23 | 363 011 | 3 qua kiểm | độ nghiêng cuối và độ cao cuối của khay |
+| 4 | `7786f5a85120` | 400 000 | tự kết luận | 19 / 23 | 355 839 | 0 qua, 2 chưa đủ bằng chứng | sai số góc và khoảng cách đặt (số đo có ngưỡng) |
+| 5 | `7786f5a85120` | 400 000 | lỗi cổng (HTTP 503) | 17 / 18 | 256 644 | 0 (không trao) | độ nghiêng cuối của khay; chưa kịp kết luận |
+| 6 | `897d7d78b434` | 1 000 000 | tự kết luận | 29 / 29 | 522 061 | 4 qua kiểm, 1 chưa đủ bằng chứng | độ nghiêng cuối của khay ở bốn cụm; sai số góc ở cụm lớn nhất |
+
+Cả lần chạy (mọi vai) mất 5 đến 8 phút và 0,008 đến 0,018 USD theo giá cổng ckey.
+
+Đối chiếu với ba cơ chế của luật viết tay (mục 9.9), làm sau khi chạy:
+
+| Cơ chế | Agent tự tới? |
+|---|---|
+| Khay nằm cao hơn mặt đặt | Một phần. Lần 3 dẫn cả độ cao cuối và độ nghiêng cuối của cụm lớn nhất, cả hai tách biệt với lượt thành công cùng mức. Lần 6 chỉ dẫn độ nghiêng cuối. Nối "khay nằm nghiêng" với "khay gác cao" là suy luận của người đọc, chưa kiểm |
+| Lệch góc khi đặt | Có nêu ở lần 4 và lần 6, nhưng bị xếp "chưa đủ bằng chứng": sai số góc là số đo bộ chấm đã đặt ngưỡng, luật bằng chứng mới không nhận nó một mình |
+| Khay nghiêng khi còn trong tay | Không lần nào. Cụm `L-TRAY-TILT` mức 2 được so tới chín số đo ở lần 6, không số nào tách biệt |
+
+Điều sai và giới hạn:
+
+- Lần 1 cho thấy luật giữ giả thuyết ban đầu nhận cả câu nhắc lại nhãn lỗi ("vượt ngưỡng của bộ chấm" luôn đúng với số đo định nghĩa nhãn). Luật đã sửa: bằng chứng là cờ tách biệt đúng, của chính cụm đó, trên số đo bộ chấm không đặt ngưỡng (Hiếu đồng ý 27/11/2026). Hệ quả: cơ chế lệch góc không qua được luật này.
+- Câu đọc quá fact: ở lần 3 và lần 6, model viết khay nghiêng "lúc thả" hoặc "lúc tới bước đặt", trong khi fact đo trạng thái cuối của lượt. Ba câu ở lần 3, một câu ở lần 6. Các câu này qua `verify` vì không mang số.
+- Agent không ổn định giữa các lần cùng cấu hình (lần 3, 4, 5 đi ba hướng), và một trong ba lần mất kết quả vì lỗi cổng.
+- Mỗi lời gọi tốn 16 000 đến 25 000 token vào vì mỗi bước gửi lại toàn bộ trạng thái và chỉ gọi được một công cụ. Trần ban đầu (30 bước, 40 lời gọi, 400 000 token) chạm ở khoảng bước 19; Hiếu nâng lên 50 bước, 60 lời gọi, 1 000 000 token ngày 27/11/2026.
+- Gói run M không có artifact điều kiện, nên phần "tham số nào của mức 2 gây lỗi" chưa chạy.
+
 ## 10. Máy chủ MCP cho các công cụ phân tích (DA-49)
 
 `fw agentqa mcp` mở một gói vòng và lộ các công cụ của sổ đăng ký (`agentqa/tools/registry.py`, hiện 13 công cụ) qua MCP trên stdio, để một vỏ chat nói được MCP gọi chúng. Máy chủ chỉ trả fact do code tính; nó không sinh văn bản và không gọi model. Story: [DA-49](../product/stories/DA-49-may-chu-mcp-cong-cu-phan-tich.md). **[Đã chốt]** phương án A (thư viện chuẩn của Python, không thêm phụ thuộc), Hiếu, 26/11/2026.
