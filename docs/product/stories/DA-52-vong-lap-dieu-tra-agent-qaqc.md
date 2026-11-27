@@ -78,7 +78,7 @@ Giới hạn của phép thử 1, nói trước: người thiết kế hai công
 | # | Câu hỏi | Đã chốt |
 |---|---|---|
 | 1 | Giả thuyết của model đã qua kiểm có được xếp trên giả thuyết của luật không | Có, trong cùng nhóm; giả thuyết hệ thống (bộ chấm, đo) của luật vẫn đứng trên và vẫn chặn tiêu dữ liệu |
-| 2 | Trần ngân sách một vòng | 30 bước, 40 lời gọi, 400 000 token vào, 1 USD (ước lượng, chưa đo) |
+| 2 | Trần ngân sách một vòng | 30 bước, 40 lời gọi, 400 000 token vào, 1 USD (ước lượng, chưa đo). Hiếu nâng ngày 27/11/2026 sau ba lần đo: 50 bước, 60 lời gọi, 1 000 000 token vào; 1 USD giữ nguyên |
 | 3 | Model nào cho run M và run N | `claude-opus-5-5` qua cổng ckey (dữ liệu sim là `public`); cổng là bên bán lại, không xác minh được model sau tên |
 | 4 | Nội dung dữ liệu là lời văn của model, có nhãn | Chấp nhận, vì danh sách đóng không tả được nội dung demo |
 | 5 | Số công cụ lên 15 | Chấp nhận; máy chủ MCP của DA-49 đọc sổ đăng ký nên tự có hai công cụ mới |
@@ -104,7 +104,7 @@ Giới hạn của phép thử 1, nói trước: người thiết kế hai công
 - [x] 2.3 Bản ghi và schema của vòng lặp; kiểm giả thuyết của model vừa `RoundHypothesis`; vai `investigate` trong `roles.yaml`, prompt (AC 3, 8)
 - [x] 2.4 Bước `investigate`: vòng lặp, trần ngân sách, rơi về sàn code, có test (AC 3, 4, 7)
 - [x] 2.5 Luật giữ giả thuyết của model và `verify` cho kết luận; trang kết quả đánh dấu lời của model, có test (AC 5, 6)
-- [ ] 3.1 Phép thử trên run M với ba luật tắt, ba lần; ghi kết quả (AC 9)
+- [x] 3.1 Phép thử trên run M với ba luật tắt, ba lần; ghi kết quả (AC 9)
 - [ ] 3.2 Chạy đủ kiểm tra (AC 10)
 - [ ] 4.1 Run N: chạy trước, đối chiếu sau; ghi kết quả (khi nhóm A có outcome)
 
