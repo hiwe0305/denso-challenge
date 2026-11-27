@@ -270,9 +270,9 @@ def test_only_a_confirmed_public_pack_opens(pack: Path) -> None:
         open_public_session(repacked(pack, "unlinked", unlinked))
 
 
-def test_the_command_has_no_option_but_pack_log_and_record() -> None:
+def test_the_command_has_no_option_but_pack_log_record_and_run() -> None:
     options = {o for a in build_parser()._actions for o in a.option_strings}
-    assert options == {"-h", "--help", "--pack", "--log", "--record"}  # --record: DA-54
+    assert options == {"-h", "--help", "--pack", "--log", "--record", "--run"}  # DA-54
 
 
 # -- as a child process (AC 1) -----------------------------------------------------------
