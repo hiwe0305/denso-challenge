@@ -315,7 +315,7 @@ def test_the_server_answers_over_stdio(pack: Path) -> None:
     assert replies[5]["error"]["code"] == -32601
     logged = [json.loads(line) for line in done.stderr.splitlines()]
     assert [r["event"] for r in logged] == ["started", "call"]
-    assert logged[0]["tools"] == 13 and logged[0]["data_class"] == "public"
+    assert logged[0]["tools"] == len(REGISTRY) and logged[0]["data_class"] == "public"
     assert logged[1]["tool"] == "paired_compare"
     assert logged[1]["fact_ids"] == [f["fact_id"] for f in call["structuredContent"]["facts"]]
 
