@@ -26,6 +26,7 @@ from flywheel.eval.agentqa.round.gateway_config import (
     load_gateway_config,
 )
 from flywheel.eval.agentqa.round.investigate import (
+    FINAL_ONLY,
     INVESTIGATED_FILE,
     INVESTIGATION_CALLS_FILE,
     INVESTIGATION_FACTS_FILE,
@@ -523,6 +524,62 @@ def test_each_cap_ends_the_loop_on_the_code_floor(
     for name in ("hypotheses.jsonl", "facts.jsonl", "tool_calls.jsonl"):
         assert (out / name).read_bytes() == (floor / name).read_bytes(), name
     assert assembly(out) == assembly(floor)
+
+
+# the final step: the end of the budget is kept for conclude --------------------------------
+
+
+def _tokens_per_step(make_pack: PackMaker, tmp_path: Path, store: Path,
+                     script: list[Script | Reply]) -> list[int]:
+    """The input tokens each investigate request of `script` cost on a run without caps."""
+    out = tmp_path / "measured_run"
+    run(make_pack("measured"), out, Bot(list(script)), store, investigate=True)
+    return [c.tokens_in for c in model_calls(out) if c.role == "investigate"]
+
+
+def test_a_small_token_cap_makes_the_last_step_final_and_conclude_is_handed_on(
+        make_pack: PackMaker, tmp_path: Path, store: Path,
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    script: list[Script | Reply] = [level_one, propose, conclude]
+    t = _tokens_per_step(make_pack, tmp_path, store, script)
+    # room for the three requests, but not for two more of the third's size at step 3
+    with_limits(tmp_path, monkeypatch, max_input_tokens=t[0] + t[1] + t[2] + t[2] // 2)
+    out = tmp_path / "out"
+    bot = Bot(list(script))
+    run(make_pack(), out, bot, store, investigate=True)
+    assert ["final" in p for p in bot.payloads] == [False, False, True]
+    assert bot.payloads[2]["final"] is True and "budget" in bot.payloads[2]
+    steps, end = log_of(out)
+    assert end.ending == "concluded" and end.kept == 1
+    assert [s.outcome for s in steps] == ["ok", "ok", "ok"]
+    assert len(kept_of(out)) == 1
+
+
+def test_any_other_action_at_the_final_step_is_rejected(
+        make_pack: PackMaker, tmp_path: Path, store: Path,
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    t = _tokens_per_step(make_pack, tmp_path, store, [level_one, propose, conclude])
+    with_limits(tmp_path, monkeypatch, max_input_tokens=t[0] + t[1] + t[2] + t[2] // 2)
+    out = tmp_path / "out"
+    bot = Bot([level_one, propose, level_one, conclude])
+    run(make_pack(), out, bot, store, investigate=True)
+    steps, end = log_of(out)
+    assert bot.payloads[2].get("final") is True
+    assert steps[2].action == "call_tool" and steps[2].outcome == "rejected"
+    assert steps[2].reason == FINAL_ONLY and steps[2].tool_call_id == ""
+    assert len(lines_of(out / INVESTIGATION_CALLS_FILE)) == 1  # only step 1's tool ran
+    # the hard cap is unchanged: the next request does not fit, nothing is handed on
+    assert end.ending == "max_input_tokens" and end.kept == 0
+    assert (out / INVESTIGATED_FILE).read_text() == ""
+
+
+def test_the_last_step_allowed_is_final(make_pack: PackMaker, tmp_path: Path, store: Path,
+                                        monkeypatch: pytest.MonkeyPatch) -> None:
+    with_limits(tmp_path, monkeypatch, max_steps=3)
+    bot = Bot([level_one, propose, conclude])
+    run(make_pack(), tmp_path / "out", bot, store, investigate=True)
+    assert ["final" in p for p in bot.payloads] == [False, False, True]
+    assert log_of(tmp_path / "out")[1].ending == "concluded"
 
 
 # failures inside the loop -----------------------------------------------------------------
