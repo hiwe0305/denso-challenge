@@ -20,18 +20,23 @@ profiles:
     max_tokens: 1024
     timeout_s: 300
 
-# role x data class -> profile. Every cell is required.
+# role x data class -> profile. Every cell of a role is required.
 routes:
   adjudicate: {public: local_text, internal: local_text, restricted: local_text}
   rank: {public: local_text, internal: local_text, restricted: local_text}
   look: {public: local_vision, internal: local_vision, restricted: local_vision}
+  # DA-52, optional: a routing.yaml without it loads; `--investigate` then refuses.
+  investigate: {public: local_text, internal: local_text, restricted: local_text}
 
 # Caps of one run, retries included. Assumptions until a round is measured: about 25
 # calls and 250k input tokens per round (architecture section 12), with room for the
-# one resend per item.
+# one resend per item. DA-52 raised both caps (from 60 calls and 600000 tokens): the
+# investigate role's own caps in roles.yaml (40 calls, 400000 input tokens) come on top
+# of what the other roles are assumed to use, so a round with --investigate does not
+# starve judge. Still assumptions until a round is measured.
 budget:
-  max_calls: 60
-  max_input_tokens: 600000
+  max_calls: 100
+  max_input_tokens: 1000000
   max_usd: 0.0                # local calls cost nothing; raise only with hosted on
   chars_per_token: 2.5        # as agent.yaml limits; estimates a prompt before it is sent
 

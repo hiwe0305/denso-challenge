@@ -49,7 +49,9 @@ from pathlib import Path
 from flywheel.eval.agentqa.endpoint import load_endpoint
 from flywheel.eval.agentqa.round.admit import ADMISSION_FILE
 from flywheel.eval.agentqa.round.gateway_config import (
+    OPTIONAL_ROLES,
     ROLES,
+    Budget,
     GatewayConfig,
     GatewayRefused,
     Profile,
@@ -184,7 +186,7 @@ class Gateway:
         self._admission = _read_admission(run_dir)
         self._providers: dict[str, ChatModel] = {}
         self.usage = Usage()
-        for role in ROLES:  # a refused run stops before its first call
+        for role in self.configured_roles():  # a refused run stops before its first call
             self._route(role)
         self._lines = 0
         self._answered: dict[str, ModelCallRecord] = {}
@@ -211,9 +213,22 @@ class Gateway:
     def data_class(self) -> str:
         return self._admission.data_class
 
+    @property
+    def budget(self) -> Budget:
+        """The run's caps and the chars-per-token estimate a role may use for its own caps."""
+        return self._config.budget
+
+    def configured_roles(self) -> tuple[str, ...]:
+        """The required roles, then the optional ones `routing.yaml` routes."""
+        return (*ROLES, *(r for r in OPTIONAL_ROLES if r in self._config.routes))
+
     def _route(self, role: str) -> tuple[str, Profile]:
-        if role not in ROLES:
-            raise GatewayRefused(f"unknown role {role!r} (roles: {', '.join(ROLES)})")
+        if role not in (*ROLES, *OPTIONAL_ROLES):
+            raise GatewayRefused(f"unknown role {role!r} (roles: "
+                                 f"{', '.join((*ROLES, *OPTIONAL_ROLES))})")
+        if role not in self._config.routes:
+            raise GatewayRefused(f"the {role} role has no route: add routes.{role} to "
+                                 "routing.yaml (it is optional, so older configs lack it)")
         data_class = self._admission.data_class
         name = self._config.routes.get(role, {}).get(data_class)
         profile = self._config.profiles.get(name) if name else None
