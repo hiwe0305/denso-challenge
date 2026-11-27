@@ -37,7 +37,7 @@ from __future__ import annotations
 import json
 import math
 import re
-from collections.abc import Sequence
+from collections.abc import Container, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Any, Literal, cast, get_args
@@ -291,6 +291,93 @@ def _hypothesis_number(hypothesis_id: str) -> int:
     return int(hypothesis_id[1:]) if hypothesis_id[1:].isdigit() else 0
 
 
+# --- the checks of one action, shared with the record tools of the MCP server (DA-54) -----
+
+
+def text_problem(where: str, text: str, cites: Sequence[str], known: Container[str]) -> str:
+    """Why a text of the model is refused; "" when it may stand. `known`: the fact ids the
+    model may cite (in the loop, every fact id a request offered)."""
+    if not text.strip():
+        return f"{where} is empty"
+    if len(text) > TEXT_CHARS:
+        return f"{where} is longer than {TEXT_CHARS} characters"
+    bare = bare_numbers(text)
+    if bare:
+        return f"{where} writes the number(s) {bare}; cite a fact as {{F#}}"
+    placeholders = _PLACEHOLDER.findall(text)
+    missing = [p for p in placeholders if p not in cites]
+    if missing:
+        return f"{where} uses {missing} without citing them"
+    unknown = [f for f in dict.fromkeys(cites) if f not in known]
+    if unknown:
+        return f"{where} cites fact(s) {unknown} that were not given"
+    return ""
+
+
+def proposal_problem(cluster_id: str, diagnosis: str, intervention: str,
+                     clusters: Mapping[str, ClusterRef], blocked: Container[str]) -> str:
+    """Why a proposal's cluster, diagnosis or intervention is refused; "" when they may
+    stand. `blocked`: the cluster ids where a system hypothesis stands (no data spend)."""
+    cluster = clusters.get(cluster_id)
+    if cluster is None:
+        return f"cluster {cluster_id!r} is not a cluster of the round"
+    if diagnosis not in get_args(Diagnosis):
+        return f"diagnosis {diagnosis!r} is not one of allowed.diagnoses"
+    if intervention not in get_args(InterventionKind):
+        return f"intervention {intervention!r} is not one of allowed.interventions"
+    allowed = INTERVENTIONS_OF_DIAGNOSIS.get(cast(Diagnosis, diagnosis), frozenset())
+    if intervention not in allowed:
+        return (f"intervention {intervention!r} is not allowed for "
+                f"{diagnosis} (allowed: {sorted(allowed)})")
+    if cluster.cluster_id in blocked and intervention in BUDGET_INTERVENTIONS:
+        return (f"cluster {cluster.cluster_id} has a system hypothesis standing: "
+                f"{intervention!r} would spend data budget")
+    return ""
+
+
+def drop_problem(hypothesis: str, is_open: bool | None, is_rule: bool,
+                 refuted_by: Sequence[str], known: Container[str]) -> str:
+    """Why dropping `hypothesis` is refused; "" when it may be dropped. `is_open`: None when
+    it is not a hypothesis of the model, else whether it is still open."""
+    if is_open is None:
+        if is_rule:
+            return f"{hypothesis} is a rule hypothesis; only your own can be dropped"
+        return f"{hypothesis!r} is not a hypothesis of yours"
+    if not is_open:
+        return f"{hypothesis} is already dropped"
+    if not refuted_by:
+        return "refuted_by is empty: cite the facts that refute it"
+    unknown = [f for f in dict.fromkeys(refuted_by) if f not in known]
+    if unknown:
+        return f"refuted_by cites fact(s) {unknown} that were not given"
+    return ""
+
+
+def offered_facts(cited: Sequence[str], book: FactBook,
+                  provenance: Mapping[str, Literal["code", "vision", "history"]],
+                  markers: tuple[str, ...]) -> dict[str, InvestigatedFact]:
+    """The `offered` block of a kept hypothesis: each cited fact as the book holds it."""
+    offered = {}
+    for fid in cited:
+        fact = book.get(fid)
+        offered[fid] = InvestigatedFact(
+            name=fact.name, value=fact.value, unit=fact.unit,
+            provenance=provenance.get(fid, "code"),
+            comparison=is_comparison_fact(fact.name, fact.value, markers))
+    return offered
+
+
+def roll_back(book: FactBook, before: int) -> None:
+    """Cut `book` back to its first `before` facts (a failed call's facts are never offered).
+
+    `FactBook` has no undo; its list and its (name, source) index are cut back here.
+    """
+    gone = {f.fact_id for f in book.facts[before:]}
+    del book.facts[before:]
+    for key in [k for k, fid in book._index.items() if fid in gone]:
+        del book._index[key]
+
+
 # --- the loop --------------------------------------------------------------------------------
 
 
@@ -458,43 +545,17 @@ class _Investigation:
 
     # -- the checks of one action -------------------------------------------------------
 
-    def _unknown(self, ids: Sequence[str]) -> list[str]:
-        return [f for f in dict.fromkeys(ids) if f not in self.offered]
-
     def _text(self, where: str, text: str, cites: Sequence[str]) -> str:
         """Why a text of the model is refused; "" when it may stand."""
-        if not text.strip():
-            return f"{where} is empty"
-        if len(text) > TEXT_CHARS:
-            return f"{where} is longer than {TEXT_CHARS} characters"
-        bare = bare_numbers(text)
-        if bare:
-            return f"{where} writes the number(s) {bare}; cite a fact as {{F#}}"
-        placeholders = _PLACEHOLDER.findall(text)
-        missing = [p for p in placeholders if p not in cites]
-        if missing:
-            return f"{where} uses {missing} without citing them"
-        unknown = self._unknown(cites)
-        if unknown:
-            return f"{where} cites fact(s) {unknown} that were not given"
-        return ""
+        return text_problem(where, text, cites, self.offered)
 
     def _propose(self, action: Propose, step: int) -> tuple[str, str]:
         """(hypothesis id, "") when accepted, ("", reason) when rejected."""
-        cluster = self.clusters.get(action.cluster_id)
-        if cluster is None:
-            return "", f"cluster {action.cluster_id!r} is not a cluster of the round"
-        if action.diagnosis not in get_args(Diagnosis):
-            return "", f"diagnosis {action.diagnosis!r} is not one of allowed.diagnoses"
-        if action.intervention not in get_args(InterventionKind):
-            return "", f"intervention {action.intervention!r} is not one of allowed.interventions"
-        allowed = INTERVENTIONS_OF_DIAGNOSIS.get(action.diagnosis, frozenset())
-        if action.intervention not in allowed:
-            return "", (f"intervention {action.intervention!r} is not allowed for "
-                        f"{action.diagnosis} (allowed: {sorted(allowed)})")
-        if cluster.cluster_id in self.blocked and action.intervention in BUDGET_INTERVENTIONS:
-            return "", (f"cluster {cluster.cluster_id} has a system hypothesis standing: "
-                        f"{action.intervention!r} would spend data budget")
+        problem = proposal_problem(action.cluster_id, action.diagnosis, action.intervention,
+                                   self.clusters, self.blocked)
+        if problem:
+            return "", problem
+        cluster = self.clusters[action.cluster_id]
         problem = self._text("statement", action.statement, [*action.support, *action.contra])
         if problem:
             return "", problem
@@ -508,17 +569,12 @@ class _Investigation:
 
     def _drop(self, action: Drop) -> str:
         mine = self.mine.get(action.hypothesis)
-        if mine is None:
-            if any(h.hypothesis_id == action.hypothesis for h in self.rules):
-                return f"{action.hypothesis} is a rule hypothesis; only your own can be dropped"
-            return f"{action.hypothesis!r} is not a hypothesis of yours"
-        if not mine.open:
-            return f"{action.hypothesis} is already dropped"
-        if not action.refuted_by:
-            return "refuted_by is empty: cite the facts that refute it"
-        unknown = self._unknown(action.refuted_by)
-        if unknown:
-            return f"refuted_by cites fact(s) {unknown} that were not given"
+        problem = drop_problem(
+            action.hypothesis, None if mine is None else mine.open,
+            any(h.hypothesis_id == action.hypothesis for h in self.rules),
+            action.refuted_by, self.offered)
+        if problem or mine is None:
+            return problem
         mine.open = False
         mine.refuted_by = list(action.refuted_by)
         return ""
@@ -540,15 +596,8 @@ class _Investigation:
         return ""
 
     def _roll_back(self, before: int) -> None:
-        """Drop the facts a failed call added to the book, so none is ever offered.
-
-        `FactBook` has no undo; its list and its (name, source) index are cut back here.
-        """
-        book = self.session.book
-        gone = {f.fact_id for f in book.facts[before:]}
-        del book.facts[before:]
-        for key in [k for k, fid in book._index.items() if fid in gone]:
-            del book._index[key]
+        """Drop the facts a failed call added to the book, so none is ever offered."""
+        roll_back(self.session.book, before)
 
     def _call_tool(self, action: CallTool) -> tuple[str, list[str], str]:
         """(tool call id, fact ids, reason); the reason is "" when the call ran."""
@@ -682,13 +731,7 @@ class _Investigation:
             h = self.mine[keep.hypothesis]
             cited = list(dict.fromkeys([*h.support, *h.contra, *keep.data_content.cites,
                                         *keep.first_check.cites]))
-            offered = {}
-            for fid in cited:
-                fact = book.get(fid)
-                offered[fid] = InvestigatedFact(
-                    name=fact.name, value=fact.value, unit=fact.unit,
-                    provenance=self.provenance.get(fid, "code"),
-                    comparison=is_comparison_fact(fact.name, fact.value, self.markers))
+            offered = offered_facts(cited, book, self.provenance, self.markers)
             out.append(InvestigatedHypothesis(
                 hypothesis_id=h.hypothesis_id, cluster=h.cluster, statement=h.statement,
                 diagnosis=h.diagnosis, intervention=h.intervention, support=h.support,

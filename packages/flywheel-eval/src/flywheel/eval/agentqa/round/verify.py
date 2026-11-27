@@ -29,7 +29,7 @@ DA-52: a hypothesis the investigate role kept (`investigated.jsonl`) gets a verd
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Container, Mapping, Sequence
 from pathlib import Path
 
 from flywheel.contracts.agentqa import bare_numbers
@@ -46,6 +46,7 @@ from flywheel.eval.agentqa.round.measure import FACTS_FILE
 from flywheel.eval.agentqa.round.records import (
     FactRecord,
     HypothesisRecord,
+    InvestigatedFact,
     InvestigatedHypothesis,
     JudgedItem,
     ModelCallRecord,
@@ -150,31 +151,54 @@ def _texts(h: InvestigatedHypothesis) -> list[tuple[str, list[str], str]]:
             ("first_check", list(h.first_check.cites), h.first_check.text)]
 
 
-def _numbers(h: InvestigatedHypothesis) -> list[str]:
+def text_numbers(where: str, cites: Sequence[str], text: str,
+                 offered: Container[str]) -> list[str]:
+    """The `numbers` rule on one text: no bare number, every `{F#}` cited, every cite offered.
+
+    Shared with the record tools of the MCP server (DA-54), which check a text the same way.
+    """
     out = []
-    for where, cites, text in _texts(h):
-        bare = bare_numbers(text)
-        if bare:
-            out.append(f"{where} writes the number(s) {bare}")
-        missing = [f for f in _PLACEHOLDER.findall(text) if f not in cites]
-        if missing:
-            out.append(f"{where} uses {missing} without citing them")
-        unknown = [f for f in dict.fromkeys(cites) if f not in h.offered]
-        if unknown:
-            out.append(f"{where} cites {unknown}, which were not offered")
+    bare = bare_numbers(text)
+    if bare:
+        out.append(f"{where} writes the number(s) {bare}")
+    missing = [f for f in _PLACEHOLDER.findall(text) if f not in cites]
+    if missing:
+        out.append(f"{where} uses {missing} without citing them")
+    unknown = [f for f in dict.fromkeys(cites) if f not in offered]
+    if unknown:
+        out.append(f"{where} cites {unknown}, which were not offered")
     return out
+
+
+def _numbers(h: InvestigatedHypothesis) -> list[str]:
+    return [m for where, cites, text in _texts(h)
+            for m in text_numbers(where, cites, text, h.offered)]
+
+
+def text_comparison(where: str, cites: Sequence[str], text: str,
+                    offered: Mapping[str, InvestigatedFact],
+                    flags: Mapping[str, bool]) -> list[str]:
+    """The `comparison` rule on one text (as `reply_rules.rule_comparison`): uncited or
+    unknown facts are `numbers`'s. Shared with the record tools of the MCP server (DA-54)."""
+    units = {offered[f].unit for f in cites if f in offered}
+    compared = any(flags.get(f, False) for f in cites if f in offered)
+    if _COMPARISON.search(text) and len(units) >= 2 and not compared:
+        return [f"{where} compares facts of different units {sorted(units)} without "
+                "citing a comparison fact"]
+    return []
 
 
 def _comparison(h: InvestigatedHypothesis, flags: dict[str, bool]) -> list[str]:
     """As `reply_rules.rule_comparison`: uncited or unknown facts are `numbers`'s."""
-    out = []
-    for where, cites, text in _texts(h):
-        units = {h.offered[f].unit for f in cites if f in h.offered}
-        compared = any(flags.get(f, False) for f in cites if f in h.offered)
-        if _COMPARISON.search(text) and len(units) >= 2 and not compared:
-            out.append(f"{where} compares facts of different units {sorted(units)} without "
-                       "citing a comparison fact")
-    return out
+    return [m for where, cites, text in _texts(h)
+            for m in text_comparison(where, cites, text, h.offered, flags)]
+
+
+def comparison_flags(offered: Mapping[str, InvestigatedFact],
+                     markers: Sequence[str]) -> dict[str, bool]:
+    """Fact id -> whether it is a comparison fact, recomputed from its name and value."""
+    return {fid: is_comparison_fact(f.name, f.value, tuple(markers))
+            for fid, f in offered.items()}
 
 
 def _provenance(h: InvestigatedHypothesis) -> list[str]:
@@ -223,8 +247,7 @@ def _evidence(h: InvestigatedHypothesis, by_name: dict[str, FactRecord]) -> list
 def investigated_verdict(h: InvestigatedHypothesis, by_name: dict[str, FactRecord],
                          markers: Sequence[str]) -> VerdictRecord:
     """The verdict of one hypothesis the investigate role kept."""
-    flags = {fid: is_comparison_fact(f.name, f.value, tuple(markers))
-             for fid, f in h.offered.items()}
+    flags = comparison_flags(h.offered, markers)
     failures = [(rule, m) for rule, found in (
         ("numbers", _numbers(h)), ("comparison", _comparison(h, flags)),
         ("provenance", _provenance(h)), (EVIDENCE, _evidence(h, by_name))) for m in found]

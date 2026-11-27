@@ -13,6 +13,7 @@
         [--investigate]
                                                            run a round into index.html (DA-43)
     fw agentqa mcp --pack <pack.json> [--log <file>]       the tools over MCP on stdio (DA-49)
+        [--record <dir>]                                   with the record tools (DA-54)
 
 Errors exit 2 with one line, as `fw eval` does. A run whose model part broke a
 report still writes everything and exits 1.
@@ -263,9 +264,10 @@ def estimates_command(
 def mcp_command(
     pack: Path = typer.Option(..., "--pack", help="The pack.json of the round."),
     log: Path | None = typer.Option(None, "--log", help=mcp_server.LOG_HELP),
+    record: Path | None = typer.Option(None, "--record", help=mcp_server.RECORD_HELP),
 ) -> None:
     """Serve the analysis tools of one round pack to a chat shell over MCP on stdio.
 
     Only a pack that admit confirms public is served; no option overrides this check.
     """
-    raise typer.Exit(mcp_server.run(pack, log))
+    raise typer.Exit(mcp_server.run(pack, log, record))

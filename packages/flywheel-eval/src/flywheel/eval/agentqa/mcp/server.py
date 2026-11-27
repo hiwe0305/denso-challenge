@@ -25,6 +25,10 @@ error (-32700) and the lines around it are served as usual.
 The server only opens a pack that `admit` confirms `public`, with the same check the
 model gateway applies before a hosted model (`hosted_refusal`): the server cannot know
 whether the model behind the chat shell is hosted. Nothing bypasses this check.
+
+DA-54: with `--record <dir>` it also serves the record tools of `records.py`
+(`hypothesis_propose`, `hypothesis_drop`, `answer_submit`) and writes the analysis calls'
+facts and the accepted records into `<dir>`. Without it nothing differs from DA-49.
 """
 
 from __future__ import annotations
@@ -42,6 +46,14 @@ from typing import IO, Any, TextIO
 
 import yaml
 from flywheel.eval.agentqa.mcp.bridge import CallOutcome, ToolSession, UnknownTool
+from flywheel.eval.agentqa.mcp.records import (
+    INSTRUCTIONS as RECORD_INSTRUCTIONS,
+)
+from flywheel.eval.agentqa.mcp.records import (
+    RECORD_TOOLS,
+    Recorder,
+    RecordRefused,
+)
 from flywheel.eval.agentqa.round.admit import admit
 from flywheel.eval.agentqa.round.gateway import hosted_refusal
 from flywheel.eval.agentqa.round.measure import PlanRefused
@@ -53,6 +65,8 @@ PROTOCOL_VERSION = "2025-11-25"
 SERVER_NAME = "flywheel-agentqa"
 CallLog = Callable[[dict[str, Any]], None]
 LOG_HELP = "append one JSON line per tool call here (default: stderr)"
+RECORD_HELP = ("also serve the record tools (hypothesis_propose, hypothesis_drop, "
+               "answer_submit) and write the facts and accepted records into this directory")
 
 INSTRUCTIONS = (
     "These tools compute facts about one admitted eval round pack; every number in an "
@@ -113,8 +127,10 @@ class McpServer:
 
     def __init__(self, session: ToolSession, *, log: CallLog | None = None,
                  clock: Callable[[], float] = time.monotonic,
-                 now: Callable[[], datetime] = _now) -> None:
-        self._session = session
+                 now: Callable[[], datetime] = _now,
+                 recorder: Recorder | None = None) -> None:
+        self._session = session if recorder is None else recorder.session
+        self._recorder = recorder
         self._log = log
         self._clock = clock
         self._now = now
@@ -198,16 +214,19 @@ class McpServer:
                 "protocolVersion": PROTOCOL_VERSION,  # the one version this server speaks
                 "capabilities": {"tools": {"listChanged": False}},
                 "serverInfo": {"name": SERVER_NAME, "version": _server_version()},
-                "instructions": INSTRUCTIONS,
+                "instructions": INSTRUCTIONS + (
+                    "" if self._recorder is None else RECORD_INSTRUCTIONS),
             }
         if method == "ping":
             return {}
         if method == "tools/list":
             if given.get("cursor") is not None:
                 raise _Reply(INVALID_PARAMS, "Invalid cursor")  # one page, no cursor issued
-            return {"tools": [{"name": t.name, "description": t.description,
-                               "inputSchema": t.input_schema}
-                              for t in self._session.tools()]}
+            tools = [{"name": t.name, "description": t.description,
+                      "inputSchema": t.input_schema} for t in self._session.tools()]
+            if self._recorder is not None:
+                tools += self._recorder.tools()
+            return {"tools": tools}
         if method == "tools/call":
             return self._call(given)
         raise _Reply(METHOD_NOT_FOUND, f"Method not found: {method}")
@@ -222,8 +241,17 @@ class McpServer:
         if not isinstance(arguments, dict):
             raise _Reply(INVALID_PARAMS, "Invalid params: arguments must be an object")
         start = self._clock()
+        if self._recorder is not None and name in RECORD_TOOLS:
+            recorded = self._recorder.record(name, arguments)
+            self._record(name, arguments, "rejected" if recorded.is_error else "accepted",
+                         recorded.cites, start)
+            return recorded.result()
+        call_id = ""
         try:
-            outcome = self._session.call(name, arguments)
+            if self._recorder is None:
+                outcome = self._session.call(name, arguments)
+            else:
+                outcome, call_id = self._recorder.call(name, arguments)
         except UnknownTool:
             raise _Reply(INVALID_PARAMS, f"Unknown tool: {name}") from None
         except Exception as error:  # noqa: BLE001  (the server answers and goes on)
@@ -236,7 +264,7 @@ class McpServer:
             return {"content": [{"type": "text",
                                  "text": f"tool {name} failed: {type(error).__name__}"}],
                     "isError": True}
-        self._record(name, arguments, outcome.status, outcome.fact_ids, start)
+        self._record(name, arguments, outcome.status, outcome.fact_ids, start, call_id=call_id)
         return self._result(outcome)
 
     @staticmethod
@@ -248,7 +276,8 @@ class McpServer:
                 "isError": outcome.is_error}
 
     def _record(self, tool: str, params: dict[str, Any], status: str,
-                fact_ids: Sequence[str], start: float, error: str | None = None) -> None:
+                fact_ids: Sequence[str], start: float, error: str | None = None,
+                call_id: str = "") -> None:
         if self._log is None:
             return
         record: dict[str, Any] = {
@@ -257,6 +286,8 @@ class McpServer:
             "seconds": round(self._clock() - start, 3)}
         if error is not None:
             record["error"] = error
+        if call_id:  # with --record: the tool_call_id of investigation_facts.jsonl
+            record["call_id"] = call_id
         self._log(record)
 
 
@@ -301,6 +332,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Serve the Agent QA/QC tools of one public round pack over MCP on stdio.")
     parser.add_argument("--pack", type=Path, required=True, help="the pack.json of the round")
     parser.add_argument("--log", type=Path, default=None, help=LOG_HELP)
+    parser.add_argument("--record", type=Path, default=None, help=RECORD_HELP)
     return parser
 
 
@@ -325,11 +357,13 @@ def _drop_stdout() -> None:
         pass
 
 
-def run(pack: Path, log: Path | None = None) -> int:
+def run(pack: Path, log: Path | None = None, record: Path | None = None) -> int:
     """Serve `pack` on stdin and stdout until EOF; 2 (one `error:` line) when refused.
 
     Shared by `python -m flywheel.eval.agentqa.mcp` and `fw agentqa mcp`. The log (the
     started record, then one record per tool call) goes to `log`, appended, or to stderr.
+    `record`: the record directory (DA-54); opened only after the pack passed the public
+    check, so a refused pack writes nothing there.
     """
     if hasattr(sys.stdout, "reconfigure"):  # replies are ASCII; UTF-8 is the transport's
         sys.stdout.reconfigure(encoding="utf-8")
@@ -341,6 +375,15 @@ def run(pack: Path, log: Path | None = None) -> int:
         # OSError: a config the tools read from the repo root (the task view) is missing
         print(f"error: {_first_line(error)}", file=sys.stderr)
         return 2
+    recorder = None
+    if record is not None:
+        try:
+            recorder = Recorder.open(record, opened.session, opened.admission.pack_id,
+                                     opened.admission.pack_sha256)
+        except (RecordRefused, OSError) as error:
+            print(f"error: {_first_line(error)}", file=sys.stderr)
+            return 2
+        opened = OpenPack(recorder.session, opened.admission)
     log_file = None if log is None else open(  # noqa: SIM115  (open for the session)
         log, "a", encoding="utf-8", buffering=1)
     try:
@@ -348,7 +391,7 @@ def run(pack: Path, log: Path | None = None) -> int:
         write(started_record(opened))
         # bytes, decoded line by line in handle_line: a line that is not UTF-8 is -32700
         lines: IO[bytes] | TextIO = getattr(sys.stdin, "buffer", sys.stdin)
-        if not McpServer(opened.session, log=write).serve(lines, sys.stdout):
+        if not McpServer(opened.session, log=write, recorder=recorder).serve(lines, sys.stdout):
             _drop_stdout()
     finally:
         if log_file is not None:
@@ -358,4 +401,4 @@ def run(pack: Path, log: Path | None = None) -> int:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    return run(args.pack, args.log)
+    return run(args.pack, args.log, args.record)

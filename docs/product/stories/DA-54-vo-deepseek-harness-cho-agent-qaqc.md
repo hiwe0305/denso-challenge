@@ -133,7 +133,7 @@ Danh sách đầy đủ các dòng cần tắt, cấu hình nhà cung cấp (ki�
 
 - [x] 1.1 Viết story và khảo sát (file này)
 - [x] 2.1 Cài harness (sau khi Hiếu duyệt), viết profile `agentqa`, kiểm lại các điểm khảo sát trên bản cài (AC 1, 2)
-- [ ] 2.2 Ba công cụ ghi nhận trên máy chủ MCP, dùng lại luật của DA-52, có test (AC 3, 7)
+- [x] 2.2 Ba công cụ ghi nhận trên máy chủ MCP, dùng lại luật của DA-52, có test (AC 3, 7)
 - [ ] 2.3 Lệnh `fw agentqa chat` qua SDK Python của harness, có test với harness giả (AC 5)
 - [ ] 3.1 Phiên thật trên run M: hỏi, hỏi tiếp, tiếp tục phiên; đo và so với mục 9.10 (AC 4, 6)
 - [ ] 3.2 Mục tài liệu trong `docs/g0/agent-qa.md`; chạy đủ kiểm tra (AC 8)
