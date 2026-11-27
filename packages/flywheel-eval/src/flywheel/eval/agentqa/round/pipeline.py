@@ -3,11 +3,18 @@
     run_round(pack.json, out)                       a fresh run into a new directory
     run_round(pack.json, out, from_step="measure")  redo from a step, keep what is before
     run_round(pack.json, out, no_model=False)       with the model steps judge and verify
+    run_round(pack.json, out, no_model=False, investigate=True)
+                                                    and the investigate loop (DA-52)
 
 A no-model run executes `NO_MODEL_STEPS` only; `run.json` records the mode and `--from`
 keeps it (a different mode is refused). `model_calls.jsonl` is never deleted by a redo:
 `--from adjudicate` and `--from judge` replay its answered requests, `--from verify` makes
 no call at all.
+
+`investigate` (`investigate.py`, DA-52) runs only when asked, in a model run, between
+hypothesize and adjudicate; `run.json` records the choice (`investigate`, left out when
+false) and `--from` keeps it, as it keeps the mode. With it off, the steps and files are
+those of a run before DA-52.
 
 `adjudicate` (`adjudicate.py`) runs in both modes, before judge: version 3's report of
 each source the pack holds, through the gateway in a model run and on the code floor in a
@@ -56,7 +63,9 @@ from flywheel.eval.agentqa.round.hypotheses import (
     hypothesize,
     missing_clusters_reason,
 )
-from flywheel.eval.agentqa.round.judge import JUDGED_FILE, MAX_RANK_CLUSTERS, judge
+from flywheel.eval.agentqa.round.investigate import FILES as INVESTIGATE_FILES
+from flywheel.eval.agentqa.round.investigate import investigate, load_limits
+from flywheel.eval.agentqa.round.judge import JUDGED_FILE, MAX_RANK_CLUSTERS, RolesRefused, judge
 from flywheel.eval.agentqa.round.measure import (
     CALLS_FILE,
     FACTS_FILE,
@@ -88,7 +97,10 @@ STEPS = ("pack", "admit", "measure", "hypothesize", "adjudicate", "judge", "veri
          "render")
 MODEL_STEPS = ("judge", "verify")
 NO_MODEL_STEPS = tuple(s for s in STEPS if s not in MODEL_STEPS)
-MODEL_ROLE_STEPS = ("adjudicate", "judge")  # steps that may call the gateway
+INVESTIGATE = "investigate"  # the optional step (DA-52), after hypothesize
+ALL_STEPS = (*STEPS[:STEPS.index("hypothesize") + 1], INVESTIGATE,
+             *STEPS[STEPS.index("hypothesize") + 1:])
+MODEL_ROLE_STEPS = ("investigate", "adjudicate", "judge")  # steps that may call the gateway
 STORY = "DA-43"
 SECONDS_NO_MODEL = 5.0
 SECONDS_PER_MODEL_CALL = 30.0  # an assumption until a model round is measured
@@ -97,6 +109,8 @@ STEP_FILES: dict[str, tuple[str, ...]] = {
     "admit": (ADMISSION_FILE,),
     "measure": (FACTS_FILE, CALLS_FILE),
     "hypothesize": (HYPOTHESES_FILE,),
+    # Not model_calls.jsonl either: the later model steps append to it.
+    "investigate": INVESTIGATE_FILES,
     # Not model_calls.jsonl: judge appends to it after this step recorded its sha256.
     "adjudicate": (REPORTS_FILE, DROPPED_FILE, ESTIMATES_FILE),
     "judge": (JUDGED_FILE, MODEL_CALLS_FILE),
@@ -218,6 +232,16 @@ def _gateway(w: _Work) -> Gateway:
     return w.gateway
 
 
+def _step_investigate(w: _Work) -> int:
+    assert w.pack is not None and w.admitted is not None
+    # Built first, as in judge: a hosted route the pack may not take, or no route for the
+    # role, stops the step before any call (GatewayRefused, recorded as broken).
+    gateway = _gateway(w)
+    result = investigate(w.out, gateway, w.pack, w.admitted)
+    w.degraded += result.problems
+    return len(result.kept)
+
+
 def _step_adjudicate(w: _Work) -> int:
     assert w.pack is not None and w.admitted is not None
     result = adjudicate(w.out, w.pack_path.parent, w.pack, w.admitted,
@@ -249,14 +273,17 @@ def _step_render(w: _Work) -> int:
 
 
 RUNNERS = {"pack": _step_pack, "admit": _step_admit, "measure": _step_measure,
-           "hypothesize": _step_hypothesize, "adjudicate": _step_adjudicate,
+           "hypothesize": _step_hypothesize, "investigate": _step_investigate,
+           "adjudicate": _step_adjudicate,
            "judge": _step_judge, "verify": _step_verify,
            "assemble": _step_assemble, "render": _step_render}
 
 
-def steps_of(no_model: bool) -> tuple[str, ...]:
-    """The steps a run of this mode executes, in order."""
-    return NO_MODEL_STEPS if no_model else STEPS
+def steps_of(no_model: bool, investigate: bool = False) -> tuple[str, ...]:
+    """The steps a run of this mode executes, in order; `investigate` only in a model run."""
+    if no_model:
+        return NO_MODEL_STEPS
+    return ALL_STEPS if investigate else STEPS
 
 
 def _write(out: Path, record: RunRecord) -> None:
@@ -288,7 +315,7 @@ def _resume(pack_path: Path, out: Path, from_step: str, plan: dict[str, object],
     with the plan that measured them; admit's plan-derived part is worked out for the
     plan in use.
     """
-    steps = steps_of(old.no_model)
+    steps = steps_of(old.no_model, old.investigate)
     if from_step not in steps:
         raise RunRefused(f"{out}: step {from_step} is not a step of this {_mode(old.no_model)} "
                          f"run (steps: {', '.join(steps)})")
@@ -351,7 +378,8 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
               store: Path | None = None, run_plan_id: str | None = None,
               gateway_root: Path | None = None,
               gateway_factory: ProviderFactory | None = None,
-              disable_rules: Sequence[str] = ()) -> RunRecord:
+              disable_rules: Sequence[str] = (),
+              investigate: bool | None = None) -> RunRecord:
     """Run the pipeline on the pack `pack_path` into `out`; see the module docstring.
 
     `no_model`: None means the code floor for a fresh run and the recorded mode for
@@ -361,9 +389,12 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
     `disable_rules`: rule ids switched off for this run besides `agent.yaml`'s
     `disabled_rules`; recorded in run.json and in the agent hash. An unknown id is refused
     before anything is created.
+    `investigate`: run the investigate step (DA-52). None means off for a fresh run and the
+    recorded choice for `from_step`; a value that differs from the recorded one is refused,
+    and so is the step in a no-model run, before anything is created.
     """
-    if from_step is not None and from_step not in STEPS:
-        raise RunRefused(f"unknown step {from_step!r} (steps: {', '.join(STEPS)})")
+    if from_step is not None and from_step not in ALL_STEPS:
+        raise RunRefused(f"unknown step {from_step!r} (steps: {', '.join(ALL_STEPS)})")
     # Checked before anything is created, so a typo leaves nothing behind.
     if not pack_path.is_file():
         raise RunRefused(f"{pack_path}: no pack file there")
@@ -382,18 +413,32 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
             raise RunRefused(f"{out} is a {_mode(old.no_model)} run; it cannot be continued "
                              f"as a {_mode(no_model)} run: use a new --out")
         mode = old.no_model
+        if investigate is not None and investigate != old.investigate:
+            raise RunRefused(f"{out} is a run {'with' if old.investigate else 'without'} "
+                             f"the investigate step; it cannot be continued "
+                             f"{'without' if old.investigate else 'with'} it: use a new --out")
+        inquire = old.investigate
     else:
         mode = True if no_model is None else no_model
+        inquire = bool(investigate)
+    if inquire and mode:
+        raise RunRefused("--investigate needs a model run: the investigate step calls the "
+                         "model gateway (drop --no-model)")
+    if inquire:
+        try:
+            limits = load_limits()  # a bad roles.yaml stops the run before anything is made
+        except RolesRefused as error:
+            raise RunRefused(str(error)) from error
     groot = gateway_root if gateway_root is not None else GATEWAY_ROOT
     planned: dict[str, object] = {
         "plan_path": plan_file.as_posix(), "plan_sha256": sha256_of(plan_file),
         "agent_version": agent_version(),
         "agent_hash": agent_hash(task_id, plan_file, gateway_root=gateway_root,
                                  disabled=[i for i in disabled if i not in configured]),
-        "disabled_rules": disabled}
+        "disabled_rules": disabled, "investigate": inquire}
     work = _Work(pack_path, out, plan_path, no_model=mode, store=store, gateway_root=groot,
                  factory=gateway_factory, disabled=tuple(disabled))
-    steps = steps_of(mode)
+    steps = steps_of(mode, inquire)
     if from_step is None:
         if out.exists():
             raise FileExistsError(f"{out} exists: a run directory is written once")
@@ -421,6 +466,8 @@ def run_round(pack_path: Path, out: Path, *, plan_path: Path | None = None,
         said = f"assumed {SECONDS_NO_MODEL:g} s for a round without a model"
     else:
         most = 2 * MAX_RANK_CLUSTERS  # the default cap, one resend per cluster at most
+        if inquire:
+            most += limits.max_calls  # the investigate role's own cap
         seconds = SECONDS_NO_MODEL + most * SECONDS_PER_MODEL_CALL
         said = (f"assumed {seconds:g} s for a round with up to {most} model calls of "
                 f"{SECONDS_PER_MODEL_CALL:g} s")
