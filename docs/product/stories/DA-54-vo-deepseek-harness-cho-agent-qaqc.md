@@ -145,7 +145,8 @@ Theo 07 mục 3.1. File story luôn được sửa.
 - `packages/flywheel-eval/src/flywheel/eval/agentqa/mcp/` (công cụ ghi nhận; `bridge.py`, `server.py`)
 - `packages/flywheel-eval/src/flywheel/eval/agentqa/chat/` (thư mục mới: lớp gọi harness)
 - `packages/flywheel-eval/src/flywheel/eval/agentqa/cli.py` (chỉ thêm lệnh `chat`)
-- `packages/flywheel-eval/src/flywheel/eval/agentqa/round/verify.py`, `round/investigate.py` (chỉ để tách phần luật dùng chung thành hàm gọi được từ `mcp/`, không đổi hành vi)
+- `packages/flywheel-eval/src/flywheel/eval/agentqa/round/verify.py` (chỉ để tách phần luật dùng chung thành hàm gọi được từ `mcp/`, không đổi hành vi)
+- `packages/flywheel-eval/src/flywheel/eval/agentqa/round/investigate.py` (như trên)
 - `configs/eval/agentqa/harness/` (thư mục mới: profile, prompt hệ thống)
 - `packages/flywheel-eval/tests/unit/agentqa/mcp/`, `packages/flywheel-eval/tests/unit/agentqa/chat/`
 - `docs/g0/agent-qa.md` (chỉ thêm một mục)
