@@ -83,7 +83,11 @@
 
 # Model route for a pack confirmed public: the ckey reseller gateway, OpenAI-compatible
 # endpoint. Its Anthropic-style endpoint failed in the harness on 27/11/2026 (the stream
-# carries no usage block). The model behind the id cannot be verified.
+# carries no usage block). The model behind an id cannot be verified.
+# Default model chosen by Hiếu on 27/11/2026 after four turns each on the run M pack:
+# every turn with claude-opus-5-5 ended with HTTP 503 on its last call, every turn with
+# the model below completed (docs/g0/agent-qa.md section 11.4). It bills far more input
+# tokens per turn; its price on the gateway is not recorded here.
 - id: llm-pi-ai
   config:
     providers:
@@ -91,6 +95,8 @@
         api: openai-completions
         baseURL: https://api.xah.io/v1
         apiKeyEnv: CKEY_API_KEY
-        models: [{id: claude-opus-5-5, contextWindow: 200000}]
+        models:
+          - {id: thanhnhan9023/claude-fable-5-aws-thinking, contextWindow: 200000}
+          - {id: claude-opus-5-5, contextWindow: 200000}
 - id: agent-default-model
-  config: {provider: ckey, model: claude-opus-5-5}
+  config: {provider: ckey, model: thanhnhan9023/claude-fable-5-aws-thinking}
