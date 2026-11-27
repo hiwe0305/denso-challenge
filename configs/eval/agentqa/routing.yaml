@@ -31,12 +31,12 @@ routes:
 # Caps of one run, retries included. Assumptions until a round is measured: about 25
 # calls and 250k input tokens per round (architecture section 12), with room for the
 # one resend per item. DA-52 raised both caps (from 60 calls and 600000 tokens): the
-# investigate role's own caps in roles.yaml (40 calls, 400000 input tokens) come on top
+# investigate role's own caps in roles.yaml (60 calls, 1000000 input tokens) come on top
 # of what the other roles are assumed to use, so a round with --investigate does not
 # starve judge. Still assumptions until a round is measured.
 budget:
-  max_calls: 100
-  max_input_tokens: 1000000
+  max_calls: 120
+  max_input_tokens: 1600000
   max_usd: 0.0                # local calls cost nothing; raise only with hosted on
   chars_per_token: 2.5        # as agent.yaml limits; estimates a prompt before it is sent
 

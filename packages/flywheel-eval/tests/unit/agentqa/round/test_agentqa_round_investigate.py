@@ -251,7 +251,7 @@ def test_a_model_hypothesis_fits_round_hypothesis() -> None:
 def test_the_roles_file_holds_the_investigate_block() -> None:
     limits = load_limits()
     assert (limits.max_steps, limits.max_calls, limits.max_input_tokens, limits.max_usd) == (
-        30, 40, 400000, 1.0)
+        50, 60, 1000000, 1.0)
     assert limits.max_rejected_in_a_row == 3 and limits.max_facts == 120
     assert load_roles().investigate is not None  # the rank loader still reads the file
 

@@ -24,12 +24,14 @@ rank:
     - _beyond_          # measure_compare (DA-52): rollouts beyond a scorer threshold
 
 # The investigate role (DA-52): the loop of `fw agentqa round --investigate`. Its prompt is
-# prompts/investigate.md. The four caps were decided by Hiếu on 27/11/2026; they are
-# estimates, not yet measured on a round.
+# prompts/investigate.md. Caps decided by Hiếu on 27/11/2026: first 30 steps, 40 calls and
+# 400000 input tokens; raised the same day after three runs on run M used about 360000
+# tokens for 19 steps (a request is 16000 to 25000 input tokens). max_steps and max_calls
+# are chosen to fit the token cap. max_usd is an estimate.
 investigate:
-  max_steps: 30                # steps of the loop (one action each, a resend included)
-  max_calls: 40                # gateway requests of this step, resends included
-  max_input_tokens: 400000     # input tokens of those requests, as model_calls.jsonl records them
+  max_steps: 50                # steps of the loop (one action each, a resend included)
+  max_calls: 60                # gateway requests of this step, resends included
+  max_input_tokens: 1000000    # input tokens of those requests, as model_calls.jsonl records them
   max_usd: 1.0                 # their cost, as model_calls.jsonl records it
   max_reply_tokens: 2000       # reply cap per request
   max_rejected_in_a_row: 3     # rejected steps in a row end the loop
