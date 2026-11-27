@@ -1,0 +1,95 @@
+# Agent QA/QC on DeepSeek Harness (story DA-54): a patch over the harness's shipped `sdk`
+# profile. Checked on harness 0.2.2-rc.2 (PyPI deepseek-harness-sdk 0.2.2rc2) on 27/11/2026
+# with `dsh --profile sdk --patch <this file> --dump-config` and a captured request.
+#
+# The harness is the chat shell only: its loop, sessions and context compaction. The model
+# gets the analysis tools of `fw agentqa mcp`, `todo_write` and `ask_user_question`, and
+# nothing that touches the machine. Read from the environment of the process that starts
+# the harness:
+#   AGENTQA_REPO     absolute path of the repo checkout that runs `fw`
+#   AGENTQA_PACK     absolute path of the round's pack.json
+#   AGENTQA_RECORD   absolute path of the directory the record tools write to
+#   CKEY_API_KEY     key of the hosted route (never written in a file)
+# Start the harness with DSH_TELEMETRY_DISABLED=1, a DSH_HOME of its own, and a working
+# directory whose path says nothing about the machine: the harness shows that path to the
+# model.
+
+# Built-in tools that run commands, touch files, reach the web or start other agents.
+- {id: tool-bash, disabled: true}
+- {id: tool-pwsh, disabled: true}
+- {id: tool-jobs, disabled: true}
+- {id: tool-fs, disabled: true}
+- {id: tool-fs-search, disabled: true}
+- {id: tool-web, disabled: true}
+- {id: tool-skill, disabled: true}
+- {id: tool-goal, disabled: true}
+- {id: tool-agent-team, disabled: true}
+- {id: tool-subagent, disabled: true}
+- {id: tool-subagent-fork, disabled: true}
+- {id: tool-subagent-control, disabled: true}
+- {id: tool-workflow, disabled: true}
+- {id: tool-office, disabled: true}
+- {id: tool-schedule, disabled: true}
+- {id: tool-plugin-manager, disabled: true}
+- {id: tool-working-directory, disabled: true}
+- {id: mcp-resources, disabled: true}
+- {id: present, disabled: true}
+
+# The repo's own CLAUDE.md / AGENTS.md must not enter the chat.
+- {id: agent-instructions, disabled: true}
+
+# Nothing leaves for the vendor: no telemetry export, no title call to its default model.
+- {id: session-telemetry-otel, disabled: true}
+- {id: session-title-llm, disabled: true}
+
+# Nothing about this machine goes to the model beyond the working directory path: no
+# clock, no harness identity, no file-link guidance; the prompt is ours.
+- {id: time-context, disabled: true}
+- {id: deliverable-file-references, disabled: true}
+- {id: file-reference-local, disabled: true}
+- id: system-prompt
+  config:
+    includeHarnessIdentity: false
+    includeRuntimeContext: false
+    personaPrefix: |
+      You analyse the failures of one evaluation round of a robot policy. You work only
+      through the agentqa tools: they compute facts about one round pack, and each fact
+      has an id (F1, F2, ...). You never write a number yourself: in any text you give to
+      a tool, a number is a placeholder {F<n>} of a fact a tool returned to you.
+      A failure label already says which scorer check failed; restating it is not a cause.
+      Compare a cluster with the successes of its level on several measures before you
+      say what causes it, and say what does not separate it too.
+      Record a cause with hypothesis_propose and give your final answer with
+      answer_submit: only a text that answer_submit accepted is shown to the user as
+      checked. If a tool rejects your text, fix what it names and call it again.
+
+# The analysis and record tools, over stdio. The harness starts this command twice per
+# session (a short probe, then the serving process).
+- insert:
+    - id: mcp-agentqa
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: agentqa
+        transport: stdio
+        command: uv
+        args: !!js >-
+          ['run', 'fw', 'agentqa', 'mcp', '--pack', process.env.AGENTQA_PACK,
+           '--record', process.env.AGENTQA_RECORD]
+        cwd: !!js process.env.AGENTQA_REPO
+        toolLoading: eager
+        startupTimeoutMs: 60000
+        failOnStartupError: true
+
+# Model route for a pack confirmed public: the ckey reseller gateway, OpenAI-compatible
+# endpoint. Its Anthropic-style endpoint failed in the harness on 27/11/2026 (the stream
+# carries no usage block). The model behind the id cannot be verified.
+- id: llm-pi-ai
+  config:
+    providers:
+      ckey:
+        api: openai-completions
+        baseURL: https://api.xah.io/v1
+        apiKeyEnv: CKEY_API_KEY
+        models: [{id: claude-opus-5-5, contextWindow: 200000}]
+- id: agent-default-model
+  config: {provider: ckey, model: claude-opus-5-5}
