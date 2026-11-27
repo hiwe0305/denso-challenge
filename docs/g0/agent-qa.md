@@ -774,11 +774,22 @@ Model `claude-opus-5-5` qua cổng ckey (bên bán lại; số token là số c�
 | B lượt 1 (`fw agentqa chat`) | cụm lớn nhất: so bốn số đo, nộp câu trả lời | 10 bước | 12 | 5 816 / 85 632 | 232 | Câu trả lời đã kiểm: khoảng cách đặt, sai số góc, độ nghiêng tách biệt; vị trí x không |
 | B lượt 2 (hỏi tiếp) | so thêm độ cao cuối của khay | 3 bước | 2 | 207 / 29 952 | 158 | Câu trả lời đã kiểm: độ cao tách biệt, 8 lượt nằm trên khoảng của lượt thành công |
 
+Bốn lượt cùng câu hỏi của phiên A với model `thanhnhan9023/claude-fable-5-aws-thinking` trên cùng cổng (Hiếu yêu cầu thử ngày 27/11/2026; không xác minh được model sau tên):
+
+| Lượt | Kết thúc | Giây | Bước | Lời gọi công cụ (bị từ chối) | Token vào không cache | Giả thuyết được giữ dựa trên |
+|---|---|---|---|---|---|---|
+| 1 | hoàn tất | 110 | 11 | 18 (3) | 141 894 | độ cao cuối và độ nghiêng cuối của khay |
+| 2 | hoàn tất | 100 | 11 | 15 (3) | 147 800 | vị trí ngang cuối của khay |
+| 3 | hoàn tất | 317 | 26 | 31 (12) | 655 931 | độ cao, độ nghiêng và vị trí cuối của khay |
+| 4 | hoàn tất | 117 | 10 | 14 (4) | 128 047 | độ nghiêng cuối của khay |
+
+Cả bốn lượt hoàn tất không lỗi cổng, trong khi cả bốn lượt với `claude-opus-5-5` kết thúc bằng HTTP 503 ở lời gọi cuối. Token vào tính tiền mỗi lượt cao hơn Opus khoảng 7 đến 100 lần (cổng báo ít token đọc từ cache cho model này); giá của model trên cổng chưa ghi nhận. Hiếu chọn model này làm mặc định của profile ngày 27/11/2026.
+
 So với vòng lặp tự viết (mục 9.10): ở đó mỗi bước gửi lại toàn bộ trạng thái (16 000 đến 25 000 token vào) và gọi một công cụ; ở đây model gộp sáu phép so vào một bước và lượt hỏi tiếp dùng lại ngữ cảnh. Hai phạm vi khác nhau (một cụm so với năm cụm), nên chưa so được tổng chi phí của một cuộc điều tra.
 
 ### 11.5 Giới hạn
 
-- **Mọi lượt thật đều kết thúc bằng lỗi cổng.** Sau khi `answer_submit` đã nhận, lời gọi model cuối nhận HTTP 503 từ cổng ckey ở cả bốn lượt đã chạy. Câu trả lời đã kiểm vẫn được ghi, nhưng lệnh thoát mã 1. Chưa rõ đây là lỗi ngẫu nhiên của cổng hay do hình dạng yêu cầu của harness.
+- **Mọi lượt thật với `claude-opus-5-5` đều kết thúc bằng lỗi cổng.** Sau khi `answer_submit` đã nhận, lời gọi model cuối nhận HTTP 503 từ cổng ckey ở cả bốn lượt đã chạy; bốn lượt với model mặc định mới thì không. Câu trả lời đã kiểm vẫn được ghi, nhưng lệnh thoát mã 1. Chưa rõ đây là lỗi ngẫu nhiên của cổng hay do hình dạng yêu cầu của harness.
 - **Phép kiểm bắt số, không bắt nghĩa.** Một câu trả lời được nhận có đoạn "with 11 rollouts 0.06436 m": model đặt placeholder sai chỗ, từng số vẫn đúng với fact của nó.
 - **Luật chặn tiêu dữ liệu chưa áp** trong máy chủ MCP: máy chủ không có giả thuyết của luật để biết cụm nào đang bị giả thuyết hệ thống chặn.
 - **Chưa nối vào trang kết quả.** `verify` chấm lại được bản ghi của thư mục ghi nhận và cho cùng phán quyết, nhưng `assemble` và `render` chưa đọc thư mục này; id fact của một phiên chat bắt đầu lại từ F1 nên chưa gộp được vào một thư mục lần chạy.
