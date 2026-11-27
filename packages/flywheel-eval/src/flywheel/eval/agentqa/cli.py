@@ -14,6 +14,9 @@
                                                            run a round into index.html (DA-43)
     fw agentqa mcp --pack <pack.json> [--log <file>]       the tools over MCP on stdio (DA-49)
         [--record <dir>]                                   with the record tools (DA-54)
+    fw agentqa chat --pack <pack.json> --record <dir> [--session <id>] [TASK | -]
+        [--dsh <path>] [--harness-home <dir>] [--patch <file>] [--key-env NAME ...]
+        [--timeout S] [--json]                             one turn through the harness (DA-54)
 
 Errors exit 2 with one line, as `fw eval` does. A run whose model part broke a
 report still writes everything and exits 1.
@@ -22,6 +25,7 @@ report still writes everything and exits 1.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -29,6 +33,7 @@ import typer
 from flywheel.contracts.agentqa import AgentReport, AgentReview
 from flywheel.eval.agentqa import estimates as est
 from flywheel.eval.agentqa.agent import load_agent_config
+from flywheel.eval.agentqa.chat import harness as chat_harness
 from flywheel.eval.agentqa.endpoint import (
     DEFAULT_AGENT_CONFIG,
     ChatModel,
@@ -271,3 +276,71 @@ def mcp_command(
     Only a pack that admit confirms public is served; no option overrides this check.
     """
     raise typer.Exit(mcp_server.run(pack, log, record))
+
+
+def _chat_lines(result: chat_harness.ChatTurn) -> list[str]:
+    lines = [f"{call.tool}: {call.status}" for call in result.tool_calls]
+    for answer in result.answers:
+        lines += ["", "CHECKED ANSWER (numbers filled in by code)",
+                  str(answer.get("rendered", ""))]
+    if not result.answers:
+        lines.append("No checked answer: answer_submit accepted nothing in this turn.")
+    for verdict in result.verdicts:
+        lines.append(f"{verdict['hypothesis']}: {verdict['verdict']}")
+    if result.text:
+        lines += ["", "UNCHECKED (the model's own words, not verified)", result.text]
+    lines += [f"{kind}: {text}" for kind, text in
+              [*(("error", e) for e in result.errors),
+               *(("note", d) for d in result.diagnostics)]]
+    usage = ""
+    if result.usage:
+        usage = ", tokens " + " ".join(f"{k} {v}" for k, v in result.usage.items())
+    hint = f"; continue with --session {result.session_id}" if result.session_id else ""
+    lines.append(f"session {result.session_id or '-'}: {result.finish_reason}, "
+                 f"{result.steps} model calls{usage}, {result.seconds:g} s{hint}")
+    return lines
+
+
+@app.command("chat")
+def chat_command(
+    task: str = typer.Argument("-", help="The task; - or nothing reads it from stdin."),
+    pack: Path = typer.Option(..., "--pack", help="The pack.json of the round."),
+    record: Path = typer.Option(..., "--record", help="The record directory of the session."),
+    session: str | None = typer.Option(None, "--session", help="Continue this session."),
+    dsh: Path | None = typer.Option(
+        None, "--dsh", help="The harness executable (default: env AGENTQA_DSH_BIN)."),
+    harness_home: Path | None = typer.Option(
+        None, "--harness-home", help="The harness's own home (default: env AGENTQA_DSH_HOME)."),
+    patch: Path = typer.Option(chat_harness.DEFAULT_PATCH, "--patch",
+                               help="The harness profile patch."),
+    key_env: list[str] = typer.Option(
+        list(chat_harness.DEFAULT_KEY_ENV), "--key-env",
+        help="Name of a key variable handed to the harness (repeatable)."),
+    timeout: float = typer.Option(chat_harness.DEFAULT_TIMEOUT, "--timeout", min=1),
+    as_json: bool = typer.Option(False, "--json", help="Print the turn as one JSON object."),
+) -> None:
+    """One chat turn through the agent harness. Only a text that answer_submit accepted
+    is shown as checked; the model's own words are labelled unchecked."""
+    dsh_path = dsh or (Path(os.environ["AGENTQA_DSH_BIN"])
+                       if os.environ.get("AGENTQA_DSH_BIN") else None)
+    home = harness_home or (Path(os.environ["AGENTQA_DSH_HOME"])
+                            if os.environ.get("AGENTQA_DSH_HOME") else None)
+    if dsh_path is None:
+        _fail("no harness executable: set --dsh or AGENTQA_DSH_BIN")
+        return
+    if home is None:
+        _fail("no harness home: set --harness-home or AGENTQA_DSH_HOME")
+        return
+    text = sys.stdin.read() if task == "-" else task
+    try:
+        result = chat_harness.turn(text, pack=pack, record=record, dsh=dsh_path,
+                                harness_home=home, patch=patch, repo=Path.cwd(),
+                                session=session, key_env=key_env, timeout=timeout)
+    except chat_harness.ChatRefused as error:
+        _fail(str(error))
+        return
+    if as_json:
+        typer.echo(json.dumps(result.to_json(), ensure_ascii=False))
+    else:
+        typer.echo("\n".join(_chat_lines(result)))
+    raise typer.Exit(0 if result.completed and result.answers else 1)

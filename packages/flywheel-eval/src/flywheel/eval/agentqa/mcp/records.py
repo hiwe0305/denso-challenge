@@ -11,7 +11,8 @@ tools and is the gate itself; the shell is trusted with nothing:
     hypothesis_drop     `drop_problem`: an open hypothesis of this record, refuting facts
     answer_submit       the answer for the user: `verify`'s numbers and comparison rules on
                         one text; accepted, the text comes back with every `{F#}` filled
-                        by code (`render.fill`) and the list of the facts it cites
+                        by code (`fill_answer`: a short value, the unit once) and the list
+                        of the facts it cites with their full values
 
 A fact is known when a tool call of this record returned it (this server session, or an
 earlier one whose facts `investigation_facts.jsonl` holds). A rejected call records
@@ -27,8 +28,8 @@ but `record.json` when it is absent; a record of another pack is refused.
 from __future__ import annotations
 
 import copy
-import html
 import json
+import math
 import os
 import re
 from collections.abc import Callable, Mapping, Sequence
@@ -58,7 +59,6 @@ from flywheel.eval.agentqa.round.records import (
     ToolCallRecord,
     VerdictRecord,
 )
-from flywheel.eval.agentqa.round.render import fill
 from flywheel.eval.agentqa.round.verify import (
     EVIDENCE,
     INVESTIGATED_FILE,
@@ -85,6 +85,9 @@ CALL_PREFIX = "M"  # the server's tool calls; the plan's are T1.., the loop's I1
 FACT_ID = r"^F[0-9]+$"
 HYPOTHESIS_ID = r"^H[1-9][0-9]*$"
 _NUMBER = re.compile(r"[0-9]+")
+_PLACEHOLDER = re.compile(r"\{(F[0-9]+)\}")  # as `round/render.py` reads one
+SIGNIFICANT = 4
+PLAIN_FROM, PLAIN_BELOW = 1e-4, 1e6  # a float outside [1e-4, 1e6) keeps an exponent
 
 INSTRUCTIONS = (
     " Record what you conclude with hypothesis_propose, hypothesis_drop and answer_submit: "
@@ -315,6 +318,64 @@ def pack_clusters(session: ToolSession) -> dict[str, ClusterRef]:
     return dict(sorted(out.items()))
 
 
+# --- the answer's text ----------------------------------------------------------------------
+
+
+def answer_value(value: float | int | str | bool) -> str:
+    """A fact's value as the answer's text shows it.
+
+    A boolean is `yes`/`no`; an integer stays as it is; a float gets `SIGNIFICANT`
+    significant digits in plain notation when its magnitude is in [1e-4, 1e6) (else an
+    exponent), without a trailing `.0` or trailing zeros; a string is unchanged.
+    """
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, str):
+        return value
+    if not math.isfinite(value):
+        return str(value)
+    if value == 0:
+        return "0"
+    rounded = float(f"{value:.{SIGNIFICANT}g}")
+    if not PLAIN_FROM <= abs(rounded) < PLAIN_BELOW:
+        return f"{value:.{SIGNIFICANT}g}"
+    if rounded.is_integer():
+        return str(int(rounded))
+    decimals = max(0, SIGNIFICANT - 1 - math.floor(math.log10(abs(rounded))))
+    return f"{rounded:.{decimals}f}".rstrip("0").rstrip(".")
+
+
+def _unit_follows(unit: str, rest: str) -> bool:
+    """Whether `rest` (the text after a placeholder) already starts with the word `unit`."""
+    pattern = r"\s*" + re.escape(unit) + r"(?![A-Za-z0-9_])"
+    return re.match(pattern, rest, flags=re.IGNORECASE) is not None
+
+
+def fill_answer(text: str, facts: Mapping[str, FactRecord]) -> str:
+    """`text` with every `{F#}` replaced by `answer_value` and the fact's unit; plain text.
+
+    The unit is left out when it is empty or when the text right after the placeholder
+    already starts with it (`{F3} rollouts` with unit `rollouts` gives `11 rollouts`).
+    `KeyError` for a placeholder of no fact (the answer's checks run before this).
+    """
+    def one(match: re.Match[str]) -> str:
+        fact = facts[match.group(1)]
+        shown = answer_value(fact.value)
+        unit = fact.unit.strip()
+        if not unit or _unit_follows(unit, text[match.end():]):
+            return shown
+        return f"{shown} {unit}"
+
+    return _PLACEHOLDER.sub(one, text)
+
+
+def full_value(fact: FactRecord) -> str:
+    """The fact's value as recorded, with its unit: the precise number stays on the record."""
+    return f"{fact.value} {fact.unit}".strip()
+
+
 # --- the record -----------------------------------------------------------------------------
 
 
@@ -543,11 +604,10 @@ class Recorder:
         if reasons:
             return _rejected(ANSWER, *reasons)
         by_id = self._by_id()
-        filled = html.unescape(fill(text, by_id))  # render's formatting, without HTML
+        filled = fill_answer(text, by_id)
         facts = [{"id": fid, "name": by_id[fid].name, "value": by_id[fid].value,
                   "unit": by_id[fid].unit} for fid in dict.fromkeys(cites)]
-        listed = "".join(f"\n- {fid} {by_id[fid].name}: "
-                         f"{html.unescape(fill(f'{{{fid}}}', by_id))}"
+        listed = "".join(f"\n- {fid} {by_id[fid].name}: {full_value(by_id[fid])}"
                          for fid in dict.fromkeys(cites))
         rendered = filled + (f"\n\nCited facts:{listed}" if facts else "")
         answer_id = f"A{self._next_answer}"
@@ -562,4 +622,4 @@ class Recorder:
 
 __all__ = ["ANSWERS_FILE", "DROPPED_FILE", "FILES", "RECORD_FILE", "RECORD_TOOLS",
            "VERDICTS_LIVE_FILE", "RecordOutcome", "RecordRefused", "Recorder",
-           "record_schemas"]
+           "answer_value", "fill_answer", "full_value", "record_schemas"]
