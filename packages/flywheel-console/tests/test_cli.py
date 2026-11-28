@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -55,3 +56,39 @@ def test_fw_console_serve_busy_port_and_prints_roots(
     assert result.exit_code == 1
     assert "serve: " in result.output and "Traceback" not in result.output
     assert f"fw_root: {tmp_path}" in result.output and "repo: " in result.output
+
+
+@pytest.mark.parametrize(
+    ("flags", "url", "model"),
+    [
+        ([], "https://gateway.test/v1", "model-from-env-file"),
+        (["--no-dotenv"], None, None),
+    ],
+)
+def test_fw_console_serve_dotenv(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    flags: list[str],
+    url: str | None,
+    model: str | None,
+) -> None:
+    from flywheel.console.server import app as server_app
+
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("CKEY_", "FW_CHAT_"))}
+    monkeypatch.setattr(os, "environ", env | {"FW_ROOT": str(tmp_path / "fwdata")})
+    monkeypatch.chdir(tmp_path)  # the repo is searched from here: no real .env is read
+    (tmp_path / ".env").write_text(
+        "CKEY_BASE_MODEL=https://gateway.test/v1\nCKEY_API_KEY=k-test\n"
+        "CKEY_MODEL=model-from-env-file\n"
+    )
+    seen: dict[str, str | None] = {}
+
+    def fake_serve(paths: object, **kw: object) -> None:
+        seen["url"] = os.environ.get("FW_CHAT_BASE_URL")
+        seen["model"] = os.environ.get("FW_CHAT_MODEL")
+
+    monkeypatch.setattr(server_app, "serve", fake_serve)
+    result = CliRunner().invoke(app, ["console", "serve", *flags])
+    assert result.exit_code == 0, result.output
+    assert seen == {"url": url, "model": model}
+    assert "k-test" not in result.output

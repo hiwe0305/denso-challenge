@@ -73,13 +73,20 @@ def serve(
     chat: bool = typer.Option(
         False, "--chat", help="With --lock: keep the chat on (it only reads)."
     ),
+    dotenv: bool = typer.Option(
+        True,
+        "--dotenv/--no-dotenv",
+        help="Read .env and point the chat at its CKEY_* gateway. --no-dotenv: only the "
+        "variables already set decide.",
+    ),
 ) -> None:
     """Serve the console on 127.0.0.1."""
     from flywheel.console.paths import ConsolePaths
     from flywheel.console.server.app import serve as run
 
     paths = ConsolePaths.from_env()
-    _autoload_dotenv_for_serve(paths)
+    if dotenv:
+        _autoload_dotenv_for_serve(paths)
     typer.echo(f"repo: {paths.repo}")
     typer.echo(f"fw_root: {paths.fw_root}")
     try:
