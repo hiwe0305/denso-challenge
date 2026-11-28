@@ -781,10 +781,12 @@ export function renderRoundEmpty({ keys = [], text = null } = {}) {
   ]);
 }
 
-// "k/n" of a links count: {successes, n} or {k, n}; a preformatted string passes through.
-function linkCount(v) {
+// "k/n" of a links count: {successes, n} or {k, n}; a bare number takes `n` of the link it
+// sits in (carried: 50, placed: 10 of 60); a preformatted string passes through.
+function linkCount(v, n = null) {
   if (v == null) return null;
   if (typeof v === "string") return v;
+  if (typeof v === "number") return n != null ? `${formatNumber(v)}/${formatNumber(n)}` : null;
   if (typeof v === "object") {
     const k = v.successes ?? v.k;
     if (k != null && v.n != null) return `${formatNumber(k)}/${formatNumber(v.n)}`;
@@ -814,8 +816,8 @@ export function renderRoundLinks(round = getCurrentRound()) {
     const name = roundShortName(target, L.round);
     let text;
     if (dir === "prev") {
-      const carried = linkCount(L.carried);
-      const placed = linkCount(L.placed);
+      const carried = linkCount(L.carried, L.n);
+      const placed = linkCount(L.placed, L.n);
       text =
         carried && placed
           ? t("round.linkPrevFound", { round: name, carried, placed })
