@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any
 
 import pytest
@@ -711,13 +712,43 @@ def test_each_level_is_its_own_sentence_with_its_own_verdict(idx: ConsolePaths) 
     _two_rounds(idx)
     t = ask("Mức 1 và mức 2 có đạt mốc 70% không?", "jig-r1")["model"]
     line = next(ln for ln in t.splitlines() if "luật 2" in ln)
-    assert "giữ kết luận của mỗi mức ngay sau số của mức đó" in line
+    assert line == "- Từng mức (luật 2): Mức 1: 85,6 % (77/90), CI 78,9–92,2, đạt mốc 70 %. Mức 2: 65,6 % (59/90), CI 55,6–75,6, chưa đạt mốc 70 %."
     assert "Mức 1: 85,6 % (77/90), CI 78,9–92,2, đạt mốc 70 %. Mức 2: 65,6 % (59/90), CI 55,6–75,6, chưa đạt mốc 70 %." in line
     en = ask("Do levels 1 and 2 meet the 70% mark?", "jig-r1", "en")["model"]
     assert "Level 1: 85.6% (77/90), CI 78.9–92.2, meets the 70% mark. Level 2: 65.6% (59/90), CI 55.6–75.6, below the 70% mark." in en
     side = registry.call("rounds_side_by_side", {}, {"task": "tray", "round": "r1", "lang": "vi", "question": "Vòng 1 so với vòng đồ gá?"})["model"]
     assert "Mức 1: 85,6 % (77/90), CI 78,9–92,2, đạt mốc 70 %." in side
-    assert "kết luận đạt hay chưa đạt mốc của mỗi mức ngay sau số của mức đó" in side
     # the closing instructions reach the model: no next-step options, no cut at the text cap
-    assert "[truncated]" not in side and "PHƯƠNG ÁN BƯỚC TIẾP" not in side and side.rstrip().endswith("ngay sau số của mức đó.")
-    assert "never one verdict after two levels" in llm.SYSTEM
+    assert "[truncated]" not in side and "PHƯƠNG ÁN BƯỚC TIẾP" not in side and side.rstrip().endswith("giữ số của mỗi vòng dưới tên vòng đó.")
+    assert "never one verdict after two levels" in llm.SYSTEM and "never write that one is better" in llm.SYSTEM
+
+
+# Labelled lines are instructions to the model (it is told not to copy upper-case headings); every
+# other line is a fact the model may copy word for word, so it must hold no instruction (Website,
+# 28/11/2026: "giữ kết luận của mỗi mức…" and "không viết vòng nào tốt hơn…" reached the answer).
+_LABELS = ("CÁCH TRẢ LỜI", "HOW TO ANSWER", "QUY TẮC", "RULE:", "ĐÃ LÀM RỒI", "ALREADY DONE", "NOTE:",
+           "PHƯƠNG ÁN", "OPTIONS FOR", "SỐ LIỆU VÀ NHẬN XÉT", "RELATED NUMBERS")  # fmt: skip
+_HEADS = re.compile(r"^(CÂU TRẢ LỜI THẲNG|DIRECT ANSWER|Ý CHÍNH CỦA VÒNG NÀY|KEY POINT OF THIS ROUND)[^:]*:\s*")
+_INSTRUCTION = re.compile(r"giữ kết luận|keep each|không viết|never write|không nói|never say|never '|đừng|\bdo not\b|don't|"
+                          r"mở đầu bằng|open with|trả lời đúng|answer (only|with)", re.I)  # fmt: skip
+
+
+def test_no_fact_line_of_a_tool_holds_an_instruction(idx: ConsolePaths) -> None:
+    _two_rounds(idx)
+    qs = ["Phân tích kết quả vòng này", "Run M đạt mốc ở những mức nào?", "Vì sao run C_70 hỏng nhiều ở bước đặt?",
+          "Nên làm gì tiếp?", "Chi phí của vòng?", "So sánh các bản model", "Vòng 1 so với vòng đồ gá khác nhau thế nào?",
+          "đặt cạnh bảng 60 rollout", "Chẩn đoán ra những nhóm lỗi nào?"]  # fmt: skip
+    seen = 0
+    for tool in ("round_report", "round_diagnosis", "pair_comparisons", "rounds_side_by_side"):
+        for rnd in ("r1", "jig-r1"):
+            for lang in ("vi", "en"):
+                for q in qs:
+                    res = registry.call(tool, {}, {"task": "tray", "round": rnd, "lang": lang, "question": q})
+                    for ln in str(res["model"]).splitlines():
+                        fact = _HEADS.sub("", ln)
+                        if fact and not fact.startswith(_LABELS):
+                            seen += 1
+                            assert not _INSTRUCTION.search(fact), (tool, rnd, lang, q, fact)
+    assert seen > 200
+    side = registry.call("rounds_side_by_side", {}, {"task": "tray", "round": "r1", "lang": "vi", "question": "Vòng 1 so với vòng đồ gá?"})["model"]
+    assert "Hai vòng khác cảnh, tập eval, bộ chấm và số bước, nên chỉ đặt cạnh nhau, không so như một kết quả." in side

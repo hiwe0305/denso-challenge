@@ -82,8 +82,8 @@ WITHHELD = ("Kết quả thi lại của lượt này không trình bày ở b�
 NOT_PRESENTED = ("Trong dữ liệu trình bày ở bản demo không có tập dữ liệu hay run nào như vậy.",
                  "The data presented in this demo has no such dataset or run.")  # fmt: skip
 # W6: two rounds differ in scene, eval set, scorer and number of steps
-SIDE_BY_SIDE = ("Hai vòng khác cảnh, tập eval, bộ chấm và số bước, nên chỉ đặt cạnh nhau, không so như một kết quả: không viết vòng nào tốt hơn hay tăng bao nhiêu.",
-                "The two rounds differ in scene, eval set, scorer and number of steps, so they are only placed side by side, not compared as a result: never write which is better or by how much.")  # fmt: skip
+SIDE_BY_SIDE = ("Hai vòng khác cảnh, tập eval, bộ chấm và số bước, nên chỉ đặt cạnh nhau, không so như một kết quả.",
+                "The two rounds differ in scene, eval set, scorer and number of steps, so they are only placed side by side, not compared as a result.")  # fmt: skip
 
 
 # what the question is after, most specific first; "all" is a general comment on the round
@@ -508,8 +508,8 @@ def rounds_side_by_side(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         # each round's own "direct answer" is one of its points here; the answer opens with W6
         body = [re.sub(r"^(CÂU TRẢ LỜI THẲNG|DIRECT ANSWER)\b[^:]*:", say("Ý CHÍNH CỦA VÒNG NÀY:", "KEY POINT OF THIS ROUND:"), ln) for ln in body]
         parts.append("\n".join(body))
-    parts.append(say("CÁCH TRẢ LỜI: câu trả lời thẳng ở trên, rồi với mỗi vòng một hoặc hai câu (kết quả, chỗ hỏng, chi phí), nêu tên vòng và run cho mọi số; giữ số của mỗi vòng dưới tên vòng đó, và kết luận đạt hay chưa đạt mốc của mỗi mức ngay sau số của mức đó.",
-                     "HOW TO ANSWER: the direct answer above, then one or two sentences per round (result, where it fails, cost), naming the round and run for every number; keep each round's numbers under its own name, and each level's met or not-met verdict next to that level's number."))  # fmt: skip
+    parts.append(say("CÁCH TRẢ LỜI: câu trả lời thẳng ở trên, rồi với mỗi vòng một hoặc hai câu (kết quả, chỗ hỏng, chi phí), nêu tên vòng và run cho mọi số; giữ số của mỗi vòng dưới tên vòng đó.",
+                     "HOW TO ANSWER: the direct answer above, then one or two sentences per round (result, where it fails, cost), naming the round and run for every number; keep each round's numbers under its own name."))  # fmt: skip
     text = "\n\n".join(parts)
     out = result({"type": "text", "text": text}, text)
     out["model"] = cap(text, len(want) * MODEL_CHARS)  # one round's room per round
@@ -609,9 +609,9 @@ def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str,
                            f"level {key}: {say.pct(x.get('p'))}% ({x.get('successes')}/{x.get('n')}), CI {say.ci(x.get('ci'))}, {_verdict(say, _reading(ev, 'level', key), rules.get('per_level', 0.7), 'level')}"))  # fmt: skip
     if lvl_txt:
         # one sentence per level, each with its own verdict, so a shortened answer cannot carry one
-        # verdict over both levels ("mức 1 …, mức 2 …, chưa đạt mốc 70 %"; Website, 28/11/2026)
-        F["levels"] = say("Từng mức (luật 2), giữ kết luận của mỗi mức ngay sau số của mức đó: ",
-                          "Per level (rule 2), keep each level's verdict next to its own number: ") + " ".join(_cap(t) + "." for t in lvl_txt)  # fmt: skip
+        # verdict over both levels ("mức 1 …, mức 2 …, chưa đạt mốc 70 %"; Website, 28/11/2026). How
+        # to keep them apart is a rule of the system prompt, never words of the facts.
+        F["levels"] = say("Từng mức (luật 2): ", "Per level (rule 2): ") + " ".join(_cap(t) + "." for t in lvl_txt)
     pl = ev.get("place") or {}
     if pl.get("n"):
         ci_txt = say(f", CI {say.ci(pl['ci'])}", f", CI {say.ci(pl['ci'])}") if pl.get("ci") else ""
@@ -651,8 +651,8 @@ def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str,
     earlier = [e for e in c60.get("earlier") or [] if e.get("run") not in held]
     if c60.get("n") and earlier:
         side = ", ".join(f"{e.get('run')} {e.get('successes')}/{e.get('n')}" for e in sorted(earlier, key=lambda e: -(e.get("successes") or 0)))
-        F["compare60"] = say(f"Đặt cạnh các run của DA-34 trên 60 rollout: {c60.get('run', run)} {c60.get('successes')}/{c60.get('n')} (lượt lặp {c60.get('repeat', 0)}); {side}. Khác cảnh, tập eval, bộ chấm, số bước: chỉ đặt cạnh nhau, không nói tốt hơn hay tăng bao nhiêu (luật 4).",
-                             f"Next to the DA-34 runs on 60 rollouts: {c60.get('run', run)} {c60.get('successes')}/{c60.get('n')} (repeat {c60.get('repeat', 0)}); {side}. Different scene, eval set, scorer and number of steps: side by side only, never 'better' or 'up by' (rule 4).")  # fmt: skip
+        F["compare60"] = say(f"Đặt cạnh các run của DA-34 trên 60 rollout: {c60.get('run', run)} {c60.get('successes')}/{c60.get('n')} (lượt lặp {c60.get('repeat', 0)}); {side}. Khác cảnh, tập eval, bộ chấm và số bước, nên chỉ đặt cạnh nhau (luật 4).",
+                             f"Next to the DA-34 runs on 60 rollouts: {c60.get('run', run)} {c60.get('successes')}/{c60.get('n')} (repeat {c60.get('repeat', 0)}); {side}. Different scene, eval set, scorer and number of steps, so side by side only (rule 4).")  # fmt: skip
     runs_here = [x.get("id") for x in rnd.get("runs") or []]
     if len(runs_here) <= 1:
         F["rule5"] = say(f"Chưa có run đối chứng K trên cùng tập điều kiện, nên không quy kết quả của run {run} cho dữ liệu bước đặt (luật 5): run {run} đổi cùng lúc cảnh, dữ liệu và số bước.",
