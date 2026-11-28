@@ -26,7 +26,7 @@ from typing import Any
 from flywheel.console.paths import active
 from flywheel.console.server import runner
 
-from . import providers, registry, tools_round
+from . import charts, providers, registry, tools_round
 from .common import HOSTED, UNREADABLE, ManifestUnreadable, fail, hidden_runs, withheld_runs
 from .numbers import numbers_any, unsupported_any
 from .tools_ops import all_jobs
@@ -68,6 +68,11 @@ SYSTEM = (
     "(5) Next steps only when the question asks what to do, as one bold 'Việc nên làm:' / 'Next step:' line after the facts (never the first line), taken from the OPTION or NEXT rows; never offer a ticket or intervention the rows mark closed or handled. "
     "(6) No source line: the interface shows the sources. No rule numbers (luật 1, rule 2) and no internal ids (failure codes such as L-PLACE-POSE, job or session ids, cluster ids unless the user asks about clusters). "
     "(7) Short: about 120 words, at most 200. "
+    "CHARTS. Only when the answer compares at least four values across runs, levels or thresholds, or gives a trend over training steps, you may add a chart as a fenced block "
+    "```chart holding one JSON object and nothing else: "
+    '{"type": "bar" or "line", "title": "...", "unit": "...", "x": ["label", ...], "series": [{"name": "...", "data": [number, ...]}]}. '
+    "At most 12 x labels, 6 series and 2 charts per answer; one number per x label in each series; numbers only from the rows, written with a dot as the decimal mark (75.6, not 75,6); "
+    "no other keys, no code, no HTML. A chart never replaces the numbers: always keep the table, or a line with the key numbers, next to it. "
     "Answer only the newest question: earlier questions of the conversation are already answered, so never answer or repeat them. "
     "A follow-up such as 'chi tiết hơn', 'thành bảng', 'vì sao', 'more detail', 'as a table' or 'why' applies to the topic of the previous question; for 'thành bảng' / 'as a table' give the same facts as a table. "
     "GLOSSARY. The task carries a tray from table A to table B: write 'bàn A' / 'bàn B' (table A / table B), never 'bảng A' / 'bảng B'. "
@@ -180,8 +185,13 @@ def rows_of(model_text: str) -> int:
 def ground(answer: str, evidence_texts: list[str]) -> list[dict[str, Any]]:
     """[{text, grounded}] for every numeral of the answer, matched against the turn's evidence."""
     ev = [t for t in evidence_texts if t]
+    # a ```chart block is checked by its values, not as text (its JSON would run numbers together)
+    text, blocks = charts.split(answer)
     # Vietnamese and English forms alike ("100.000", "49,23", "75,6 %", "100 000"), one token each
-    return [{"text": tok, "grounded": not unsupported_any(tok, ev)} for tok in numbers_any(answer)]
+    out = [{"text": tok, "grounded": not unsupported_any(tok, ev)} for tok in numbers_any(text)]
+    for i, block in enumerate(blocks):
+        out += [{"text": tok, "grounded": not unsupported_any(tok, ev), "chart": i} for tok in block.numbers]
+    return out
 
 
 # ------------------------------------------------------------------ model status
