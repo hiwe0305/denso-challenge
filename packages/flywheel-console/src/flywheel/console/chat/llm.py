@@ -60,7 +60,7 @@ SYSTEM = (
     "Compare with a control only when the tool says the conditions are the same; otherwise put the numbers side by side and say why they cannot be compared. "
     "Say which interval is the bootstrap CI the rules read and which is descriptive only. Keep measured and estimated cost apart. Say what has not been checked. "
     "For a result that is not presented, write only the sentence the tool gives; never confirm or deny a figure the user offers for it. "
-    "Cite only numbers that appear in the tool results. "
+    "Cite only numbers that appear in the tool results. End an answer about a round with one short line naming the source the tool result gives (Nguồn: … / Source: …). "
     "Never claim to change a QA status, start a job, train a model or read holdout data. "
     "If the question is not about this console's data, say so in one short sentence and call no tool."
 )
