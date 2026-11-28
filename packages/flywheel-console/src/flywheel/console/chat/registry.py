@@ -18,7 +18,14 @@ from .tools_data import (
     qa_summary,
 )
 from .tools_ops import KINDS, findings, job_get, job_list, open_page, propose_job
-from .tools_round import asks_held, ego_summary, round_report
+from .tools_round import (
+    asks_held,
+    ego_summary,
+    pair_comparisons,
+    round_diagnosis,
+    round_report,
+    strip_round_refs,
+)
 from .tools_runs import (
     eval_failures,
     eval_summary,
@@ -32,6 +39,7 @@ from .tools_runs import (
 
 ToolFn = Callable[[dict[str, Any], dict[str, Any]], Result]
 MAX_OFFERED = 7  # plus open_page
+ANALYSIS_TOOLS = ["round_report", "round_diagnosis", "pair_comparisons"]
 
 # Tools a hosted model never gets: they read jobs, logs, findings and the egocentric pipeline,
 # which name the team's own videos (internal data), and they have no public-only filter
@@ -58,8 +66,12 @@ def P(**props: tuple[str, str]) -> dict[str, Any]:
 
 TOOLS: dict[str, tuple[ToolFn, str, str, dict[str, Any]]] = {
     "ego_summary": (ego_summary, "/ego", "The egocentric (human first-person video) pipeline in numbers: clips in, episodes exported, clips rejected by QA or left out, the QA reasons. Call this for any question about egocentric or human video clips as a whole (video người, clip egocentric, đã xuất, bị loại).", P()),
-    "round_report": (round_report, "/round", "ALL facts of the selected task and its Failure -> Data round in one call, already written in the user's language: each model's test result, the best model, where the robot fails, the diagnosis, the data order, the outcome, the decision, the cost of the round, the points worth raising and options for next steps. Also the status of a task that has no round yet: what was measured, which stages have no result, what is missing. Call this FIRST for results, status, 'which model is best', 'where does it fail', 'cost of the round', 'analyse', 'comment', 'assess', 'why', 'what next', 'summarise' (kết quả, bản nào tốt nhất, hỏng ở đâu, chi phí vòng, nhận xét, phân tích, đánh giá, vì sao, nên làm gì, tóm tắt).",
+    "round_report": (round_report, "/round", "ALL facts of the selected task and ONE Failure -> Data round in one call, already written in the user's language and tagged with the round they belong to: each model's test result with its confidence interval and the reading rules (marks met or not), the model with the most successes and whether the intervals tell the models apart, where the robot fails, the side-by-side table against earlier runs, the diagnosis summary, the data order, the cost of the round, the limits, the points worth raising and options for next steps. Also the status of a task that has no round yet. Call this FIRST for results, status, 'which model has the most successes', 'does it meet the mark', 'where does it fail', 'cost of the round', 'analyse', 'comment', 'assess', 'why', 'what next', 'summarise' (kết quả, đạt mốc, hỏng ở đâu, chi phí vòng, nhận xét, phân tích, đánh giá, vì sao, nên làm gì, tóm tắt).",
                      P()),
+    "round_diagnosis": (round_diagnosis, "/diagnosis", "Diagnosis of the selected round: each failure group (c1-c8) with its diagnosis and whether it got data, the step-4 system checks (H1-H3) with their verdict and ticket, and the cost of generating and checking the data. Call this for 'why were these groups chosen', 'which system issues were ruled out', 'what did step 4 find', tickets (vì sao chọn cụm, lỗi hệ thống nào đã loại trừ, bước 4, phiếu).",
+                        P()),
+    "pair_comparisons": (pair_comparisons, "/comparisons", "The paired comparisons fixed in advance between the models of the DA-34 round, each with its difference, confidence interval and McNemar p, read descriptively. Call this for confidence intervals, significance, 'is the difference real' (khoảng tin cậy, phép so sánh, có khác biệt thật không).",
+                         P()),
     "catalog_search": (catalog_search, "/catalog", "List datasets in the catalog. Use for 'what datasets', 'which sets are teleop/egocentric/synthetic', find a dataset by text.",
                        P(q=("string", "free text"), data_type=("string", "egocentric | teleop | synthetic"), task=("string", "tray | two_table"), status=("string", "current | upstream"), limit=("integer", "max rows"))),
     "dataset_stats": (dataset_stats, "/stats", "Statistics of ONE dataset: episodes, hours, frames, fps, size, length histogram.",
@@ -239,21 +251,39 @@ def _specific(q: str) -> bool:
     return bool(_dataset_in(q)) or bool(_SPECIFIC_RX.search(q))
 
 
+_LOOKUP_RX = re.compile(r"\bloss\b|\blogs?\b|\bstep\b|checkpoint|curve|đường cong|throughput|vram", re.I)
+_DIAG_RX = re.compile(r"\bc[1-8]\b|\bH[1-3]\b|bước 4|step 4|loại trừ|ruled? out|lỗi hệ thống|system (issue|check|fault|problem)s?|kiểm hệ thống", re.I)
+_PAIR_RX = re.compile(r"phép so sánh|\bcomparisons?\b|mcnemar|khoảng tin cậy|\bCI\b|confidence interval|ý nghĩa thống kê|significan", re.I)
+
+
 def forced_tool(question: Any) -> str | None:
     """The tool the code runs itself, before the model writes anything.
 
     For a question about the round, the task or the egocentric clips as a whole there is one
     right lookup and it takes no argument. A small model asked to make that call sometimes writes
-    it as text instead (seen 16/11/2026), so the code makes it and the model only answers.
+    it as text instead (seen 16/11/2026), so the code makes it and the model only answers. A
+    round named in the question (``tray-r1``, "vòng 1", "run M") selects that round; it is not a
+    dataset or run lookup.
     """
     q = str(question or "")
-    if asks_held(q) and not re.search(r"\bloss\b|\blog\b|\bstep\b|checkpoint", q, re.I):
+    if asks_held(q) and not _LOOKUP_RX.search(q):
         return "round_report"  # its test result is not presented: one fixed answer, no other lookup
-    if _specific(q):
+    if _DIAG_RX.search(q) and not _LOOKUP_RX.search(q):
+        return "round_diagnosis"  # failure groups and step-4 checks: one lookup, no argument
+    bare = strip_round_refs(q)
+    if bare != q and not _LOOKUP_RX.search(q) and not _dataset_in(bare):
+        return "round_report"  # the question names a round or a run only that round has
+    if _specific(bare):
         return None  # a named dataset, run, job, policy or a list request: the model picks the lookup
     if _EGO_RX.search(q):
         return "ego_summary" if _COUNT_RX.search(q) and usable("ego_summary") else None
     return "round_report" if _ANALYSE_RX.search(q) else None
+
+
+def analysis_question(question: Any) -> bool:
+    """A question about the round as a whole (no single dataset, run or job named)."""
+    q = str(question or "")
+    return forced_tool(q) in ANALYSIS_TOOLS or bool(_PAIR_RX.search(q))
 
 
 def offered_names(route: Any, question: Any) -> list[str]:
@@ -266,11 +296,12 @@ def offered_names(route: Any, question: Any) -> list[str]:
     here = page_of(route)
     # an analysis question, or a page about the task as a whole, gets the round's facts first
     q = str(question or "")
-    has_id = _specific(q)
+    has_id = _specific(strip_round_refs(q))
     if _EGO_RX.search(q) and _COUNT_RX.search(q) and not has_id:
         names = ["ego_summary"] + names
-    elif _ANALYSE_RX.search(q) and not has_id:
-        return ["round_report"]  # one tool: a small model otherwise picks a lookup or a page
+    elif analysis_question(q) or (_ANALYSE_RX.search(q) and not has_id):
+        # the round's tools only, no page to open: a model otherwise spends rounds on lookups or pages
+        return [n for n in ANALYSIS_TOOLS if usable(n)]
     elif here in ROUND_PAGES and not names:
         names = ["round_report"] + names
     pages = list(dict.fromkeys(TOPIC_PAGE[t] for t in topics_of(question)))
