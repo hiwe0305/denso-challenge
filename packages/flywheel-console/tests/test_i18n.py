@@ -75,6 +75,14 @@ DYNAMIC: dict[str, list[str]] = {
         "none",
     ],
     "cost.line.": ["train_1", "train_2", "serve", "jig_train", "jig_eval"],
+    # chat lookups by their tool names (web/chat.js toolLabel; chat/registry.py TOOL_LABELS)
+    "chat.tool.": (
+        "round_report round_diagnosis rounds_side_by_side pair_comparisons failure_table "
+        "train_progress project_status ego_summary catalog_search dataset_stats "
+        "episode_list episode_get qa_summary run_list run_metrics run_compare log_tail "
+        "eval_summary eval_failures loop_proposals ledger_query job_list job_get findings "
+        "lineage open_page propose_job"
+    ).split(),
     "runs.metric.": ["loss", "val", "thr", "vram", "gn"],
     "runs.phase.": ["setup", "train"],
     "fail.": ["L-PLACE-POSE", "L-TRAY-TILT", "L-TIMEOUT", "L-PART-DROP", "L-ONE-HAND"],

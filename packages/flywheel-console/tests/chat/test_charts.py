@@ -136,7 +136,9 @@ def test_the_web_draws_chart_blocks_by_the_same_rules() -> None:
     keys = re.search(r"const CHART_KEYS = new Set\(\[([^\]]*)\]\)", js)
     assert keys and {k.strip().strip('"') for k in keys.group(1).split(",")} == charts._TOP_KEYS
     # an invalid block shows a note and a table, a block still arriving a placeholder; never raw JSON
-    assert "Không vẽ được biểu đồ." in js and "Đang vẽ biểu đồ…" in js
+    vi = (Path(llm.__file__).parent.parent / "web" / "i18n" / "vi.js").read_text(encoding="utf-8")
+    assert 't("chat.chart.invalid")' in js and 't("chat.chart.pending")' in js
+    assert '"chat.chart.invalid": "Không vẽ được biểu đồ."' in vi and '"chat.chart.pending": "Đang vẽ biểu đồ…"' in vi
     fn = js.split("export function renderChartSpec")[1].split("\nexport function ")[0]
     assert "JSON.stringify" not in fn and "innerHTML" not in fn and "chartTable(parsed.obj)" in fn
     assert 'if (lang === "chart")' in js and "!closed && isStreaming" in js
