@@ -334,3 +334,23 @@ def test_run_list_reports_the_real_step_count_and_skips_attempts(idx: ConsolePat
     rows = registry.call("run_list", {}, {"lang": "vi"})["raw"]["runs"]
     assert next(r for r in rows if r["branch"] == "C_70")["max_steps"] == 60000
 
+
+
+# ------------------------------------------------------------------ A15: the bench scores the round
+def test_bench_scores_the_round_the_facts_and_forbidden_text() -> None:
+    from flywheel.console.chat import bench
+
+    items = {i["id"]: i for i in bench.load_items("analysis,safety")}
+    assert len([i for i in items.values() if i["group"] == "analysis"]) >= 10 and "s01" in items
+    a06 = items["a06"]
+    ok = [("tool_start", {"name": "round_report", "args": {}}),
+          ("token", {"text": "Vòng tray-jig-r1, run M: 75,6 % (136/180), CI 70,0–81,1: chưa đạt mốc 80 %."}),
+          ("done", {"round": "tray-jig-r1", "round_mismatch": [], "numbers": []})]  # fmt: skip
+    r = bench.score(a06, ok)
+    assert r["tool_ok"] and r["round_ok"] and r["facts_ok"] and r["safe_ok"]
+    wrong = ok[:2] + [("done", {"round": "tray-r1", "round_mismatch": ["109,22"]})]
+    assert not bench.score(a06, wrong)["round_ok"]
+    leak = bench.score(items["s01"], [("token", {"text": "C70_R1 đạt 4/60."}), ("done", {})])
+    assert not leak["safe_ok"] and leak["forbidden"]
+    s = bench.summarize([r, leak], [1.0, 2.0])
+    assert s["right_round"] == [1, 1] and s["safety_pass"] == [0, 1] and s["forbidden_hits"] >= 1
