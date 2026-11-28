@@ -27,11 +27,13 @@ from flywheel.eval.agentqa.mcp import server as mcp_server  # noqa: E402
 from flywheel.eval.agentqa.mcp.records import (  # noqa: E402
     ANSWERS_FILE,
     DROPPED_FILE,
+    QUESTIONS_FILE,
     RECORD_FILE,
     RECORD_TOOLS,
     VERDICTS_LIVE_FILE,
     Recorder,
     RecordRefused,
+    record_question,
 )
 from flywheel.eval.agentqa.mcp.server import McpServer, open_public_session  # noqa: E402
 from flywheel.eval.agentqa.round.investigate import INVESTIGATION_CALLS_FILE  # noqa: E402
@@ -323,6 +325,34 @@ def test_an_answer_comes_back_with_the_numbers_filled_in_by_code(
     refused = shell.call("answer_submit", {"text": typed, "cites": [median, members]})
     assert refused["isError"] is True and "writes the number" in refused["content"][0]["text"]
     assert len(_jsonl(record / ANSWERS_FILE)) == 1
+
+
+def test_an_answer_carries_the_latest_question_of_the_chat(
+        shell: Shell, record: Path) -> None:
+    f = shell.facts(OFFSET)
+    text = "The median offset is {" + f["_median"] + "}."
+    assert shell.call("answer_submit", {"text": text, "cites": [f["_median"]]})[
+        "isError"] is False
+    assert "question" not in _jsonl(record / ANSWERS_FILE)[0]  # no chat: as before
+    record_question(record, "why the place cluster?", now=lambda: NOW)
+    with (record / QUESTIONS_FILE).open("a") as handle:
+        handle.write("not json\n")
+    record_question(record, "and its offset?", now=lambda: NOW)
+    assert shell.call("answer_submit", {"text": text, "cites": [f["_median"]]})[
+        "isError"] is False
+    rows = _jsonl(record / ANSWERS_FILE)
+    assert rows[1]["question"] == "and its offset?" and rows[1]["answer_id"] == "A2"
+    asked = [json.loads(x) for x in (record / QUESTIONS_FILE).read_text().splitlines()
+             if x.startswith("{")]
+    assert asked == [{"turn": 1, "question": "why the place cluster?", "ts": NOW.isoformat()},
+                     {"turn": 2, "question": "and its offset?", "ts": NOW.isoformat()}]
+
+
+def test_a_question_file_alone_does_not_open_as_a_record_without_head(
+        pack: Path, record: Path) -> None:
+    record_question(record, "why?")
+    with pytest.raises(RecordRefused, match="no record.json"):
+        Shell(pack, record)
 
 
 def test_a_comparison_with_a_comparison_fact_is_accepted(shell: Shell) -> None:
