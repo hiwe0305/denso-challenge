@@ -402,11 +402,17 @@ def problem(p: Provider) -> str | None:
 
 
 def reasoning_body(p: Provider) -> dict[str, Any] | None:
-    """OpenRouter's ``reasoning`` field for this turn; None for other servers or ``default``."""
-    if "openrouter.ai" not in p.base_url:
-        return None
+    """OpenRouter's ``reasoning`` field for this turn, or, with reasoning off, the switch that
+    turns a Claude model's thinking off on another OpenAI-compatible gateway; None otherwise.
+
+    The ckey gateway runs some Claude ids with thinking on: "Run nào tốt nhất, vì sao?" took
+    28 s to its first token (1-2k characters of reasoning first), 2-4 s with it off (28/11/2026)."""
     raw = p.reasoning or os.environ.get("FW_CHAT_REASONING", "off")
     mode = raw.strip().lower() or "off"
+    if "openrouter.ai" not in p.base_url:
+        if mode == "off" and "claude" in p.model.lower():
+            return {"thinking": {"type": "disabled"}}
+        return None
     if mode == "default":
         return None
     if mode in ("low", "medium", "high"):
