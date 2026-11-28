@@ -2773,6 +2773,56 @@ main {
   line-height: 1.45;
 }
 
+.md-body em {
+  font-style: italic;
+}
+
+.md-body .md-table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.md-body table.md-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.md-body table.md-table th,
+.md-body table.md-table td {
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.md-body table.md-table th {
+  background: var(--surface-muted);
+  font-weight: 650;
+}
+
+.md-source-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.md-source-chip {
+  display: inline-block;
+  max-width: 100%;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .stream-cursor {
   display: inline-block;
   width: 6px;

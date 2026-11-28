@@ -106,6 +106,7 @@ function persistSessions() {
         tokensIn: tr.tokensIn || 0,
         tokensOut: tr.tokensOut || 0,
         groundedCount: tr.groundedCount || 0,
+        sources: Array.isArray(tr.sources) ? tr.sources.slice(0, 12) : [],
         unverified: tr.unverified || [],
         error: tr.error || null,
         stopped: Boolean(tr.stopped),
@@ -367,7 +368,9 @@ export function copyText(text, btn) {
 // ============================================================================
 // Safe DOM Markdown & Route-Entity Renderer (zero innerHTML)
 // ============================================================================
-const INLINE_TOKEN_RE = /(`[^`]+`|\*\*[^*]+\*\*|#\/[A-Za-z0-9_./?=&%-]+)/g;
+const INLINE_TOKEN_RE =
+  /(`[^`]+`|\*\*[^*]+\*\*|(?<!\*)\*[^*\s][^*]*\*(?!\*)|(?<![A-Za-z0-9_])_[^_\s][^_]*_(?![A-Za-z0-9_])|#\/[A-Za-z0-9_./?=&%-]+)/g;
+const ITALIC_FULL_RE = /^(?:\*[^*\s][^*]*\*|_[^_\s][^_]*_)$/;
 
 function renderInlineTokens(lineText) {
   const parts = String(lineText || "").split(INLINE_TOKEN_RE);
@@ -378,6 +381,8 @@ function renderInlineTokens(lineText) {
       nodes.push(el("code", { className: cls("md-inline-code", "mono"), text: part.slice(1, -1) }));
     } else if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
       nodes.push(el("strong", { text: part.slice(2, -2) }));
+    } else if (part.length > 2 && ITALIC_FULL_RE.test(part)) {
+      nodes.push(el("em", {}, renderInlineTokens(part.slice(1, -1))));
     } else if (part.startsWith("#/")) {
       nodes.push(el("a", { className: cls("md-route-pill", "mono"), href: part }, [`${part} ↗`]));
     } else {
@@ -406,6 +411,66 @@ export function splitThinkAndAnswer(rawText) {
     answer: (text.slice(0, openIdx) + text.slice(closeIdx + 8)).trim(),
     thinkingOpen: false,
   };
+}
+
+// GFM pipe tables: header row, separator row (|---|:--:|--:|), body rows.
+const TABLE_SEP_RE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
+
+function splitTableCells(line) {
+  let body = String(line || "").trim();
+  if (body.startsWith("|")) body = body.slice(1);
+  if (body.endsWith("|") && !body.endsWith("\\|")) body = body.slice(0, -1);
+  return body.split(/(?<!\\)\|/).map((c) => c.replace(/\\\|/g, "|").trim());
+}
+
+function isTableStart(lines, idx) {
+  if (idx + 1 >= lines.length) return false;
+  const head = lines[idx];
+  const sep = lines[idx + 1];
+  if (!head || !sep || !head.includes("|") || !sep.includes("-")) return false;
+  if (!TABLE_SEP_RE.test(sep)) return false;
+  return splitTableCells(head).length === splitTableCells(sep).length;
+}
+
+function buildTable(lines, startIdx) {
+  const heads = splitTableCells(lines[startIdx]);
+  const aligns = splitTableCells(lines[startIdx + 1]).map((c) => {
+    const left = c.startsWith(":");
+    const right = c.endsWith(":");
+    if (left && right) return "center";
+    if (right) return "right";
+    return left ? "left" : "";
+  });
+  const mkCell = (tag, text, k) => {
+    const node = el(tag, {}, renderInlineTokens(text));
+    if (aligns[k]) node.style.textAlign = aligns[k];
+    return node;
+  };
+  const headRow = el("tr", {}, heads.map((h, k) => mkCell("th", h, k)));
+  const bodyRows = [];
+  let next = startIdx + 2;
+  while (next < lines.length && lines[next].trim() && lines[next].includes("|")) {
+    const cells = splitTableCells(lines[next]);
+    const row = heads.map((_, k) => mkCell("td", cells[k] || "", k));
+    bodyRows.push(el("tr", {}, row));
+    next += 1;
+  }
+  const table = el("table", { className: "md-table" }, [
+    el("thead", {}, [headRow]),
+    el("tbody", {}, bodyRows),
+  ]);
+  return { node: el("div", { className: "md-table-wrap" }, [table]), next };
+}
+
+// Source chips under an answer; `sources` is done.sources (array of strings).
+export function renderSourceChips(sources) {
+  const list = (Array.isArray(sources) ? sources : []).filter((x) => typeof x === "string" && x.trim());
+  if (list.length === 0) return null;
+  return el(
+    "div",
+    { className: "md-source-chips" },
+    list.map((src) => el("span", { className: "md-source-chip", title: src, text: src }))
+  );
 }
 
 export function renderMarkdownInto(container, rawText, isStreaming = false) {
@@ -442,6 +507,13 @@ export function renderMarkdownInto(container, rawText, isStreaming = false) {
       continue;
     }
 
+    if (isTableStart(lines, i)) {
+      const built = buildTable(lines, i);
+      blocks.push(built.node);
+      i = built.next;
+      continue;
+    }
+
     if (/^#{1,3}\s+/.test(ln)) {
       blocks.push(el("h4", {}, renderInlineTokens(ln.replace(/^#{1,3}\s+/, ""))));
       i += 1;
@@ -475,7 +547,8 @@ export function renderMarkdownInto(container, rawText, isStreaming = false) {
       !lines[i].trim().startsWith("```") &&
       !/^#{1,3}\s+/.test(lines[i]) &&
       !/^\s*[-*•]\s+/.test(lines[i]) &&
-      !/^\s*\d+[.)]\s+/.test(lines[i])
+      !/^\s*\d+[.)]\s+/.test(lines[i]) &&
+      !isTableStart(lines, i)
     ) {
       paraLines.push(lines[i]);
       i += 1;
@@ -1105,6 +1178,9 @@ export async function runSharedTurn(rawQuestion, opts = {}) {
         ? dataObj.numbers.filter((n) => n && n.grounded)
         : [];
       turnObj.groundedCount = grounded.length;
+      turnObj.sources = Array.isArray(dataObj.sources)
+        ? dataObj.sources.filter((x) => typeof x === "string" && x.trim())
+        : [];
       turnObj.round = dataObj.round || null;
       turnObj.roundMismatch = Array.isArray(dataObj.round_mismatch) ? dataObj.round_mismatch : [];
       if (!turnObj.answer && dataObj.no_narration) turnObj.error = t("chat.err.empty");
@@ -1605,6 +1681,7 @@ function renderSideTurnNode(tr) {
         )
       : null,
     tr.answer || isRunning ? mdZone : null,
+    isRunning ? null : renderSourceChips(tr.sources),
     tr.error ? el("div", { className: "missing-item", text: tr.error }) : null,
     tr.navigate
       ? el(
