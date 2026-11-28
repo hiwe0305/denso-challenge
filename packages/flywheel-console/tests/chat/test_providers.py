@@ -81,12 +81,23 @@ def test_hosted_model_never_sees_rows_that_are_not_public(idx: ConsolePaths) -> 
         common.HOSTED.reset(tok)
 
 
-def test_forced_lookup_never_contradicts_the_benchmark() -> None:
-    """A question the bench expects another tool for must not be taken over by the forced lookup."""
+def test_forced_lookup_never_contradicts_the_benchmark(idx: ConsolePaths) -> None:
+    """A question the bench expects another tool for must not be taken over by the forced lookup.
+    The rounds of the tray task (ids of the seed) are in the index, as in a real turn: which rounds
+    and runs a question names is read from it."""
+    pair_runs = [{"id": r} for r in ("C_ALL", "C_70", "B_ALL", "B_70", "C70_R1")]
+    rounds = [
+        {"id": "tray-r1", "task": "tray", "number": 1, "baseline": "C_70",
+         "withhold_eval": ["C70_R1"], "runs": pair_runs, "index": ["story.pair", "story.round"]},
+        {"id": "tray-jig-r1", "task": "tray", "number": 2, "scene": "jig2", "baseline": "M",
+         "runs": [{"id": "M"}], "index": ["story.jig"]},
+    ]  # fmt: skip
+    tasks = {"tasks": [{"id": "tray", "rounds": ["tray-r1", "tray-jig-r1"]}], "rounds": rounds}
+    (idx.index / "tasks.json").write_text(json.dumps(tasks), encoding="utf-8")
     for item in bench.load_items():
-        forced = registry.forced_tool(item["question"])
+        forced = registry.forced_tools(item["question"])  # every lookup a turn makes by code
         expected = [e["name"] for e in item.get("expect_tools") or []]
-        assert forced is None or forced in expected, (item["id"], forced, expected)
+        assert all(f in expected for f in forced), (item["id"], forced, expected)
 
 
 def test_openrouter_turns_reasoning_off_unless_asked(monkeypatch: pytest.MonkeyPatch) -> None:

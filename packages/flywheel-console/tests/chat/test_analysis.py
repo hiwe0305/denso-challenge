@@ -558,3 +558,101 @@ def test_a_seed_that_cannot_be_read_gives_no_figures(idx: ConsolePaths, monkeypa
     text = "".join(d.get("text", "") for e, d in evs if e == "token")
     assert text == common.UNREADABLE[0] and evs[-1][0] == "done" and evs[-1][1]["guard"] == "manifest"
     assert not any(e == "tool_start" for e, _ in evs)
+
+
+# ------------------------------------------------------------------ trial merge 28/11 (Website)
+EVAL_C40K = {"source": "docs/he/tray.md §16.6", "policy": "C @40k", "stages": ["reach", "place"],
+             "levels": [{"level": "L1-2", "n": 200, "successes": 9, "steps_pct": [90, 20]}],
+             "failure_labels": {"L-PLACE-POSE": {"L0": 16, "L1": 68, "L2": 63}}}  # fmt: skip
+
+
+def _turn_tools(monkeypatch: pytest.MonkeyPatch, q: str, rnd: str = "r1", lang_answer: str = "ok") -> tuple[list[str], list[dict[str, Any]]]:
+    """Run one turn with a model that only answers; return the tools the code ran and the messages
+    the model was given."""
+    _hosted(monkeypatch)
+    seen: list[Any] = []
+
+    def gen(msgs: Any, schemas: Any, deadline: float, *a: Any) -> Any:
+        seen.append(list(msgs))
+        yield "tok", lang_answer
+        yield "end", (lang_answer, [], 1, 1)
+
+    monkeypatch.setattr(llm, "generate", gen)
+    evs = list(llm.events(_body(q, rnd)))
+    ran = [d["name"] for e, d in evs if e == "tool_start"]
+    start = next(d for e, d in evs if e == "trace_start")
+    assert start["tools_forced"] == ran  # the SSE names the lookups the code makes
+    return ran, seen[-1] if seen else []
+
+
+def test_a_round_run_asked_why_it_fails_reads_the_round_and_its_diagnosis_never_the_earlier_eval(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
+    _two_rounds(idx)
+    _edit_story(idx, eval=EVAL_C40K)
+    q = "Vì sao run C_70 hỏng nhiều ở bước đặt?"
+    assert registry.forced_tools(q) == ["round_report", "round_diagnosis"]
+    assert registry.forced_tools("C_70 có bao nhiêu lượt thành công?") == ["round_report"]
+    assert registry.forced_tools("Loss của C_70 thế nào?") == []  # a training lookup stays with the model
+    tools, msgs = _turn_tools(monkeypatch, q)
+    assert tools == ["round_report", "round_diagnosis"]
+    given = "\n".join(str(m.get("content")) for m in msgs if m.get("role") == "tool")
+    assert "50/60" in given and "10/60" in given and "c1" in given  # the run's own numbers and the diagnosis
+    assert "147" not in given and "68" not in given  # never the eval of policy C at 40k
+    # the earlier eval, when a page asks for it, is labelled as before the round, not C_70's own
+    fails = registry.call("eval_failures", {}, {"lang": "vi"})["model"]
+    assert fails.startswith("NOTE: this is the EARLIER evaluation") and "trước khi sinh dữ liệu cho C_70" in fails
+
+
+def test_two_rounds_named_are_placed_side_by_side_with_the_w6_sentence(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
+    _two_rounds(idx)
+    q = "Vòng 1 so với vòng đồ gá khác nhau thế nào?"
+    assert registry.forced_tools(q) == ["rounds_side_by_side"]
+    res = registry.call("rounds_side_by_side", {}, {"task": "tray", "round": "r1", "lang": "vi", "question": q})
+    t = res["model"]
+    assert res["ok"] and res["round"] == "r1" and res["rounds"] == ["r1", "jig-r1"]
+    assert t.startswith("CÂU TRẢ LỜI THẲNG (mở đầu bằng câu này): " + tools_round.SIDE_BY_SIDE[0])
+    assert "VÒNG r1" in t and "VÒNG jig-r1" in t and "10/60" in t and "136/180" in t
+    assert t.index("VÒNG r1") < t.index("VÒNG jig-r1")  # the selected round first
+    assert t.count("CÂU TRẢ LỜI THẲNG") == 1 and "4/60" not in t  # one direct answer; no held figure
+    en = registry.call("rounds_side_by_side", {}, {"task": "tray", "round": "jig-r1", "lang": "en", "question": "Round 1 vs the jig round?"})
+    assert en["rounds"] == ["jig-r1", "r1"] and tools_round.SIDE_BY_SIDE[1] in en["model"]
+    tools, _ = _turn_tools(monkeypatch, q)
+    assert tools == ["rounds_side_by_side"]
+
+
+def test_a_project_wide_cost_question_reads_the_ledger_with_the_host_split(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
+    _two_rounds(idx)
+    diag = {"round": "r1", "clusters": [], "step4": [],
+            "gen_qa_cost": {"host": "rtx3060", "cu": 0, "diagnosis_cu": 0, "generation": {"hours": 1.16}, "qa": {"hours": 0.67},
+                            "train_serve_cu": 109.22, "train_serve_parts": {"train_1": 8.55, "train_2": 77.27, "serve": 23.4},
+                            "source": ["docs/he/tray.md §20.16"]}}  # fmt: skip
+    _edit_story(idx, ledger=LEDGER_258, diag=diag)
+    q = "Tổng chi phí thu dữ liệu và train của cả dự án là bao nhiêu?"
+    assert registry.forced_tools(q) == ["ledger_query"]
+    assert registry.forced_tools("What is the total cost of the whole project?") == ["ledger_query"]
+    assert registry.forced_tools("Chi phí vòng 1 bao nhiêu?") == ["round_report"]  # one round: its own cost
+    tools, msgs = _turn_tools(monkeypatch, q)
+    assert tools == ["ledger_query"]
+    t = "\n".join(str(m.get("content")) for m in msgs if m.get("role") == "tool")
+    assert "total estimated=814.8 CU" in t and "total measured=189.32 CU" in t
+    assert "Thí nghiệm khác (không trình bày)" in t and "DA-50" not in t
+    assert "ran on rtx3060 at 0 CU" in t and "train and serve = 109.22 CU" in t
+
+
+def test_a_hidden_run_or_story_gets_the_scoped_sentence_neither_confirmed_nor_denied(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
+    _two_rounds(idx)
+    for q in ("Có những tập dữ liệu nào của DA-50 hay run N không?", "Lượt N đạt bao nhiêu?", "Show the datasets of story DA-50"):
+        assert tools_round.asks_hidden(q), q
+    for q in ("Run M đạt mốc 80% không?", "Mức 2 hỏng ở đâu?", "run nào tốt nhất?", "C_70 có bao nhiêu lượt?"):
+        assert not tools_round.asks_hidden(q), q
+    _hosted(monkeypatch)
+
+    def gen(msgs: Any, schemas: Any, deadline: float, *a: Any) -> Any:
+        raise AssertionError("the model is never asked")
+
+    monkeypatch.setattr(llm, "generate", gen)
+    for q, want in (("Có những tập dữ liệu nào của DA-50 hay run N không?", tools_round.NOT_PRESENTED[0]),
+                    ("Which datasets belong to run N?", tools_round.NOT_PRESENTED[1])):
+        evs = list(llm.events(_body(q, "r1")))
+        text = "".join(d.get("text", "") for e, d in evs if e == "token")
+        assert text == want and evs[-1][1]["guard"] == "hidden"
+        assert not any(e == "tool_start" for e, _ in evs)

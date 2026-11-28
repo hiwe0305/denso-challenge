@@ -75,6 +75,13 @@ RESULT_VI = {"unclear (scorer threshold)": "CHƯA RÕ (ngưỡng bộ chấm)", 
 # W5 (Hiếu 28/11/2026): the one sentence for every place a result is not presented
 WITHHELD = ("Kết quả thi lại của lượt này không trình bày ở bản demo.",
             "The re-test result of this run is not presented in this demo.")  # fmt: skip
+# A question about a hidden run or story (run N, DA-50): a scoped, true sentence that neither
+# confirms nor denies it (same rule as W5; Hiếu 28/11/2026)
+NOT_PRESENTED = ("Trong dữ liệu trình bày ở bản demo không có tập dữ liệu hay run nào như vậy.",
+                 "The data presented in this demo has no such dataset or run.")  # fmt: skip
+# W6: two rounds differ in scene, eval set, scorer and number of steps
+SIDE_BY_SIDE = ("Hai vòng khác cảnh, tập eval, bộ chấm và số bước, nên chỉ đặt cạnh nhau, không so như một kết quả: không viết vòng nào tốt hơn hay tăng bao nhiêu.",
+                "The two rounds differ in scene, eval set, scorer and number of steps, so they are only placed side by side, not compared as a result: never write which is better or by how much.")  # fmt: skip
 
 
 # what the question is after, most specific first; "all" is a general comment on the round
@@ -138,6 +145,19 @@ def asks_held(question: Any) -> bool:
                  if x.get("id") not in held]  # fmt: skip
         return not any(_word_in(s, q, case=True) for s in shown)
     return False
+
+
+def asks_hidden(question: Any) -> bool:
+    """The question names a run or story that is not presented (``withhold_runs``): a hidden run
+    as "run N" / "lượt N" / "bản N", one of its session or folder names, or a hidden story id."""
+    q = str(question or "")
+    h = hidden_runs()
+    if not h:
+        return False
+    if h.mentions(q) or any(_word_in(s, q) for s in h.stories):
+        return True
+    ids = "|".join(re.escape(i) for i in sorted(h.ids))
+    return bool(re.search(rf"(?i:lượt|bản|run|model|policy)\s+(?:{ids})(?![\w])", q))
 
 
 def focus_of(question: Any) -> str:
@@ -221,6 +241,30 @@ def _named_rounds(q: str, rounds: list[dict[str, Any]]) -> list[str]:
     return list(dict.fromkeys(out))
 
 
+def runs_named(question: Any) -> set[str]:
+    """Run ids of the rounds the question names: plain letters ("M") as case-sensitive words, other
+    ids ("C_70", "C_ALL") as words in any case."""
+    q = str(question or "")
+    rounds = _rounds()
+    runs = {run for r in rounds for run in _plain_runs(r) if _word_in(run, q, case=True)}
+    runs |= {str(x.get("id")) for r in rounds for x in r.get("runs") or []
+             if x.get("id") and not re.fullmatch(r"[A-Z][A-Za-z]{0,3}", str(x["id"])) and _word_in(str(x["id"]), q)}  # fmt: skip
+    return runs
+
+
+def pair_runs_named(question: Any) -> set[str]:
+    """Runs named in the question that belong to the pair round (DA-34: C_70, C_ALL...), whose
+    diagnosis ``story.diag`` holds."""
+    pid = _pair_round_id()
+    own = {str(x.get("id")) for r in _rounds() if str(r.get("id")) == pid for x in r.get("runs") or []}
+    return runs_named(question) & own
+
+
+def rounds_named(question: Any) -> list[str]:
+    """Every round the question names by id, number or scene, in the order ``_named_rounds`` gives."""
+    return _named_rounds(str(question or ""), _rounds())
+
+
 def round_named(question: Any, current: Any = None) -> str:
     """The round a question is about, from every round it names and every run it names.
 
@@ -232,9 +276,7 @@ def round_named(question: Any, current: Any = None) -> str:
     cur = str(current or "")
     rounds = _rounds()
     named = _named_rounds(q, rounds)
-    runs = {run for r in rounds for run in _plain_runs(r) if _word_in(run, q, case=True)}
-    runs |= {str(x.get("id")) for r in rounds for x in r.get("runs") or []
-             if x.get("id") and not re.fullmatch(r"[A-Z][A-Za-z]{0,3}", str(x["id"])) and _word_in(str(x["id"]), q)}  # fmt: skip
+    runs = runs_named(q)
     if runs:
         cover = [str(r["id"]) for r in rounds if runs <= _covers(r)]
         if cover:
@@ -428,6 +470,36 @@ def round_report(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     else:
         out = _pair_report(task, rnd, say, focus, extra)
     out["round"] = str(rnd.get("id"))
+    return out
+
+
+def rounds_side_by_side(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
+    """Two or more rounds the question names, each read by ``round_report`` under its own title,
+    with the W6 sentence first: they are placed side by side, never compared as a result."""
+    say = Say(ctx.get("lang"))
+    want = [str(x) for x in args.get("rounds") or [] if x] or rounds_named(ctx.get("question"))
+    cur = str(ctx.get("round") or "")
+    want = sorted(dict.fromkeys(want), key=lambda r: r != cur)  # the selected round first
+    if len(want) < 2:
+        return round_report(args, ctx)
+    parts = [say("CÂU TRẢ LỜI THẲNG (mở đầu bằng câu này): " + SIDE_BY_SIDE[0],
+                 "DIRECT ANSWER (open with this sentence): " + SIDE_BY_SIDE[1])]  # fmt: skip
+    for rid in want:
+        res = round_report({}, {**ctx, "round": rid, "question": "", "deep": False})
+        if res.get("round") != rid:
+            parts.append(say(f"VÒNG {rid}: index chưa có số liệu của vòng này.", f"ROUND {rid}: the index has no numbers for this round."))
+            continue
+        how = _how(say, "all")
+        body = [ln for ln in str(res["model"]).splitlines() if ln.strip() and ln != how]
+        # each round's own "direct answer" is one of its points here; the answer opens with W6
+        body = [re.sub(r"^(CÂU TRẢ LỜI THẲNG|DIRECT ANSWER)\b[^:]*:", say("Ý CHÍNH CỦA VÒNG NÀY:", "KEY POINT OF THIS ROUND:"), ln) for ln in body]
+        parts.append("\n".join(body))
+    parts.append(say("CÁCH TRẢ LỜI: câu trả lời thẳng ở trên, rồi với mỗi vòng một hoặc hai câu (kết quả, chỗ hỏng, chi phí), nêu tên vòng và run cho mọi số; giữ số của mỗi vòng dưới tên vòng đó.",
+                     "HOW TO ANSWER: the direct answer above, then one or two sentences per round (result, where it fails, cost), naming the round and run for every number; keep each round's numbers under its own name."))  # fmt: skip
+    text = "\n\n".join(parts)
+    out = result({"type": "text", "text": text}, text)
+    out["round"] = want[0]  # the selected round; the others are named in the text
+    out["rounds"] = want
     return out
 
 
