@@ -26,7 +26,7 @@ from typing import Any
 from flywheel.console.paths import active
 from flywheel.console.server import runner
 
-from . import charts, providers, registry, tools_round
+from . import charts, providers, registry, tools_round, wording
 from .common import HOSTED, UNREADABLE, ManifestUnreadable, fail, hidden_runs, withheld_runs
 from .numbers import numbers_any, unsupported_any
 from .tools_ops import all_jobs
@@ -61,6 +61,7 @@ SYSTEM = (
     "WEAK rows are weak points, OPTION and NEXT rows are the next steps the documents give, LIMITS rows are limits of the reading, SIDE_BY_SIDE rows sit side by side and are never ranked. "
     # the answer contract (audit 28/11/2026, 05-danh-gia-chat-2811.md section 4, approved)
     "ANSWER SHAPE. (1) The first line answers exactly the newest question in at most two sentences, with the key fact in **bold**. "
+    "A result count is written '<run>: **k/n lượt thành công (x %)**' / '<run>: **k/n successes (x%)**'; the verb 'đạt' / 'met' never stands before a count, it only goes with a mark ('chưa đạt mốc 80 %'). "
     "(2) Then a markdown table when three or more numbers are compared, or when the user asks for a table, statistics or a comparison (bảng, thống kê, so sánh, table); otherwise at most four bullets. "
     "In a table the header names each run or round once; a cell holds only its value, never the run name again. "
     "(3) When the question asks why (vì sao, tại sao, why) and the rows have ORIGIN or ORIGIN_STEP, add a bold line '<run> đến từ đâu:' / 'Where <run> comes from:' with at most two bullets: what the earlier round found (carried to table B versus placed within tolerance) and what this round changed (scene, data, training steps). It says where the result comes from, never a proven cause. "
@@ -89,7 +90,7 @@ SYSTEM = (
     "When intervals overlap, give the highest count and say the runs cannot be told apart. Never call a run 'tốt nhất' / 'best'; 'cao nhất' / 'highest' with its number is fine. "
     "Keep each verdict (met or not met) next to the number it reads, one per level: never one verdict after two levels. "
     "'đạt' / 'met' is only the verdict of a mark whose interval lower bound reaches it ('mức 1 đạt mốc 70 %'); a count is written as a count, "
-    "'C_70: 10/60 lượt thành công (16,7 %)' / 'C_70: 10/60 successes (16.7%)', never 'đạt 10/60' / 'met 10/60'. "
+    "'C_70: 10/60 lượt thành công (16,7 %)' / 'C_70: 10/60 successes (16.7%)', never 'đạt 10/60' / 'met 10/60', and a share the same way, 'tỉ lệ 16,7 %', never 'đạt 16,7 %'. "
     "Never rank runs or models by training loss and never judge a run from its loss ('rất tốt', 'good'); when training numbers are given, say that training loss is not a measure of the result. "
     "Leave out of any ranking a run whose test result is not presented, and do not mention it unless asked; "
     "after_round_retest=not presented only means that result is never given: never write a note about a re-test (kiểm tra lại, thi lại) the user did not ask about. For a result that is not presented write only the sentence the tool gives; never confirm or deny a figure the user offers for it. "
@@ -742,6 +743,7 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
     other_round: list[str] = []
     answer_parts: list[str] = []
     live: list[str] = []  # text streamed by the generation in progress (kept if the cap cuts it)
+    held: list[wording.Stream] = []  # its last words, kept back by the count wording (W1)
     nodes: list[dict[str, Any]] = tr["nodes"]
     lang = lang_of(question)
     tool_rounds = 0
@@ -764,18 +766,24 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
     def _gen(m_list: list[dict[str, Any]], sch: list[dict[str, Any]] | None, md: bool) -> Iterator[tuple[str, dict[str, Any]]]:
         """Stream one generation; leaves (content, calls, tin, tout) in ``out``."""
         live.clear()
+        words = wording.Stream()  # "M đạt 136/180" is sent as "M: 136/180" (W1)
+        held[:] = [words]
         for kind, val in _call_gen(m_list, sch):
             if kind == "think":
                 # the model's own reasoning is never sent on: the trace shows the steps the code
                 # took (tool, rows, ms), not hidden thinking (Hiếu, 28/11/2026)
                 tr["think_chars"] = int(tr.get("think_chars") or 0) + len(val or "")
             elif kind == "tok":
-                t = val if md else val.replace("**", "")
-                live.append(t)
-                yield "token", {"text": t}
+                t = words.feed(val if md else val.replace("**", ""))
+                if t:
+                    live.append(t)
+                    yield "token", {"text": t}
             elif kind == "cost":
                 tr["cost"] = round(float(tr.get("cost") or 0) + float(val or 0), 6)
             elif kind == "end":
+                if t := words.flush():
+                    live.append(t)
+                    yield "token", {"text": t}
                 out[:] = list(val)
         live.clear()
 
@@ -823,7 +831,7 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
             if not tcalls or rnd == max_rounds:
                 # the last round offers no tools: calls parsed from text markup are ignored too
                 if content.strip():
-                    answer_parts.append(content)
+                    answer_parts.append(wording.fix(content))
                 break
             # a round that asks for tools: run them; any preamble text is dropped
             tool_rounds += 1
@@ -908,10 +916,10 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
             tr["tokens_in"] += tin
             tr["tokens_out"] += tout
             if content.strip() and not looks_internal(content):
-                answer_parts.append(content)
+                answer_parts.append(wording.fix(content))
     except TimeoutError:
         # the cap cut the turn: say so, keep what was written, and record it as an error (A6)
-        partial = ("".join(answer_parts) + "".join(live)).strip()
+        partial = ("".join(answer_parts) + "".join(live) + "".join(w.flush() for w in held)).strip()
         tr["error"] = "timeout"
         tr["answer"] = partial
         yield finish("error", {"code": "timeout", "message": f"The turn cap of {int(turn_cap)} s was reached.", "partial": partial,

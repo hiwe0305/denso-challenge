@@ -170,7 +170,7 @@ def test_lookups_without_an_answer_get_one_forced_answer_round(
     evs = list(llm.events({"messages": [{"role": "user", "content": "list the jobs"}],
                            "context": {"route": "#/jobs"}}))  # fmt: skip
     assert seen[-1] == (False, "user") and len(seen) == llm.MAX_ROUNDS + 2
-    assert ("token", {"text": "no jobs"}) in evs
+    assert "".join(d["text"] for e, d in evs if e == "token") == "no jobs"  # the stream may split it (W1 wording)
     assert evs[-1][0] == "done" and not evs[-1][1].get("no_narration")
 
 
