@@ -23,6 +23,7 @@ import {
   renderProcessEmptyBlock,
   renderReportSubnav,
   renderRoundEmpty,
+  renderRoundLinks,
   renderSourceCitation,
   renderStatStrip,
   renderStateChip,
@@ -2177,6 +2178,14 @@ export function renderBasePage() {
           },
         ]),
 
+        // a round with no control arms (the jig round) points at the round that has them
+        (round.controls || []).length === 0
+          ? renderRoundEmpty({
+              keys: ["story.pair"],
+              text: t("base.noControls", { round: pickLang(round.title) || round.id }),
+            })
+          : null,
+
         el("section", { className: cls("card", "table-wrap") }, [
           el("h2", { text: t("base.modelsTitle") }),
           el("table", { className: "table" }, [
@@ -2525,6 +2534,9 @@ export function renderDesignPage() {
             )
           : null,
 
+        // the jig round has no design block of its own: one line and a switch (28/11 evening)
+        design ? null : renderRoundEmpty({ keys: ["story.demo"] }),
+
         design && Array.isArray(design.unsourced) && design.unsourced.length > 0
           ? el("section", { className: "card" }, [
               el("h2", { text: t("design.unsourcedTitle") }),
@@ -2861,6 +2873,7 @@ export function renderReportPage() {
           lead: t("report.lead"),
         }),
         renderReportSubnav("report"),
+        renderRoundLinks(),
 
         task
           ? el("section", { className: "card" }, [

@@ -12,6 +12,7 @@ WEB = Path(budget.__file__).parent / "web"
 # Keys constructed dynamically as t("prefix" + value). Every prefix in web/*.js must be listed here,
 # and every resulting key must exist in both vi.js and en.js.
 DYNAMIC: dict[str, list[str]] = {
+    "round.shortName.": ["tray-r1", "tray-jig-r1"],
     "nav.group.": ["start", "data", "ops", "exp", "f2d", "plan"],
     "nav.item.": [
         "tasks",
