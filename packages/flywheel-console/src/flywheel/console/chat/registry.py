@@ -325,6 +325,8 @@ def context_defaults(context: Any) -> dict[str, Any]:
     for k in ("task", "round", "lang", "question"):  # the (task, round) chosen in the top bar; the question's language
         if isinstance(context.get(k), str) and context[k]:
             d[k] = context[k]
+    if context.get("deep") is True:
+        d["deep"] = True  # a deep analysis: round_report reads the whole round
     m = re.search(r"data/([^/?#]+)(?:/ep/([^/?#]+))?", route)
     if m:
         d["dataset_id"] = m.group(1)

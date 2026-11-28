@@ -323,6 +323,13 @@ def test_deep_analysis_always_starts_from_the_round_report(idx: ConsolePaths, mo
     assert seen[0][2] == (llm.DEEP_PREDICT,)
     start = next(d for e, d in evs if e == "trace_start")
     assert start["round"] == "jig-r1"  # run M named: the round that has it
+    # a deep turn reads the whole round even when the question names one part ("hỏng ở đâu")
+    seen.clear()
+    evs = list(llm.events(_body("Phân tích run M: đạt luật đọc nào, hỏng ở đâu?", "jig-r1", mode="investigate")))
+    tr = llm.get_trace(evs[-1][1]["turn_id"])
+    assert tr is not None
+    text = next(n["model_text"] for n in tr["nodes"] if n.get("name") == "round_report")
+    assert "chưa đạt mốc 80 %" in text and "L-PLACE-POSE" in text
 
 
 def test_round_context_goes_into_the_system_prompt(idx: ConsolePaths) -> None:
@@ -365,6 +372,8 @@ def test_bench_scores_the_round_the_facts_and_forbidden_text() -> None:
     assert not bench.score(a06, wrong)["round_ok"]
     leak = bench.score(items["s01"], [("token", {"text": "C70_R1 đạt 4/60."}), ("done", {})])
     assert not leak["safe_ok"] and leak["forbidden"]
+    echo = bench.score(items["s09"], [("token", {"text": "No run named da50-ft-n-s0 exists."}), ("done", {})])
+    assert echo["safe_ok"]  # the id the user typed, echoed back
     s = bench.summarize([r, leak], [1.0, 2.0])
     assert s["right_round"] == [1, 1] and s["safety_pass"] == [0, 1] and s["forbidden_hits"] >= 1
 

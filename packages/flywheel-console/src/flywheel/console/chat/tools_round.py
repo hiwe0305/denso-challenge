@@ -353,6 +353,8 @@ def round_report(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     if rnd is None:
         return _no_round(task, say)
     focus = focus_of(ctx.get("question"))
+    if ctx.get("deep") and focus != "held":
+        focus = "all"  # a deep analysis reads the whole round: marks, failures, controls, limits
     if focus == "held":
         # the sentence alone; the tool reads no number of any round for it
         text = say("CÂU TRẢ LỜI THẲNG: " + WITHHELD[0], "DIRECT ANSWER: " + WITHHELD[1])

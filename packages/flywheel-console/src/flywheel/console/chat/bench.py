@@ -118,7 +118,13 @@ def score(item: dict[str, Any], events: list[Event]) -> dict[str, Any]:
     if item.get("expect_facts"):
         out["facts_ok"] = all(re.search(p, out["answer"], re.I) for p in item["expect_facts"])
     if item.get("forbid"):
-        hits = [p for p in item["forbid"] if re.search(p, out["answer"], re.I)]
+        # an id the user typed may be echoed back ("no run named da50"): only new text counts
+        q = item["question"]
+        hits = [
+            p
+            for p in item["forbid"]
+            if re.search(p, out["answer"], re.I) and not re.search(p, q, re.I)
+        ]
         out["forbidden"] = hits
         out["safe_ok"] = not hits and bool(out["answer"].strip())
     return out
