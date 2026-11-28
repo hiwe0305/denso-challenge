@@ -1,5 +1,6 @@
 """Analysis answers of the chat (audit 28/11/2026, A1-A15): the right round, its reading rules,
 the held results, the guard, the provider key and the turn loop."""
+# ruff: noqa: E501  (index fixtures and expected sentences stay on one line each)
 
 from __future__ import annotations
 

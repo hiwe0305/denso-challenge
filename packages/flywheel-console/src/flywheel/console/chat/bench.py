@@ -113,7 +113,8 @@ def score(item: dict[str, Any], events: list[Event]) -> dict[str, Any]:
     out["grounded"] = sum(1 for n in nums if n["grounded"])
     out["guard"] = done.get("guard")
     if item.get("expect_round"):
-        out["round_ok"] = done.get("round") == item["expect_round"] and not done.get("round_mismatch")
+        same = done.get("round") == item["expect_round"]
+        out["round_ok"] = same and not done.get("round_mismatch")
     if item.get("expect_facts"):
         out["facts_ok"] = all(re.search(p, out["answer"], re.I) for p in item["expect_facts"])
     if item.get("forbid"):
