@@ -739,18 +739,23 @@ def serve(
     srv = make_server(paths, port, lock, chat)
 
     def stop(signum: int, frame: Any) -> None:  # `kill`: close the ssh tunnel like Ctrl+C does
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)  # a second kill must not cut the cleanup
         raise KeyboardInterrupt
 
-    if threading.current_thread() is threading.main_thread():
-        signal.signal(signal.SIGTERM, stop)
+    on_main = threading.current_thread() is threading.main_thread()
     mode = " (locked, chat on)" if lock and chat else " (locked)" if lock else ""
-    print(f"console on http://127.0.0.1:{srv.port}" + mode, flush=True)
-    if srv.chat_on:
-        threading.Thread(target=_warm_chat, daemon=True).start()
     try:
+        # inside the try: the handler raises wherever the program is, the banner included
+        if on_main:
+            signal.signal(signal.SIGTERM, stop)
+        print(f"console on http://127.0.0.1:{srv.port}" + mode, flush=True)
+        if srv.chat_on:
+            threading.Thread(target=_warm_chat, daemon=True).start()
         srv.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
         srv.server_close()
         runner.TUNNEL.close()
+        if on_main:  # nothing left to protect: a process stuck in exit can still be killed
+            signal.signal(signal.SIGTERM, signal.SIG_DFL)
