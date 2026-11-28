@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Nháp 27/11/2026, chờ Hiếu duyệt story và chốt các câu hỏi ở mục "Cần Hiếu chốt"; mã chỉ bắt đầu sau khi nhánh dựng lại giao diện `chore-console-ui-rebuild` vào master |
+| Trạng thái | Hiếu đã chốt bốn câu ngày 28/11/2026 (mục "Quyết định của Hiếu"); mã chỉ bắt đầu sau khi PR #252 (`chore-console-ui-rebuild`) vào master |
 | Người làm | Hiếu, cùng Claude |
 | Làn | Ngoài ba làn: `packages/flywheel-console` (index, seed, giao diện). Không sửa nhân, làn, adapter hay đường ống eval |
 | Nguồn yêu cầu | Hiếu, 27/11/2026: lần train gần nhất (run M) và kết quả tốt nhất không thấy trên Console |
@@ -31,7 +31,7 @@ Số của run M (thực đo, [tray-jig.md](../../he/tray-jig.md) mục 4 và 5)
 
 ## Cách làm
 
-**[Đề xuất]** Claude 27/11/2026. Chờ Hiếu chốt các câu hỏi ở mục sau.
+Claude đề xuất 27/11/2026; Hiếu chốt ngày 28/11/2026 theo mục "Quyết định của Hiếu".
 
 ### Mô hình hóa: run M và N là một vòng trên cảnh đồ gá
 
@@ -75,12 +75,23 @@ Ngưỡng của luật (80 % cả task, 70 % từng mức, bước đặt trên 
 
 Thời lượng của một pha là `seconds` của nó trừ `seconds` của pha trước nếu giá trị tăng dần; ghi rõ cách tính trong docstring. Trang Train ghi pha VM thuộc run nào. Lỗi này cũng có ở vòng `tray-r1`.
 
-### Cần Hiếu chốt
+### Quyết định của Hiếu
 
-1. Phương án A hay B.
-2. Có hiện run N trên Console khi đang train không (đường cong từ `metrics.jsonl` khi file đã kéo về laptop), hay chỉ hiện khi đã có eval.
-3. Kết quả eval của M và N có nằm ngoài `withhold_eval` không. Đề xuất: có hiện; công tắc chỉ dành cho `C70_R1` theo quyết định ngày 16/11/2026.
-4. Trang tổng quan và trang chọn bài toán: "kết quả tốt nhất" của task `tray` lấy theo vòng đang chọn (đề xuất), hay luôn lấy vòng mới nhất.
+Hiếu chốt ngày 28/11/2026, cả bốn câu theo đề xuất:
+
+1. **Phương án A.** Vòng `tray-jig-r1` trong `seed/tasks.yaml`, `baseline: M`, `after_round: N`, `controls: []`.
+2. **Hiện run N khi đang train.** Đường cong lấy từ `metrics.jsonl` đã kéo về laptop; trang ghi rõ N đang train, chưa có eval.
+3. **M và N nằm ngoài `withhold_eval`.** Công tắc vẫn chỉ dành cho `C70_R1` theo quyết định ngày 16/11/2026.
+4. **"Kết quả tốt nhất" theo vòng đang chọn.** Không trộn cảnh `tray` với cảnh `jig2` trên trang tổng quan và trang chọn bài toán.
+
+### Phần PR #252 đã làm trước
+
+PR #252 (dựng lại giao diện) đã hiện run M và N, trước khi story này được duyệt:
+- `index/story.py` có hàm `_jig` quét mọi `tray/outcomes/jig-*/scores.jsonl`, không qua `tasks.yaml`.
+- Trang Train vẽ đường cong của M và N.
+- Trang Đánh giá hiện bốn thẻ số. Khoảng Wilson trên rollout ghi là "mô tả", không có câu đạt hay chưa đạt, vì ngưỡng đang viết cứng trong JS.
+
+Story này thay cách quét đó bằng vòng `tray-jig-r1` (quyết định 1) và đọc `results.json` (mục "Đọc số eval"). Khi xong, `_jig` và ngưỡng viết cứng được gỡ.
 
 ## Tiêu chí chấp nhận
 
@@ -105,7 +116,7 @@ Thời lượng của một pha là `seconds` của nó trừ `seconds` của ph
 ## Nhiệm vụ
 
 - [x] 1.1 Viết story (file này)
-- [ ] 1.2 Hiếu chốt bốn câu ở mục "Cần Hiếu chốt"; ghi quyết định vào file này
+- [x] 1.2 Hiếu chốt bốn câu; ghi quyết định vào file này (mục "Quyết định của Hiếu")
 - [ ] 2.1 `index/tasks.py` và `seed/tasks.yaml`: vòng `tray-jig-r1`, đường dẫn theo run, ngưỡng và nguồn luật, có test (AC 1)
 - [ ] 2.2 `index/story.py`: đọc run train theo đường dẫn của từng run; sửa thời lượng pha VM, có test (AC 2, 5)
 - [ ] 2.3 Module mới trong `index/` đọc `results.json`, kiểm điều kiện trước khi đọc, ghi câu đọc theo luật, có test (AC 3, 4, 6)
