@@ -136,6 +136,7 @@ def test_a_hosted_turn_sets_the_rule_first_and_resets_it(
     )
     monkeypatch.setattr(llm, "provider", lambda: prov)
     monkeypatch.setenv("FW_CHAT_API_KEY", "k")
+    monkeypatch.setenv("FW_CHAT_BASE_URL", "https://openrouter.ai/api/v1")  # the key's own host
     seen: list[tuple[Any, Any]] = []
 
     def fake_generate(msgs: Any, schemas: Any, deadline: float) -> Any:

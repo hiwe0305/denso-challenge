@@ -219,13 +219,9 @@ class Handler(BaseHTTPRequestHandler):
             if u.path == "/api/chat":
                 return self.chat_sse(body)
             if u.path == "/api/chat/config":
-                if os.environ.get("FW_CHAT_BASE_URL"):
-                    if body.get("base_url"):
-                        os.environ["FW_CHAT_BASE_URL"] = str(body["base_url"]).strip()
-                    if body.get("model"):
-                        os.environ["FW_CHAT_MODEL"] = str(body["model"]).strip()
-                    if body.get("api_key"):
-                        os.environ["FW_CHAT_API_KEY"] = str(body["api_key"]).strip()
+                # the setting lives in the chat layer only: the environment keeps what the
+                # operator set, so FW_CHAT_API_KEY and FW_CHAT_SELF_HOSTED stay with the start-up
+                # URL, and a new host needs its own key (A3, S-P0-3, 28/11/2026)
                 return self.jok(_chat("providers").set_runtime_config(body))
             if u.path == "/api/models/prewarm":
                 return self.jok(probe.prewarm(_chat("llm"), _chat("providers")))

@@ -14,8 +14,15 @@ OpenRouter, OpenCode Zen, a NIM, or the same Ollama at ``/v1``.
                        600 of 600 tokens, empty answer); the chat phrases facts a tool computed,
                        so thinking is switched off unless asked for
 
-    FW_CHAT_SELF_HOSTED  1 declares that the server runs on a machine of the team (a NIM, an
-                       Ollama on another port); without it the server counts as hosted
+    FW_CHAT_SELF_HOSTED  1 declares that the server at FW_CHAT_BASE_URL runs on a machine of the
+                       team (a NIM, an Ollama on another port); without it the server counts as
+                       hosted. It holds for that URL only: a URL set later through the console
+                       counts as hosted (S-P0-3, 28/11/2026)
+
+Keys are bound to a host (A3, 28/11/2026): FW_CHAT_API_KEY goes only to the host of
+FW_CHAT_BASE_URL, a key typed in the console only to the host it was typed for, a vendor key
+(OPENAI_API_KEY ...) only to that vendor. Switching the URL to another host drops the typed key
+and asks for a new one; the console never rewrites the environment.
 
 Data rule (design 27/10 section 8.4, CLAUDE.md): rows that are not ``data_class: public`` never
 leave for a hosted service, so while a hosted provider answers, the chat tools do not see those
@@ -102,9 +109,26 @@ PROVIDER_PRESETS: dict[str, dict[str, Any]] = {
     },
 }
 
-# Runtime override set via POST /api/chat/config. API key stays in RAM only (never written to disk).
+# Runtime override set via POST /api/chat/config. API key stays in RAM only (never written to disk),
+# bound to the host it was typed for.
 _RUNTIME_CFG: dict[str, Any] = {}
 _RUNTIME_API_KEY: str = ""
+_RUNTIME_KEY_HOST: str = ""
+
+
+def _host(url: str) -> str:
+    return (urllib.parse.urlparse(str(url or "")).hostname or "").lower()
+
+
+def startup_url() -> str:
+    """``FW_CHAT_BASE_URL`` as the operator set it; the console never rewrites it."""
+    return os.environ.get("FW_CHAT_BASE_URL", "").strip().rstrip("/")
+
+
+def _self_hosted(base_url: str) -> bool:
+    """``FW_CHAT_SELF_HOSTED=1`` covers the start-up URL only, never a URL set later (S-P0-3)."""
+    declared = os.environ.get("FW_CHAT_SELF_HOSTED", "").strip() == "1"
+    return declared and bool(startup_url()) and base_url.strip().rstrip("/") == startup_url()
 
 
 def _config_file_path() -> Any:
@@ -127,17 +151,29 @@ def _load_persisted_cfg() -> dict[str, Any]:
 
 def reset_runtime_config() -> None:
     """Clear in-memory runtime overrides (used by tests)."""
-    global _RUNTIME_API_KEY
+    global _RUNTIME_API_KEY, _RUNTIME_KEY_HOST
     _RUNTIME_CFG.clear()
     _RUNTIME_API_KEY = ""
+    _RUNTIME_KEY_HOST = ""
+
+
+def _current_base() -> str:
+    """The base URL ``active()`` uses now (runtime setting, else environment, else saved file)."""
+    return str(_RUNTIME_CFG.get("base_url") or startup_url() or _load_persisted_cfg().get("base_url") or "")
 
 
 def set_runtime_config(body: dict[str, Any], persist: bool = True) -> dict[str, Any]:
-    """Update runtime API provider configuration; API key is kept strictly in memory."""
-    global _RUNTIME_API_KEY
+    """Update runtime API provider configuration; API key is kept strictly in memory.
+
+    A new host drops the key typed for the old one (A3): the answer says ``key_cleared`` and,
+    until a key for the new host is given, ``needs_key``."""
+    global _RUNTIME_API_KEY, _RUNTIME_KEY_HOST
+    old_host = _host(_current_base())
     preset = str(body.get("preset") or "custom").strip().lower()
     spec = PROVIDER_PRESETS.get(preset, PROVIDER_PRESETS["custom"])
-    base_url = str(body.get("base_url") or spec["base_url"]).strip().rstrip("/")
+    # no URL and no vendor preset: keep the server in use (a model change only)
+    keep = _current_base() if preset == "custom" and not body.get("base_url") else ""
+    base_url = str(body.get("base_url") or keep or spec["base_url"]).strip().rstrip("/")
     model = str(body.get("model") or spec["default_model"]).strip()
     kind = str(body.get("kind") or spec["kind"]).strip().lower()
     if "api.anthropic.com" in base_url and "/openai" not in base_url:
@@ -149,12 +185,18 @@ def set_runtime_config(body: dict[str, Any], persist: bool = True) -> dict[str, 
     # a request body never declares a server self-hosted: only the operator can, through
     # FW_CHAT_SELF_HOSTED; otherwise a POST could open restricted data to a hosted API
 
-    if "api_key" in body:
-        raw_key = str(body.get("api_key") or "").strip()
-        if raw_key:
-            _RUNTIME_API_KEY = raw_key
-        elif body.get("clear_key"):
-            _RUNTIME_API_KEY = ""
+    new_host = _host(base_url)
+    raw_key = str(body.get("api_key") or "").strip()
+    key_cleared = False
+    if raw_key:
+        _RUNTIME_API_KEY, _RUNTIME_KEY_HOST = raw_key, new_host
+    elif body.get("clear_key"):
+        _RUNTIME_API_KEY, _RUNTIME_KEY_HOST = "", ""
+    elif _RUNTIME_API_KEY and _RUNTIME_KEY_HOST != new_host:
+        _RUNTIME_API_KEY, _RUNTIME_KEY_HOST = "", ""  # a key never follows the URL to another host
+        key_cleared = True
+    if old_host and new_host != old_host and not raw_key:
+        key_cleared = True
 
     clean_cfg = {
         "preset": preset if preset in PROVIDER_PRESETS else "custom",
@@ -175,22 +217,27 @@ def set_runtime_config(body: dict[str, Any], persist: bool = True) -> dict[str, 
                 fp.write_text(json.dumps(clean_cfg, ensure_ascii=False, indent=2), encoding="utf-8")
             except OSError:
                 pass
-    return get_runtime_config()
+    out = get_runtime_config()
+    out["key_cleared"] = key_cleared
+    out["needs_key"] = not out["has_key"] and not out["ready"]
+    return out
 
 
 def _resolve_api_key(preset: str = "", base_url: str = "") -> tuple[str, str]:
-    """Return (api_key, source_label) without ever exposing the key to callers."""
-    if _RUNTIME_API_KEY:
+    """Return (api_key, source_label) for ``base_url``; every key goes to its own host only."""
+    host = _host(base_url)
+    if not host:
+        return "", "none"
+    if _RUNTIME_API_KEY and _RUNTIME_KEY_HOST == host:
         return _RUNTIME_API_KEY, "session"
     env_main = os.environ.get("FW_CHAT_API_KEY", "").strip()
-    if env_main:
+    if env_main and host == _host(startup_url()):
         return env_main, "FW_CHAT_API_KEY"
-    if preset in PROVIDER_PRESETS:
+    if preset in PROVIDER_PRESETS and preset != "custom" and _host(PROVIDER_PRESETS[preset]["base_url"]) == host:
         ek = PROVIDER_PRESETS[preset]["env_key"]
         val = os.environ.get(ek, "").strip()
         if val:
             return val, ek
-    host = (urllib.parse.urlparse(base_url).hostname or "").lower()
     host_env_map = [
         ("openai.com", "OPENAI_API_KEY"),
         ("deepseek.com", "DEEPSEEK_API_KEY"),
@@ -199,7 +246,7 @@ def _resolve_api_key(preset: str = "", base_url: str = "") -> tuple[str, str]:
         ("openrouter.ai", "OPENROUTER_API_KEY"),
     ]
     for needle, ek in host_env_map:
-        if needle in host:
+        if host == needle or host.endswith("." + needle):
             val = os.environ.get(ek, "").strip()
             if val:
                 return val, ek
@@ -232,7 +279,7 @@ def get_runtime_config(
         "active_model": p.model,
         "hosted": p.hosted,
         "reasoning": str(cfg.get("reasoning") or os.environ.get("FW_CHAT_REASONING", "off")),
-        "self_hosted": os.environ.get("FW_CHAT_SELF_HOSTED", "").strip() == "1",
+        "self_hosted": _self_hosted(p.base_url),
         "has_key": bool(p.key),
         "key_source": key_source,
         "ready": p.kind != "ollama" and why is None,
@@ -266,11 +313,13 @@ def cloud_model(model: str) -> bool:
 
 
 def active(default_url: str, default_model: str) -> Provider:
+    """The provider of the next turn: a setting made in the console (this process) first, then
+    ``FW_CHAT_BASE_URL``, then the saved ``chat_provider.json``, else Nemotron over the tunnel."""
     tunnel = urllib.parse.urlparse(default_url)
-    base = os.environ.get("FW_CHAT_BASE_URL", "").strip()
-    cfg = {} if base else (_RUNTIME_CFG or _load_persisted_cfg())
-    if not base and cfg.get("base_url"):
-        base = str(cfg["base_url"]).strip()
+    env_base = startup_url()
+    cfg = dict(_RUNTIME_CFG) if _RUNTIME_CFG.get("base_url") else ({} if env_base else _load_persisted_cfg())
+    if cfg.get("base_url"):
+        base = str(cfg["base_url"]).strip().rstrip("/")
         u = urllib.parse.urlparse(base)
         model = str(cfg.get("model") or "").strip()
         kind = str(cfg.get("kind") or "openai").strip().lower()
@@ -278,13 +327,12 @@ def active(default_url: str, default_model: str) -> Provider:
             kind = "anthropic"
         loopback = (u.hostname or "") in LOCAL_HOSTS
         own_tunnel = loopback and u.port is not None and u.port == tunnel.port
-        declared = os.environ.get("FW_CHAT_SELF_HOSTED", "").strip() == "1"
-        hosted = not (own_tunnel or declared) or cloud_model(model)
+        hosted = not (own_tunnel or _self_hosted(base)) or cloud_model(model)
         name = str(cfg.get("name") or u.hostname or "api").strip()
         return Provider(
             name,
             kind,
-            base.rstrip("/"),
+            base,
             model,
             hosted,
             u.port,
@@ -292,23 +340,22 @@ def active(default_url: str, default_model: str) -> Provider:
             preset=str(cfg.get("preset") or ""),
             reasoning=str(cfg.get("reasoning") or ""),
         )
-    if not base:
+    if not env_base:
         on_loopback = (tunnel.hostname or "") in LOCAL_HOSTS
         hosted = cloud_model(default_model)
         return Provider(
             "nemotron", "ollama", default_url, default_model, hosted, tunnel.port, on_loopback
         )
-    u = urllib.parse.urlparse(base)
+    u = urllib.parse.urlparse(env_base)
     model = os.environ.get("FW_CHAT_MODEL", "").strip()
     kind = os.environ.get("FW_CHAT_KIND", "").strip().lower() or "openai"
-    if "api.anthropic.com" in base and "/openai" not in base:
+    if "api.anthropic.com" in env_base and "/openai" not in env_base:
         kind = "anthropic"
     loopback = (u.hostname or "") in LOCAL_HOSTS
     own_tunnel = loopback and u.port is not None and u.port == tunnel.port
-    declared = os.environ.get("FW_CHAT_SELF_HOSTED", "").strip() == "1"
-    hosted = not (own_tunnel or declared) or cloud_model(model)
+    hosted = not (own_tunnel or _self_hosted(env_base)) or cloud_model(model)
     name = os.environ.get("FW_CHAT_NAME", "").strip() or (u.hostname or "model")
-    return Provider(name, kind, base.rstrip("/"), model, hosted, u.port, loopback)
+    return Provider(name, kind, env_base, model, hosted, u.port, loopback)
 
 
 def problem(p: Provider) -> str | None:
@@ -328,7 +375,7 @@ def problem(p: Provider) -> str | None:
             " (set FW_CHAT_SELF_HOSTED=1 if the server runs on a machine of the team)."
         )
     if remote and not p.key:
-        return "FW_CHAT_API_KEY is not set for the hosted chat model."
+        return f"No API key for {_host(p.base_url) or 'this server'}: enter the key for this host (FW_CHAT_API_KEY is not set for it)."
     return None
 
 
@@ -447,6 +494,7 @@ def _generate_anthropic(
         "max_tokens": max_tokens,
         "messages": anth_msgs,
         "stream": True,
+        "temperature": 0,  # as on the OpenAI path: the chat words facts, it does not invent
     }
     if sys_text:
         payload["system"] = sys_text
@@ -568,6 +616,7 @@ def generate(
     if extra:
         kw["extra_body"] = extra
     content, tin, tout = "", 0, 0
+    cost: float | None = None
     parts: dict[int, dict[str, str]] = {}  # tool calls arrive in pieces, keyed by their index
     with client.chat.completions.create(**kw) as stream:
         for ch in stream:
@@ -575,6 +624,7 @@ def generate(
                 raise TimeoutError("turn cap reached")
             if getattr(ch, "usage", None):
                 tin, tout = ch.usage.prompt_tokens or 0, ch.usage.completion_tokens or 0
+                cost = gateway_cost(ch.usage) if cost is None else cost
             if not ch.choices:
                 continue
             d = ch.choices[0].delta
@@ -598,4 +648,17 @@ def generate(
             args = {}
         ok = args if isinstance(args, dict) else {}
         calls.append({"name": parts[i]["name"], "arguments": ok})
+    if cost is not None:
+        yield "cost", cost
     yield "end", (content, calls, tin, tout)
+
+
+def gateway_cost(usage: Any) -> float | None:
+    """The cost a gateway reports with the usage (CKEY: ``usage.x_ckey.cost``, in VND, marked as
+    an estimate by the gateway itself); None when the server reports none (A13)."""
+    xk = getattr(usage, "x_ckey", None)
+    if xk is None:
+        xk = (getattr(usage, "model_extra", None) or {}).get("x_ckey")
+    if isinstance(xk, dict) and isinstance(xk.get("cost"), (int, float)):
+        return float(xk["cost"])
+    return None
