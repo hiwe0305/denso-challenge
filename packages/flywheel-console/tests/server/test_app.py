@@ -550,3 +550,72 @@ def test_held_results_never_leave_the_server(locked_srv: Srv) -> None:
     assert out["runs"] == story["runs"] and out["demo"]["models"] == story["demo"]["models"]
     (ix / "tasks.json").write_text(json.dumps({"rounds": [{"id": "r1"}]}))
     assert json.loads(locked_srv.get("/data/story.json")[1]) == story  # nothing held: file as it is
+
+
+def _stale_n_index(ix: Path) -> dict[str, Any]:
+    """story.json and tasks.json built before ``withhold_runs``: run N everywhere."""
+    ix.mkdir(parents=True, exist_ok=True)
+    tasks_doc = {"rounds": [
+        {"id": "tray-jig-r1", "baseline": "M", "after_round": "N", "log_run": "N",
+         "runs": [{"id": "M"},
+                  {"id": "N", "train": "tray/jig-n/da50-ft-n-s0", "session": "da50-n"}],
+         "withhold_runs": [{"id": "N", "sessions": ["da50-*"]}]},
+        {"id": "tray-r1", "after_round": "C70_R1", "withhold_eval": ["C70_R1"],
+         "runs": [{"id": "C_70"}, {"id": "C70_R1"}]},
+    ]}  # fmt: skip
+    story = {
+        "runs": [{"branch": "M", "job": "da48-ft-m-s0"}, {"branch": "N", "job": "da50-ft-n-s0"}],
+        "colab_sessions": [{"session": "da50-n"}, {"session": "da48-m"}],
+        "ledger": [["DA-50", 1.0, 2.5]],
+        "pair": {"runs": [{"run": "C_70", "f": "10/60"}, {"run": "C70_R1", "f": "4/60"}]},
+        "jig": {"runs": [{"run": "M", "successes": 136}, {"run": "N", "successes": 124}],
+                "best": "M", "rollouts": [{"run": "N"}], "conditions": [{"run": "N"}],
+                "live_evals": [{"folder": "da50-eval-n-20261128-033608",
+                                "session": "da50-serve-n-1"}],
+                "n_ckpt_done": 100000,
+                "next_cut": {"name": "N", "source": "fwdata/tray/jig-n/N.tar.json"},
+                "active_sessions": [{"session": "da50-n"}]},
+    }  # fmt: skip
+    (ix / "tasks.json").write_text(json.dumps(tasks_doc))
+    (ix / "story.json").write_text(json.dumps(story))
+    return story
+
+
+def test_hidden_run_never_leaves_the_server(locked_srv: Srv) -> None:
+    """``withhold_runs`` (seed, Hiếu 28/11/2026): a stale index is served without run N."""
+    story = _stale_n_index(locked_srv.paths.index)
+    st, body = locked_srv.get("/data/story.json")
+    text = body.decode()
+    assert st == 200
+    for needle in ("da50", "jig-n", "N.tar", "124"):
+        assert needle not in text, needle
+    out = json.loads(body)
+    assert [r["branch"] for r in out["runs"]] == ["M"]
+    assert [r["run"] for r in out["jig"]["runs"]] == ["M"] and out["jig"]["best"] == "M"
+    assert out["jig"]["next_cut"] is None and out["jig"]["n_ckpt_done"] is None
+    assert out["ledger"] == story["ledger"]  # money spent stays
+    # withhold_eval of tray-r1 still holds C70_R1's result (index tasks.json)
+    assert [r["run"] for r in out["pair"]["runs"]] == ["C_70"]
+    st, body = locked_srv.get("/data/tasks.json")
+    text = body.decode()
+    assert st == 200 and "da50" not in text and "withhold_runs" not in text
+    jig, pair = json.loads(body)["rounds"]
+    assert jig["runs"] == [{"id": "M"}] and jig["after_round"] is None
+    assert pair["withhold_eval"] == ["C70_R1"] and len(pair["runs"]) == 2
+
+
+def test_locked_status_carries_no_hidden_run(locked_srv: Srv) -> None:
+    root = locked_srv.paths.fw_root
+    for folder in ("tray/jig-m/da48-ft-m-s0", "tray/jig-n/da50-ft-n-s0"):
+        (root / folder).mkdir(parents=True)
+        (root / folder / "metrics.jsonl").write_text(json.dumps({"step": 9, "loss": 0.1}) + "\n")
+    guard = root / "colab/da50-eval-n-x"
+    guard.mkdir(parents=True)
+    poll = {"event": "poll", "balance": 1.0, "listed": ["gpu-l4-x"], "time": "t"}
+    (guard / "guard.jsonl").write_text(json.dumps(poll) + "\n")
+    _stale_n_index(locked_srv.paths.index)
+    st, body = locked_srv.get("/api/status")
+    text = body.decode()
+    assert st == 200 and "da50" not in text and "jig-n" not in text
+    train = next(s for s in json.loads(body)["stages"] if s["id"] == "train")
+    assert [r["branch"] for r in train["runs"]] == ["M"]

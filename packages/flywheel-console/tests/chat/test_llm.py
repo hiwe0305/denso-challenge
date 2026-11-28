@@ -307,3 +307,17 @@ def test_stored_turns_that_name_a_held_run_are_not_listed(idx: ConsolePaths) -> 
     (idx.chat / "2026-11-16.jsonl").write_text("\n".join(json.dumps(t) for t in turns) + "\n")
     assert [t["turn_id"] for t in llm.list_traces(10, {"C70_R1"})] == ["t-2"]
     assert llm.get_trace("t-1", {"C70_R1"}) is None and llm.get_trace("t-1") is not None
+
+
+def test_stored_turns_that_name_a_hidden_run_are_not_listed(idx: ConsolePaths) -> None:
+    """``withhold_runs`` (run N): a bare substring test of "N" cannot work; the run's folders,
+    session patterns and ``run N`` as a whole word are matched instead (from the seed)."""
+    idx.chat.mkdir(parents=True, exist_ok=True)
+    turns = [{"turn_id": "t-1", "question": "loss?", "answer": "job da50-ft-n-s0 at 0.12"},
+             {"turn_id": "t-2", "question": "Run N đạt bao nhiêu?", "answer": "x"},
+             {"turn_id": "t-3", "question": "run nào tốt nhất?", "answer": "M đạt 136/180"},
+             {"turn_id": "t-4", "question": "colab?", "answer": "da50-serve-n-1 on"}]  # fmt: skip
+    (idx.chat / "2026-11-28.jsonl").write_text("\n".join(json.dumps(t) for t in turns) + "\n")
+    assert [t["turn_id"] for t in llm.list_traces(10)] == ["t-3"]
+    assert llm.get_trace("t-1") is None and llm.get_trace("t-2") is None
+    assert llm.get_trace("t-3") is not None

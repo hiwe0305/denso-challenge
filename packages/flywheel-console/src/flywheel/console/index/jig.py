@@ -17,8 +17,9 @@ Shape::
       "rules": {whole_task, per_level, place, read_at, source{vi,en}},   # from tasks.yaml
       "eval_set": {"path", "conditions_sha256", "sha_ok"}, "rollouts_expected", "scorer_version",
       "runs": [train entries in manifest order (story.round_runs)],
-      "train_log_tail": [...], "vm_phases": {...},                      # of log_run
-      "evals": [one per run, manifest order:
+      "log_run": the run id whose VM log the two next keys are (None without one),
+      "train_log_tail": [...], "vm_phases": {...},
+      "evals": [one per shown run, manifest order:
         {"run", "role", "status": "ready" | "missing" | "blocked" | "withheld",
          "results_source": "fwdata/<outcome>/results.json",
          "command": results_cmd                 # only when "missing"
@@ -32,17 +33,25 @@ Shape::
                       {"rule": "2", "scope": "level", "level": "1", ...}, {... "level": "2"},
                       {"rule": "3", "scope": "place", "threshold", "lower": None,
                        "verdict": None, "why": "no_ci"}]}],
-      "paired": {"variant", "baseline", "status", "source", "command" (when missing), "problems",
+      "paired": None when the variant or the baseline is hidden, else
+                {"variant", "baseline", "status", "source", "command" (when missing), "problems",
                  "headline", "by_level",         # copied from paired.repeats of the variant
                  "readings": [{"rule": "n2", "scope": "whole_task", "diff", "ci", "ci_vs_0",
                                "verdict": "better" | "worse" | "not_distinguished" | None},
                               {"rule": "n3", "scope": "level", "level": "2", ...}]},
-      "featured": after_round's run id if its eval is ready, else the baseline's, else None,
+      "featured": after_round's run id if shown and its eval is ready, else the baseline's if
+                  ready, else None,
       # descriptive, from the runs' outcome folders (scores.jsonl, outcomes.jsonl): no interval
       "steps", "outcomes": [per run: counts, step pass, repeat spread, relaxed placement],
-      "rollouts", "conditions", "live_evals", "agentqa", "cuts", "m_cut", "next_cut",
-      "n_ckpt_done", "active_sessions",
+      "rollouts", "conditions", "live_evals", "agentqa", "cuts", "m_cut",
+      "next_cut", "n_ckpt_done",          # of the after-round run; None when it is hidden
+      "active_sessions",
     }
+
+Runs in the round's ``withhold_runs`` (Hiếu, 28/11/2026: run N) are never written: no eval, train
+entry, outcome row, rollout, condition, cut, log, paired block, live eval watcher or Colab session
+whose name matches the round's session patterns, and no Agent QA cluster of the run
+(``hidden.py``; ``story.build`` also runs the whole document through ``hidden.story``).
 
 A reading is given only when the file meets every condition before reading (story DA-53 "Luật
 đọc"): ``rollouts`` equals the round's ``rollouts_expected``, ``missing`` is empty, the eval set's
@@ -68,6 +77,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+from flywheel.console.index import hidden
 from flywheel.console.index.tasks import Round, Run
 
 RESULTS = "results.json"
@@ -244,9 +254,12 @@ def _paired_reading(rule: str, scope: str, d: Any, blocked: bool, **extra: Any) 
     return r | {"verdict": CI_VS_0[where]}
 
 
-def _paired(fw: Path, rnd: Round, evals: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    """``paired.repeats`` of the after-round run's results.json (written with ``--baseline``)."""
-    var, base = rnd.after_round, rnd.baseline
+def _paired(fw: Path, rnd: Round, evals: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+    """``paired.repeats`` of the after-round run's results.json (written with ``--baseline``);
+    None when the after-round run is hidden (``withhold_runs``)."""
+    var, base = rnd.shown_after_round, rnd.baseline
+    if var is None:
+        return None
     head: dict[str, Any] = {"variant": var, "baseline": base}
     ev, eb = evals.get(var) or {}, evals.get(base) or {}
     if "withheld" in (ev.get("status"), eb.get("status")):
@@ -519,23 +532,31 @@ def build(
     vm_phases: dict[str, float],
     step_ids: tuple[str, ...],
     sessions: list[dict[str, Any]],
+    log_run: str | None = None,
 ) -> dict[str, Any]:
     """The ``jig`` block of ``story.json`` for the round listing ``story.jig`` (``{}`` if none).
 
     ``runs``, ``train_log_tail`` and ``vm_phases`` are the round's training runs and VM log read
-    by ``story.round_runs`` and ``story._train_log``.
+    by ``story.round_runs`` and ``story._train_log``; ``log_run`` names whose log it is. A run in
+    ``withhold_runs`` is left out of everything (module docstring).
     """
     if rnd is None:
         return {}
+    hide = hidden.of_round(rnd)
+    shown = rnd.shown_runs
+    runs = [e for e in runs if not hide.run(e.get("branch"))]
+    if hide.run(log_run):
+        log_run, train_log_tail, vm_phases = None, [], {}
     sha_ok, sha_problem = _sha_ok(fw, rnd)
-    evals = [_eval(fw, rnd, r, sha_problem) for r in rnd.runs]
+    evals = [_eval(fw, rnd, r, sha_problem) for r in shown]
     by_id = {e["run"]: e for e in evals}
     ready = {e["run"] for e in evals if e["status"] == "ready"}
-    featured = next((x for x in (rnd.after_round, rnd.baseline) if x in ready), None)
+    after_id = rnd.shown_after_round
+    featured = next((x for x in (after_id, rnd.baseline) if x is not None and x in ready), None)
     outcomes: list[dict[str, Any]] = []
     rollouts: list[dict[str, Any]] = []
     conditions: list[dict[str, Any]] = []
-    for r in rnd.runs:
+    for r in shown:
         if r.id in rnd.withhold_eval:
             continue
         row, rr, cc = _outcome(fw, r, step_ids)
@@ -543,8 +564,10 @@ def build(
             outcomes.append(row)
             rollouts += rr
             conditions += cc
-    cuts = {r.id: c for r in rnd.runs if (c := _cut(fw, r)) is not None}
-    after = next((e for e in runs if e.get("branch") == rnd.after_round), {})
+    cuts = {r.id: c for r in shown if (c := _cut(fw, r)) is not None}
+    after = next((e for e in runs if after_id is not None and e.get("branch") == after_id), {})
+    watchers = hidden.off_sessions(live_eval_watchers(fw), hide, "folder", "session")
+    running = [s for s in sessions if s.get("state") == "running"]
     return {
         "round": rnd.id,
         "scene": rnd.scene,
@@ -559,6 +582,7 @@ def build(
         "rollouts_expected": rnd.rollouts_expected,
         "scorer_version": rnd.scorer_version,
         "runs": runs,
+        "log_run": log_run,
         "train_log_tail": train_log_tail,
         "vm_phases": vm_phases,
         "evals": evals,
@@ -568,11 +592,11 @@ def build(
         "outcomes": outcomes,
         "rollouts": rollouts,
         "conditions": conditions,
-        "live_evals": live_eval_watchers(fw),
-        "agentqa": agentqa_assemblies(fw),
+        "live_evals": watchers,
+        "agentqa": hidden.agentqa(agentqa_assemblies(fw), hide),
         "cuts": cuts,
         "m_cut": cuts.get(rnd.baseline),  # kept for the pages until task 2.4
-        "next_cut": cuts.get(rnd.after_round),
+        "next_cut": cuts.get(after_id) if after_id is not None else None,
         "n_ckpt_done": after.get("ckpt_step"),
-        "active_sessions": [s for s in sessions if s.get("state") == "running"],
+        "active_sessions": hidden.off_sessions(running, hide, "session"),
     }

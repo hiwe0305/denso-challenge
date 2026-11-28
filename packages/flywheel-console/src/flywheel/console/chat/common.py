@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from flywheel.console.index import hidden
 from flywheel.console.paths import PathDenied, active, guard
 
 Result = dict[str, Any]
@@ -134,7 +135,10 @@ def public_ds(ds: str) -> bool:
 
 
 def story() -> dict[str, Any]:
+    """The index ``story.json`` without the runs a round does not present (``withhold_runs``,
+    read from the seed, so an index built before the switch is cleaned too)."""
     d = jload(active().index / "story.json", {})
+    d = hidden.story(d, hidden.load(active())) if isinstance(d, dict) else {}
     return d if isinstance(d, dict) else {}
 
 

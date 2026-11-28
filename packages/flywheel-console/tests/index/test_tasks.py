@@ -41,15 +41,18 @@ def test_packaged_jig_round(fw: ConsolePaths) -> None:
     assert m.jig_round() is j and j.index == ("story.jig",)
     assert j.run_ids == ("M", "N") and j.controls == () and j.withhold_eval == ()
     assert [x.role for x in j.runs] == ["baseline", "after_round"]
+    # Hiếu, 28/11/2026: run N stays declared but is not presented
+    assert j.withhold_runs == ("N",) and j.hidden_sessions == ("da50-*",)
+    assert [x.id for x in j.shown_runs] == ["M"] and j.shown_after_round is None
+    assert j.log_run == "M" and "N" not in j.raw["title"]["vi"] + j.raw["title"]["en"]
     assert j.train_dir is None and j.eval_dir is None and j.rule_tag is None
     assert (j.scene, j.max_steps, j.rollouts_expected, j.scorer_version) == ("jig2", 100000, 180, 2)
-    # docs/he/tray-jig.md §6 (jig-n-rules, scope)
     assert j.conditions_sha256 == (
         "bbec07e31ee022ac46d59e5322628c226519abe76363160ccbdb78b68725d348"
     )
     assert j.rules is not None
     assert (j.rules["whole_task"], j.rules["per_level"], j.rules["place"]) == (0.8, 0.7, 0.5)
-    assert "jig-m-rules" in j.rules["source"]["en"] and "jig-n-rules" in j.rules["source"]["vi"]
+    assert "jig-m-rules" in j.rules["source"]["en"] and "jig-n" not in str(j.rules["source"])
     mm, nn = j.runs
     assert (mm.bootstrap_seed, nn.bootstrap_seed) == (20261125, 20261126)
     assert (mm.rules_block, nn.rules_block) == ("jig-m-rules", "jig-n-rules")
@@ -105,6 +108,26 @@ def _pair_round(d: dict[str, Any]) -> dict[str, Any]:
         (lambda d: _jig(d)["rules"].update(read_at="point"), "read_at: expected 'lower_bound'"),
         (lambda d: _jig(d)["rules"]["source"].pop("vi"), "rules.source: needs a non-empty 'vi'"),
         (lambda d: _jig(d).update(controls=["X"]), "'X' is not one of its runs"),
+        # withhold_runs (Hiếu, 28/11/2026)
+        (lambda d: _jig(d).update(withhold_runs="N"), "withhold_runs: expected a list"),
+        (lambda d: _jig(d).update(withhold_runs=[{"id": "X"}]), "'X' is not one of its runs"),
+        (lambda d: _jig(d).update(withhold_runs=[{"id": ""}]), "id: must not be empty"),
+        (lambda d: _jig(d).update(withhold_runs=[{"sessions": []}]), "missing key 'id'"),
+        (lambda d: _jig(d).update(withhold_runs=[{"id": "N"}, {"id": "N"}]), "listed twice"),
+        (lambda d: _jig(d).update(withhold_runs=[{"id": "M"}]), "baseline and cannot be hidden"),
+        (
+            lambda d: _jig(d).update(withhold_runs=[{"id": "N", "sessions": "da50-*"}]),
+            "sessions: expected a list of non-empty strings",
+        ),
+        (
+            lambda d: _jig(d).update(withhold_runs=[{"id": "N", "sessions": [""]}]),
+            "sessions: expected a list of non-empty strings",
+        ),
+        (lambda d: _jig(d).update(log_run="N"), "log_run and cannot be hidden"),
+        (
+            lambda d: _pair_round(d).update(withhold_runs=[{"id": "B_70"}]),
+            "control 'B_70' and cannot be hidden",
+        ),
     ],
 )
 def test_manifest_errors_name_the_rule(fw: ConsolePaths, edit: Any, message: str) -> None:
@@ -142,8 +165,33 @@ def test_build_resolves_totals_evals_and_clusters(fw: ConsolePaths, tmp_path: Pa
     roles = {r["id"]: r["role"] for r in doc["rounds"][0]["runs"]}
     assert roles[doc["rounds"][0]["baseline"]] == "baseline"
     jig = _jig(doc)
-    assert [(r["id"], r["role"]) for r in jig["runs"]] == [("M", "baseline"), ("N", "after_round")]
+    assert [(r["id"], r["role"]) for r in jig["runs"]] == [("M", "baseline")]
     assert jig["rules"]["whole_task"] == 0.8 and jig["controls"] == []
+
+
+def test_build_never_writes_a_hidden_run(fw: ConsolePaths, tmp_path: Path) -> None:
+    """``withhold_runs``: tasks.json (read by the browser) names nothing of run N."""
+    out = tmp_path / "out"
+    tasks.build(fw, out)
+    doc = json.loads((out / "tasks.json").read_text())
+    jig = _jig(doc)
+    assert jig["after_round"] is None and jig["baseline"] == "M" and jig["log_run"] == "M"
+    assert [r["id"] for r in jig["runs"]] == ["M"] and "withhold_runs" not in jig
+    text = json.dumps(jig, ensure_ascii=False)
+    for needle in ('"N"', "da50", "jig-n", "N.tar", "20261126", "jig-n-rules"):
+        assert needle not in text, needle
+    pair = _pair_round(doc)  # withhold_eval of tray-r1 is unchanged (Hiếu, 16/11/2026)
+    assert pair["withhold_eval"] == ["C70_R1"] and pair["after_round"] == "C70_R1"
+    assert "C70_R1" in [r["id"] for r in pair["runs"]]
+
+
+def test_build_keeps_the_run_without_withhold_runs(fw: ConsolePaths) -> None:
+    """The M -> N modelling stays ready: without the key, N is a normal after-round run."""
+    data = copy.deepcopy(_raw(fw))
+    _jig(data).pop("withhold_runs")
+    j = tasks.parse(data).round("tray-jig-r1")
+    assert j.withhold_runs == () and [x.id for x in j.shown_runs] == ["M", "N"]
+    assert j.shown_after_round == "N"
 
 
 def test_build_without_summary_gives_no_number(fw: ConsolePaths, tmp_path: Path) -> None:

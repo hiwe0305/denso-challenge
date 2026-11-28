@@ -24,7 +24,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from flywheel.console.index import cards
+from flywheel.console.index import cards, hidden
 from flywheel.console.paths import ConsolePaths, active, guard
 
 VIDEO_EXT = (".mp4", ".mov", ".mkv", ".avi", ".webm")
@@ -1651,6 +1651,8 @@ def max_steps(job_dir: Path) -> int | None:
 
 
 def train_runs() -> list[dict[str, Any]]:
+    """Training runs with a ``metrics.jsonl``; a run in ``withhold_runs`` is left out."""
+    hide = hidden.load(_p())
     runs: list[dict[str, Any]] = []
     seen: set[Path] = set()
     candidates: list[tuple[str, str, Path]] = []
@@ -1666,7 +1668,7 @@ def train_runs() -> list[dict[str, Any]]:
         branch = parent_name.removeprefix("jig-").upper() or parent_name
         candidates.append(("tray", branch, f))
     for task_id, branch, f in candidates:
-        if f in seen:
+        if f in seen or hide.run(branch) or hide.mentions(f.parent.name):
             continue
         seen.add(f)
         try:
@@ -1686,9 +1688,27 @@ def train_runs() -> list[dict[str, Any]]:
     return runs
 
 
+def _hidden_endpoints(hide: hidden.Hidden) -> set[str]:
+    """Colab VM endpoints of the sessions of hidden runs (``colab/*/<session>.json``)."""
+    out: set[str] = set()
+    if not hide:
+        return out
+    for f in _fw().glob("colab/*/*.json"):
+        if hide.session(f.stem):
+            ep = (jread(f, {}) or {}).get("endpoint") if f.is_file() else None
+            if isinstance(ep, str) and ep:
+                out.add(ep)
+    return out
+
+
 def colab_state() -> dict[str, Any]:
+    """Balance and listed VMs of the newest guard log. A guard of a hidden run's session folder
+    is skipped, and VMs of hidden runs' sessions are left out of ``sessions``."""
+    hide = hidden.load(_p())
     best: Path | None = None
     for f in _fw().glob("colab/*/guard.jsonl"):
+        if hide.session(f.parent.name):
+            continue
         if best is None or f.stat().st_mtime > best.stat().st_mtime:
             best = f
     out: dict[str, Any] = {"balance": None, "sessions": [], "time": None}
@@ -1700,8 +1720,10 @@ def colab_state() -> dict[str, Any]:
         except Exception:
             continue
         if d.get("event") == "poll":
+            gone = _hidden_endpoints(hide)
+            listed = [x for x in d.get("listed") or [] if not hide.session(x) and x not in gone]
             out.update(
-                balance=d.get("balance"), sessions=d.get("listed") or [], time=d.get("time"),
+                balance=d.get("balance"), sessions=listed, time=d.get("time"),
                 rate=d.get("rate"), fresh=(time.time() - best.stat().st_mtime) < 900,
             )  # fmt: skip
             break
@@ -1748,6 +1770,7 @@ def _eval_loop_text() -> tuple[str, str]:
         return "", ""
     if not isinstance(doc, dict):
         return "", ""
+    doc = hidden.story(doc, hidden.load(_p()))  # an index built before withhold_runs
     pair = doc.get("pair") or {}
     held = _withheld_runs()  # a run whose test result is not presented stays out of the status
     runs = {r.get("run"): r for r in pair.get("runs") or []
