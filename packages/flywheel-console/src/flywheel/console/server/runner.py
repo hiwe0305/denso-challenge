@@ -2008,8 +2008,13 @@ def _hidden(name: str) -> bool:
 
 
 def _run_folder(name: str, hide: hidden.Hidden) -> bool:
-    """``name`` is a job, outcome or session folder (or file) of a run in ``withhold_runs``."""
-    return name in hide.names or hide.session(name)
+    """``name`` is a job, outcome or session folder (or file) of a run in ``withhold_runs``.
+
+    A manifest name also covers what starts with it and a separator, so a later job of the run is
+    hidden too (``jig-n`` covers ``jig-n-60000-r3``, not ``jig-new``)."""
+    return hide.session(name) or any(
+        name == n or name.startswith((f"{n}-", f"{n}_", f"{n}.")) for n in hide.names
+    )
 
 
 def _browsable(p: Path, hide: hidden.Hidden) -> Path:
