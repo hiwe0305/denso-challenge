@@ -730,6 +730,14 @@ def _mark(say: Say, reading: dict[str, Any], thr: Any) -> dict[str, str]:
     return {"mark": t + (" %" if say.vi else "%"), "verdict": verdict}
 
 
+def _mark_cell(say: Say, m: dict[str, str]) -> str:
+    """A table cell with the mark beside its verdict ("chưa đạt mốc 80 %"): without the word
+    for the mark the percent reads as a share of successes (W1: the verdict reads a CI lower bound)."""
+    if m["verdict"] in (say("đạt", "met"), say("chưa đạt", "not met")):
+        return say(f"{m['verdict']} mốc {m['mark']}", f"{m['verdict']} the {m['mark']} mark")
+    return f"{m['verdict']} ({say('mốc', 'mark')} {m['mark']})"
+
+
 KIND_WORD = {"measured": ("thực đo", "measured"), "estimated": ("ước tính", "estimated")}
 PART_WORD = {"train": ("train", "training"), "eval": ("eval", "evaluation")}
 
@@ -903,12 +911,14 @@ def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str,
     for key in _sections(PLAN, focus, extra or []):
         lines += F.get(key) or []
         sources += src_of.get(key, []) if F.get(key) else []
-    rows = [{"run": run, "scope": say("cả task", "whole task"), "successes": f"{k}/{n}", "ci": say.ci(h.get("ci")), "reading": f"{whole['verdict']} {whole['mark']}"}]
+    rows = [{"run": run, "scope": say("cả task", "whole task"), "successes": f"{k}/{n}", "ci": say.ci(h.get("ci")), "reading": _mark_cell(say, whole)}]
     for key in sorted(lv):
         x = lv[key] or {}
         rows.append({"run": run, "scope": say(f"mức {key}", f"level {key}"), "successes": f"{x.get('successes')}/{x.get('n')}", "ci": say.ci(x.get("ci")),
-                     "reading": f"{lvl_mark[key]['verdict']} {lvl_mark[key]['mark']}"})  # fmt: skip
-    ui = table(say.name(rnd.get("title")), cols("run", "scope", "successes", "ci", "reading"), rows, link="#/eval")
+                     "reading": _mark_cell(say, lvl_mark[key])})  # fmt: skip
+    columns = [{"key": "run", "label": "Run"}, {"key": "scope", "label": say("Phạm vi", "Scope")}, {"key": "successes", "label": say("Thành công", "Successes")},
+               {"key": "ci", "label": say("KTC 95 %", "95% CI")}, {"key": "reading", "label": say("Đọc theo luật", "Reading by the rules")}]  # fmt: skip
+    ui = table(say.name(rnd.get("title")), columns, rows, link="#/eval")
     return _done(ui, lines, sources)
 
 

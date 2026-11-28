@@ -5,6 +5,10 @@ identity answer names no model, and the tools' sources reach the ``done`` event.
 
 from __future__ import annotations
 
+import ast
+import json
+import re
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -136,7 +140,7 @@ def test_the_real_27_11_sequence_answers_the_newest_question_only(idx: ConsolePa
 
     monkeypatch.setattr(llm, "generate", gen)
     turns = [
-        ("Hãy phân tích cho tôi về kết quả của lần chạy M", "Run M đạt 136/180 lượt."),
+        ("Hãy phân tích cho tôi về kết quả của lần chạy M", "Run M: 136/180 lượt thành công."),
         ("Bạn là phiên bản claude bao nhiêu?", "Tôi là Trợ lý phân tích của Flywheel Console."),
         ("[Pinned context: dataset=egodex-da30] @egodex-da30 đánh giá cho tôi bộ dữ liệu này", "Bộ egodex-da30 có 30 clip."),
         ("[Pinned context: dataset=egodex-da30] Tôi muốn xem qua 1 số sample của nó", "Đây là vài sample."),
@@ -258,3 +262,62 @@ def test_the_trace_carries_labels_rows_and_ms_and_no_model_thinking(idx: Console
 def test_the_prompt_keeps_an_unasked_re_test_out_of_the_answer() -> None:
     # live panel check 28/11/2026: a failure-chart answer ended with "chưa có kết quả kiểm tra lại sau vòng"
     assert "never write a note about a re-test (kiểm tra lại, thi lại) the user did not ask about" in llm.SYSTEM
+
+
+# W1 (docs/he/tray-jig.md §2): "đạt" reads a CI lower bound against a mark, never a count.
+# Live panel 28/11/2026: "chỉ run M được trình bày, đạt 136/180 (75,6 %)".
+_MET_COUNT = re.compile(r"(?i)\b(đạt|met)\s*(\d|\{)")
+_RULE_EXAMPLE = "never 'đạt 10/60' / 'met 10/60'"  # the prompt's own counter-example
+
+
+def _literals(path: Path) -> list[str]:
+    """The string literals of a module (f-strings as written), never its comments."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return [ast.unparse(n) if isinstance(n, ast.JoinedStr) else n.value for n in ast.walk(tree)
+            if isinstance(n, ast.JoinedStr) or (isinstance(n, ast.Constant) and isinstance(n.value, str))]  # fmt: skip
+
+
+def test_no_canned_text_writes_dat_before_a_count() -> None:
+    chat = Path(llm.__file__).parent
+    hits = [(p.name, s) for p in sorted(chat.glob("*.py")) for s in _literals(p) if _MET_COUNT.search(s.replace(_RULE_EXAMPLE, ""))]
+    web = chat.parent / "web"
+    for p in [web / "chat.js", *sorted((web / "i18n").glob("*.js"))]:
+        hits += [(p.name, m.group(0)) for m in _MET_COUNT.finditer(p.read_text(encoding="utf-8"))]
+    # bench history replays earlier assistant turns to the model: they must show the right form
+    for ln in (chat / "bench.jsonl").read_text(encoding="utf-8").splitlines():
+        item = json.loads(ln)
+        hits += [(item["id"], h["content"]) for h in item.get("history") or [] if _MET_COUNT.search(h["content"])]
+    assert hits == []
+
+
+def test_the_prompt_writes_a_count_as_a_count() -> None:
+    assert _RULE_EXAMPLE in llm.SYSTEM and "'136/180" not in llm.SYSTEM  # an earlier answer's figure never reaches the prompt
+    assert "'C_70: 10/60 lượt thành công (16,7 %)'" in llm.SYSTEM and "'đạt' / 'met' is only the verdict of a mark" in llm.SYSTEM
+    bench = {json.loads(ln)["id"]: json.loads(ln) for ln in (Path(llm.__file__).parent / "bench.jsonl").read_text(encoding="utf-8").splitlines()}
+    for bid in ("a01", "a09", "a19"):
+        forbid = [re.compile(p, re.I) for p in bench[bid]["forbid"]]
+        assert any(p.search("Chỉ run M được trình bày, đạt 136/180 (75,6 %).") for p in forbid), bid
+        assert not any(p.search("Run M: 136/180 lượt thành công (75,6 %); mức 1 đạt mốc 70 %.") for p in forbid), bid
+
+
+@pytest.mark.parametrize("rnd", ["r1", "jig-r1"])
+def test_the_round_report_rows_never_write_dat_before_a_count(idx: ConsolePaths, rnd: str) -> None:
+    _two_rounds(idx)
+    res = registry.call("round_report", {}, {"task": "tray", "round": rnd, "lang": "vi", "question": "Run nào tốt nhất, vì sao?"})
+    assert res["ok"] and not _MET_COUNT.search(res["model"]) and not _MET_COUNT.search(json.dumps(res["ui"], ensure_ascii=False))
+
+
+def test_the_round_report_table_names_its_columns_in_the_user_language(idx: ConsolePaths) -> None:
+    _two_rounds(idx)
+    labels = {}
+    for lang in ("vi", "en"):
+        res = registry.call("round_report", {}, {"task": "tray", "round": "jig-r1", "lang": lang, "question": "Run nào tốt nhất, vì sao?"})
+        labels[lang] = [(c["key"], c["label"]) for c in res["ui"]["columns"]]
+    keys = ["run", "scope", "successes", "ci", "reading"]
+    assert labels["vi"] == list(zip(keys, ["Run", "Phạm vi", "Thành công", "KTC 95 %", "Đọc theo luật"]))
+    assert labels["en"] == list(zip(keys, ["Run", "Scope", "Successes", "95% CI", "Reading by the rules"]))
+    # a verdict names its mark: "chưa đạt mốc 80 %", never "chưa đạt 80 %" (read as a share)
+    rows = {r["scope"]: r["reading"] for r in res["ui"]["rows"]}
+    assert rows["whole task"] == "not met the 80% mark", rows
+    vi = registry.call("round_report", {}, {"task": "tray", "round": "jig-r1", "lang": "vi", "question": "Run nào tốt nhất, vì sao?"})
+    assert [r["reading"] for r in vi["ui"]["rows"]] == ["chưa đạt mốc 80 %", "đạt mốc 70 %", "chưa đạt mốc 70 %"]
