@@ -116,3 +116,19 @@ def test_the_shares_verify_and_the_prompt_sets_the_format(idx: ConsolePaths, mon
     assert "COMPARE60 rows" in llm.SYSTEM and "'47/60 (78,3 %)'" in llm.SYSTEM and "In deep analysis only, add one bar chart" in llm.SYSTEM
     assert "the one exception is the COMPARE60 chart" in llm.SYSTEM
     assert "the NOTE text word for word as the last line" in llm.SYSTEM and "never 'tốt hơn', 'cao hơn', 'thấp hơn'" in llm.SYSTEM
+
+
+def test_the_table_reads_well_and_has_no_duplicate_5_cm_row(idx: ConsolePaths) -> None:
+    _with_ladder(idx)
+    res = _call()
+    # "≤ 5 cm" relaxed is the success row again: only the thresholds above the standard
+    assert "Nới ≤ 5 cm" not in res["model"] and "standard_cm=5 | relaxed_cm=7,5,10,15,20" in res["model"]
+    assert [r["measure"] for r in res["ui"]["rows"]][:2] == ["Thành công (chuẩn 5 cm)", "Nới ≤ 7,5 cm"]
+    # the first header in words, run ids as written (cols() would give "C ALL")
+    assert res["ui"]["columns"][:3] == [{"key": "measure", "label": "Chỉ số"}, {"key": "C_ALL", "label": "C_ALL"}, {"key": "C_70", "label": "C_70"}]
+    assert _call("en")["ui"]["columns"][0]["label"] == "Measure"
+    # tool tables are drawn as plain text, never through the markdown renderer
+    from pathlib import Path
+
+    js = (Path(llm.__file__).parent.parent / "web" / "chat.js").read_text(encoding="utf-8")
+    assert 'el("th", { text: c.label || c.key })' in js and 'return el("td", { text: valTxt });' in js
