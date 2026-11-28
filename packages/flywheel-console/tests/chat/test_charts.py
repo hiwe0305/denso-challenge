@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 from chat_index import make_idx  # noqa: F401
-from flywheel.console.chat import charts, llm
+from flywheel.console.chat import charts, llm, registry
 from flywheel.console.paths import ConsolePaths
 from test_analysis import _body, _hosted, _two_rounds
 
@@ -98,6 +98,34 @@ def test_the_prompt_allows_charts_only_with_the_numbers_beside_them() -> None:
     assert "at least four values" in llm.SYSTEM and "At most 12 x labels, 6 series and 2 charts" in llm.SYSTEM
     assert "always keep the table, or a line with the key numbers" in llm.SYSTEM
     assert "no code, no HTML" in llm.SYSTEM
+
+
+def test_deep_analysis_has_five_parts_and_the_tray_jig_reading_rules() -> None:
+    assert llm.DEEP_PARTS["Vietnamese"] == "Kết luận / Bằng chứng / Diễn giải / Giới hạn / Hướng tiếp theo"
+    assert llm.DEEP_PARTS["English"] == "Conclusion / Evidence / Reading / Limits / Next steps"
+    for phrase in ("at most four bullets, each tied to a number", "never invent one", "descriptive only", "lower bound of its interval reaches the mark", "several lookups in a row"):
+        assert phrase in llm.DEEP, phrase
+    assert "Nguồn" not in llm.DEEP
+
+
+def test_a_deep_turn_may_read_several_lookups_in_a_row(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
+    _two_rounds(idx)
+    _hosted(monkeypatch)
+    offered: list[list[str]] = []
+    calls = iter([[{"name": "failure_table", "arguments": {}}], [{"name": "train_progress", "arguments": {}}], []])
+
+    def gen(msgs: Any, schemas: Any, deadline: float, *a: Any) -> Any:
+        offered.append([s["function"]["name"] for s in schemas or []])
+        tc = next(calls)
+        text = "" if tc else "**Kết luận** Run M 136/180."
+        yield "end", (text, tc, 1, 1)
+
+    monkeypatch.setattr(llm, "generate", gen)
+    evs = list(llm.events(_body("Phân tích sâu kết quả vòng hiện tại", "jig-r1", mode="investigate")))
+    ran = [d["name"] for e, d in evs if e == "tool_result"]
+    assert ran[0] == "round_report" and "failure_table" in ran and "train_progress" in ran
+    assert set(registry.DEEP_TOOLS) - {"round_diagnosis", "pair_comparisons"} <= set(offered[0])
+    assert evs[-1][0] == "done"
 
 
 def test_the_web_draws_chart_blocks_by_the_same_rules() -> None:

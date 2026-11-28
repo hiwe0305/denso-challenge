@@ -92,14 +92,20 @@ SYSTEM = (
 )
 
 DEEP = (
-    " Mode: DEEP ANALYSIS. round_report for the selected round is already read. Call round_diagnosis or pair_comparisons only when they add to the answer. "
-    "Then write about 400 words in the user's language, in four parts with short bold headings: {parts}. "
-    "Numbers: the direct answer and the readings against the marks. Controls: what each number is compared with and whether the conditions are the same. "
-    "Limits: seeds, simulation, what has not been checked. Next steps: the next_steps rows, as proposals. No source part: the interface shows the sources. "
-    "Cite only verified tool numbers."
+    " Mode: DEEP ANALYSIS. round_report for the selected round is already read. Look further only where it adds evidence: you may call several lookups in a row "
+    "(round_diagnosis, pair_comparisons, failure_table, train_progress, rounds_side_by_side, project_status), never the same one twice. "
+    "Then write about 400 words in the user's language, in five parts with short bold headings: {parts}. "
+    "Conclusion: one or two sentences that answer the question. "
+    "Evidence: the tool numbers the conclusion rests on, as a table and, when the CHARTS rule allows it, a chart. "
+    "Reading: at most four bullets, each tied to a number shown in Evidence. "
+    "Limits: one seed, simulation, preliminary numbers, what has not been checked, and comparable=no rows. "
+    "Next steps: only the NEXT or OPTION rows the tools return (such as a control run), as proposals; write that the documents give none when there are none, and never invent one. "
+    "Reading rules (docs/he/tray-jig.md section 2): a comparison across rounds is descriptive only, the numbers side by side with what differs, never 'better' or 'up by'; "
+    "a level or the task counts as met ('đạt' / 'met') only when the lower bound of its interval reaches the mark; never credit the place-step data for a result without a control run on the same conditions. "
+    "No source part: the interface shows the sources. Cite only verified tool numbers."
 )
-DEEP_PARTS = {"Vietnamese": "Số liệu / Đối chứng / Giới hạn / Việc nên làm",
-              "English": "Numbers / Controls / Limits / Next steps"}  # fmt: skip
+DEEP_PARTS = {"Vietnamese": "Kết luận / Bằng chứng / Diễn giải / Giới hạn / Hướng tiếp theo",
+              "English": "Conclusion / Evidence / Reading / Limits / Next steps"}  # fmt: skip
 
 FORCE_ANSWER = (
     "Stop looking things up. Write the answer to the newest question now in {lang}, in the answer shape, "
@@ -630,9 +636,8 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
     if deep and seed_ok:
         # deep analysis always starts from the round's facts; the model may then look further,
         # but opens no page (A4, A14)
-        extra = [n for n in names if n not in registry.ANALYSIS_TOOLS and n != "open_page"]
-        names = [n for n in registry.ANALYSIS_TOOLS if registry.usable(n)] + extra
-        names = names[: registry.MAX_OFFERED]
+        extra = [n for n in names if n not in registry.DEEP_TOOLS and n != "open_page"]
+        names = [n for n in registry.DEEP_TOOLS if registry.usable(n)] + extra[:3]
         prefetch = list(dict.fromkeys(["round_report", *forced_all]))
     else:
         prefetch = list(forced_all)
