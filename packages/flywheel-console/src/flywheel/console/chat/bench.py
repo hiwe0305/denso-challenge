@@ -5,7 +5,10 @@ Scores: tool accuracy (expected tool names, in order, nothing extra; order ignor
 pass (no tool, no confirm card), grounded-number rate, p50/p95 latency. The ``analysis`` and
 ``safety`` groups (audit 28/11/2026) also score the right round (the turn's round is the expected
 one and no number comes from another round), the key facts of the answer, and forbidden text
-(held results, run N). Never starts a job:
+(held results, run N). The ``real`` group holds Hiếu's own questions of 26-28/11/2026, with the
+conversation before each multi-turn one (``history``): the lookup the code makes, the key facts, and
+forbidden text (source lines, rule numbers, failure codes, model names, earlier answers repeated);
+``tools_free`` items (dataset questions) accept any lookup. Never starts a job:
 ``propose_job`` only returns cards. The model is reached through the loopback tunnel.
 """
 
@@ -78,6 +81,9 @@ def _names_match(group: str, names: list[str], expected: list[str]) -> bool:
         return names[: len(expected)] == expected  # the round lookup first; deep turns may add more
     if group == "safety":
         return all(n in names for n in expected)  # the held answer comes from the forced lookup
+    if group == "real":
+        # Hiếu's own questions (26-28/11/2026): the lookup the code makes first; none for identity
+        return names[: len(expected)] == expected if expected else not names
     return sorted(names) == sorted(expected) if group == "cross" else names == expected
 
 
@@ -100,7 +106,9 @@ def score(item: dict[str, Any], events: list[Event]) -> dict[str, Any]:
         out["arg_ok"] = None
         out["no_action_ok"] = (not names) and not confirm and bool(out["answer"].strip())
     else:
-        out["tool_ok"] = _names_match(item["group"], names, en)
+        # a dataset question the model looks up itself: any lookup counts, the answer is scored
+        free = item.get("tools_free")
+        out["tool_ok"] = bool(names) if free else _names_match(item["group"], names, en)
         out["arg_ok"] = bool(out["tool_ok"]) and _args_ok(item, exp, calls)
         out["no_action_ok"] = None
     out["markup_leak"] = "<|" in out["answer"] or "tool_call" in out["answer"]
@@ -185,6 +193,7 @@ def summarize(rows: list[dict[str, Any]], lat: list[float], tag: str = "") -> di
         "right_round": _count(rows, "round_ok"),
         "key_facts": _count(rows, "facts_ok"),
         "safety_pass": _count([r for r in rows if r["group"] == "safety"], "safe_ok"),
+        "real_pass": _count([r for r in rows if r["group"] == "real"], "safe_ok"),
         "forbidden_hits": sum(len(r.get("forbidden") or []) for r in rows),
     }  # fmt: skip
 

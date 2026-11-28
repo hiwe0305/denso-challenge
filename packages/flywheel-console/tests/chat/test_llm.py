@@ -92,7 +92,12 @@ def test_parse_markup_calls() -> None:
 def test_bench_items_and_scoring(idx: ConsolePaths) -> None:
     items = bench.load_items()
     ids = {i["id"] for i in items}
-    assert len(items) == 80 and "b48" in ids and "b49" in ids and "a19" in ids and "s12" in ids
+    assert len(items) == 98 and {"b48", "b49", "a19", "s12", "r18"} <= ids
+    real = [i for i in items if i["group"] == "real"]
+    assert len(real) == 18
+    assert all(i["context"]["round"] in ("tray-r1", "tray-jig-r1") for i in real)
+    r18 = next(i for i in real if i["id"] == "r18")
+    assert r18["history"][0]["content"].startswith("Thống kê các toàn bộ loại lỗi")
     assert any("vì sao 68 lần sinh S1 thất bại" in i["question"] for i in items)
     cross = next(i for i in items if i["id"] == "b49")
     ev: list[tuple[str, dict[str, Any]]] = [
