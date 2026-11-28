@@ -2556,7 +2556,7 @@ main {
   animation: pulse 1s ease-in-out infinite;
 }
 
-/* Reasoning / Thinking Accordion (<think> or DeepSeek-Harness) */
+/* "Quá trình suy luận": the steps the console took (round, lookups, number check) */
 .reasoning-box {
   border-left: 2px solid var(--line);
   padding-left: 9px;
@@ -2571,9 +2571,14 @@ main {
   user-select: none;
 }
 
-.reasoning-body {
-  margin-top: 5px;
-  white-space: pre-wrap;
+.reasoning-box > .agent-steps {
+  margin-top: 6px;
+}
+
+.trace-lines {
+  list-style: none;
+  margin: 5px 0 0;
+  padding: 0;
   font-size: 12px;
   line-height: 1.45;
 }
