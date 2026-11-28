@@ -300,7 +300,7 @@ def test_reasoning_block_shows_steps_and_never_the_thinking() -> None:
     the answer streams."""
     src = (WEB / "pages_chat.js").read_text(encoding="utf-8")
     block = src[src.index("const renderReasoning") : src.index("const renderStudioTurn")]
-    assert "tr.steps" in block and "toolLabel(st)" in block and "stepRows(st.ui)" in block
+    assert "tr.steps" in block and "chatToolLabel(st.name)" in block and "stepRows(st.ui)" in block
     assert "choice === undefined ? isRunning : choice" in block
     for needle in ("tr.thinking", "system", "/api/chat/traces"):
         assert needle not in block, needle
