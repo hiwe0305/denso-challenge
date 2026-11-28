@@ -635,7 +635,7 @@ def test_a_round_run_asked_why_it_fails_reads_the_round_and_its_diagnosis_never_
     tools, msgs = _turn_tools(monkeypatch, q)
     assert tools == ["round_report", "round_diagnosis"]
     given = "\n".join(str(m.get("content")) for m in msgs if m.get("role") == "tool")
-    assert "carried_to_table_b=50" in given and "placed=10" in given and "id=c1" in given  # the run's own numbers and the diagnosis
+    assert "carried_to_table_b=50" in given and "placed_within_tolerance=10" in given and "id=c1" in given  # the run's own numbers and the diagnosis
     assert "147" not in given and "68" not in given  # never the eval of policy C at 40k
     # the earlier eval, when a page asks for it, is labelled as before the round, not C_70's own
     fails = registry.call("eval_failures", {}, {"lang": "vi"})["model"]
@@ -860,7 +860,7 @@ def test_best_on_the_jig_round_is_sample_b(idx: ConsolePaths) -> None:
         "SIDE_BY_SIDE | run=C_70 | round=r1 | scene=không đồ gá | scorer=bản 1 | successes=10 | n=60 | rate=16,7 %",
         "SIDE_BY_SIDE | run=C_ALL | round=r1 | scene=không đồ gá | scorer=bản 1 | successes=5 | n=60 | rate=8,3 %",
         "READING | highest=M | latest=M | latest_round=jig-r1 | latest_date=26/11/2026 | runs_in_round=1",
-        "ORIGIN | round=r1 | run=C_70 | successes=10 | n=60 | carried_to_table_b=50 | placed=10",
+        "ORIGIN | round=r1 | run=C_70 | carried_to_table_b=50 | placed_within_tolerance=10 | n=60",
         "ORIGIN_STEP | date=25/11/2026 | story=DA-46 | title=Bản cắt đoạn đặt | result=539 bản cắt",
         "ORIGIN_STEP | date=26/11/2026 | story=DA-48 | title=Train run M 100 000 bước",
         "LIMITS | comparable=no | with_round=r1 | why=khác cảnh, tập eval, bộ chấm",
@@ -888,7 +888,7 @@ def test_sample_b_without_the_new_index_keys_falls_back_and_says_what_is_missing
         s.pop(k)
     (idx.index / "story.json").write_text(json.dumps(s), encoding="utf-8")
     t = ask("Run nào tốt nhất, vì sao?", "jig-r1")["model"]
-    assert "ORIGIN | round=r1 | run=C_70 | successes=10 | n=60 | carried_to_table_b=50 | placed=10" in t
+    assert "ORIGIN | round=r1 | run=C_70 | carried_to_table_b=50 | placed_within_tolerance=10 | n=60" in t
     assert "ORIGIN_STEP | run=M | missing=diễn tiến của vòng (timeline)" in t
     assert "READING | highest=M | missing=kết quả mới nhất | runs_in_round=1" in t
     assert "LIMITS | comparable=no | with_round=r1 | why=khác cảnh, tập eval, bộ chấm" in t

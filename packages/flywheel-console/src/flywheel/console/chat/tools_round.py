@@ -843,8 +843,9 @@ def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str,
     # where the run comes from: the earlier round's carry and place, then the steps of this round
     origin = []
     if prev:
-        origin.append(_row("ORIGIN", round=prev.get("round"), run=prev.get("run"), successes=prev.get("successes"), n=prev.get("n"),
-                           carried_to_table_b=prev.get("carried"), placed=prev.get("placed")))  # fmt: skip
+        # carried: the tray reached table B (bàn B); placed: it was set down within the tolerance
+        origin.append(_row("ORIGIN", round=prev.get("round"), run=prev.get("run"), carried_to_table_b=prev.get("carried"),
+                           placed_within_tolerance=prev.get("placed"), n=prev.get("n")))  # fmt: skip
     tl = story().get("timeline")
     steps_tl = [e for e in tl if _shown(e) and str(e.get("round") or "") == rid] if isinstance(tl, list) else []
     for e in steps_tl:
@@ -961,7 +962,7 @@ def _pair_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str
     if b and a:
         F["outcome"] = [_row("BEFORE_AFTER", before_run=base, before_successes=b.get("successes"), after_run=after, after_successes=a.get("successes"), n=n)]
     if lb.get("on_table_b") is not None:
-        F["strength"] = [_row("CARRY_PLACE", run=base, role=role(base), carried_to_table_b=lb["on_table_b"], placed_within_cm=tol, placed=b.get("successes"), n=n,
+        F["strength"] = [_row("CARRY_PLACE", run=base, role=role(base), carried_to_table_b=lb["on_table_b"], placed_within_tolerance=b.get("successes"), tolerance_cm=tol, n=n,
                               weak_point=say("độ chính xác lúc đặt", "precision at placing"))]  # fmt: skip
     fails = sorted((b.get("failures") or {}).items(), key=lambda kv: -kv[1])
     failed = n - b.get("successes", 0) if n else 0
