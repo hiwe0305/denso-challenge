@@ -1672,17 +1672,16 @@ function syncChatMeta() {
     (cfg && cfg.active_kind && cfg.active_kind !== "ollama") ||
     (m && m.chat && m.chat.kind && m.chat.kind !== "ollama");
 
-  if (isApiActive) {
-    // the model and gateway names belong to the config page only (audit Q3, P0-8)
-    const ready = cfg ? Boolean(cfg.ready) : Boolean(m && m.chat && m.chat.ready);
-    els.subEl.textContent = t("chat.subAnalysis");
-    els.statusDot.className = cls("status-dot", ready ? "warm" : "cold");
-    els.modelStatusLabel.textContent = ready ? t("chat.statusReady") : t("chat.keyNeeded");
-  } else {
-    els.subEl.textContent = t("chat.subAnalysis");
-    els.statusDot.className = cls("status-dot", "cold");
-    els.modelStatusLabel.textContent = t("studio.apiNeedsKey");
-  }
+  // the model and gateway names belong to the config page only (audit Q3, P0-8); the Ollama of
+  // rtx3060 is ready when the tunnel serves the model, an API when it has its key (S-A13)
+  const ready = cfg ? Boolean(cfg.ready) : Boolean(m && m.chat && m.chat.ready);
+  els.subEl.textContent = t("chat.subAnalysis");
+  els.statusDot.className = cls("status-dot", ready ? "warm" : "cold");
+  els.modelStatusLabel.textContent = ready
+    ? t("chat.statusReady")
+    : isApiActive
+      ? t("chat.keyNeeded")
+      : t("chat.err.tunnel");
   els.apiBtn.hidden = state.locked;
   els.apiBtn.textContent = t("studio.apiConfigureBtn");
 
