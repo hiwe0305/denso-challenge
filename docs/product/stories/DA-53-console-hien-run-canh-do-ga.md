@@ -84,6 +84,28 @@ Hiếu chốt ngày 28/11/2026, cả bốn câu theo đề xuất:
 3. **M và N nằm ngoài `withhold_eval`.** Công tắc vẫn chỉ dành cho `C70_R1` theo quyết định ngày 16/11/2026.
 4. **"Kết quả tốt nhất" theo vòng đang chọn.** Không trộn cảnh `tray` với cảnh `jig2` trên trang tổng quan và trang chọn bài toán.
 
+### Điều chỉnh sau khi đọc dữ liệu (Claude, 28/11/2026)
+
+Đọc `fwdata` thật và mã ở `origin/master` `dd1338ce` trước khi viết code:
+
+1. **Seed bootstrap.** `eval_results` không nạp được plan của M, nên phải chạy với `he-tray-v2.yaml` và `--bootstrap-seed`. Chạy thử vào thư mục tạm cho đúng số của mục 5 tray-jig.md:
+   - M, seed 20261125: cả task 0,700–0,811; mức 1 0,789–0,922; mức 2 0,556–0,756.
+   - File ghi `bootstrap_seed` và `plan_mismatch`. Index kiểm `bootstrap_seed` bằng seed khai báo của run; sai thì không có câu đọc.
+2. **Pha `persist` chạy song song với `train`** (`persist --watch` của `trainer/colab.py`), không phải mốc cộng dồn. `train` có đồng hồ riêng, nên trừ pha trước cho mọi pha sẽ sai `train`. Cách sửa:
+   - `setup` và `train` giữ nguyên.
+   - `persist` hiện là phần đồng bộ sau train, bằng `persist − train` khi `persist ≥ train` (C_70: 213,4 s), kèm ghi chú chạy song song.
+3. **Bước `place` không có khoảng tin cậy trong `results.json`** (chỉ có `step_pass`). Theo ghi chú cho người làm, Console không tự tính: thẻ quy tắc 3 hiện tỉ lệ, ghi "chưa có khoảng tin cậy", và không có câu đọc. AC 4 vì vậy chỉ đòi ba câu của quy tắc 1 và 2. Muốn có câu cho bước đặt thì cần một PR cho `eval_results` (ngoài phạm vi).
+4. **Run N đã train xong, nhưng `metrics.jsonl` trên laptop chỉ tới bước 8 201** (`fetched.json`: `final: false`, vòng `follow` hỏng ở bước 8 198, tray-jig.md mục 8). Trang Train hiện đúng file đang có, kèm ghi chú file chưa kéo đủ; bước 3.1 thêm việc kéo `metrics.jsonl` đầy đủ từ Drive.
+5. **Eval của N đã có** (`tray/outcomes/jig-n-100000-r3`, 180 dòng, 28/11/2026). Chạy thử với `--baseline` là eval của M ra `paired.repeats`. Vì vậy AC 6 kiểm được trên số thật, không cần chờ.
+6. **Vòng mặc định.** Task `tray` liệt kê `tray-jig-r1` trước `tray-r1`, để Console mở vào vòng mới nhất. "Kết quả tốt nhất" vẫn lấy theo vòng đang chọn (quyết định 4).
+
+Lệnh của bước 3.1 (chạy từ gốc repo, `FW` là thư mục `fwdata/tray`):
+
+```bash
+uv run python -m flywheel_psi0.tray.eval_results configs/runplans/tray/he-tray-v2.yaml --set $FW/eval-sets/jig-m-rp_a410d01efa62 --out $FW/eval/jig-m-100000-r3 --repeats 3 --bootstrap-seed 20261125 --json $FW/outcomes/jig-m-100000-r3/results.json
+uv run python -m flywheel_psi0.tray.eval_results configs/runplans/tray/he-tray-v2.yaml --set $FW/eval-sets/jig-m-rp_a410d01efa62 --out $FW/eval/jig-n-100000-r3 --repeats 3 --bootstrap-seed 20261126 --baseline $FW/eval/jig-m-100000-r3 --json $FW/outcomes/jig-n-100000-r3/results.json
+```
+
 ### Phần PR #252 đã làm trước
 
 PR #252 (dựng lại giao diện) đã hiện run M và N, trước khi story này được duyệt:
@@ -103,11 +125,12 @@ Story này thay cách quét đó bằng vòng `tray-jig-r1` (quyết định 1) 
    - Thiếu file thì trả trạng thái "chưa có" kèm lệnh.
    - Có test.
 4. Câu đọc theo luật:
-   - Trên số của M, ra đúng ba câu như bảng ở tray-jig.md mục 5: chưa đạt 80 % cả task, mức 1 đạt 70 %, mức 2 chưa đạt, bước đặt trên 50 %.
+   - Trên số của M, ra đúng ba câu như bảng ở tray-jig.md mục 5: chưa đạt 80 % cả task, mức 1 đạt 70 %, mức 2 chưa đạt. Bước đặt hiện tỉ lệ, không có câu đọc (mục "Điều chỉnh sau khi đọc dữ liệu", điểm 3).
+   - Sai `bootstrap_seed` so với seed khai báo của run thì không có câu đọc.
    - Thiếu rollout hoặc sai `conditions.sha256` thì không có câu đọc.
    - Không trang nào có chữ "tốt hơn" khi đặt M cạnh run DA-34.
    - Có test.
-5. Thời lượng pha VM là hiệu giữa các mốc. Trên report của C_70, pha `persist` khoảng 213 s chứ không phải 38 262,6 s. Có test.
+5. Pha `persist` hiện phần đồng bộ sau train (`persist − train`), `setup` và `train` giữ nguyên. Trên report của C_70, pha `persist` khoảng 213 s chứ không phải 38 262,6 s. Có test.
 6. Khi có `results.json` chạy với `--baseline` của M, vòng hiện N trừ M (trung bình hiệu, khoảng tin cậy, câu đọc theo quy tắc 2 và 3 của `jig-n-rules`). Khi chưa có thì ghi "Chưa có", không ghi 0. Có test.
 7. `withhold_eval` vẫn chặn kết quả thi lại của `C70_R1` ở mọi trang và trong chat. Test cũ vẫn qua.
 8. `docs/console/api-contract.md` và `docs/console/api-samples/` cập nhật cho các khối mới trong `story.json` và `tasks.json`.
@@ -121,7 +144,7 @@ Story này thay cách quét đó bằng vòng `tray-jig-r1` (quyết định 1) 
 - [ ] 2.2 `index/story.py`: đọc run train theo đường dẫn của từng run; sửa thời lượng pha VM, có test (AC 2, 5)
 - [ ] 2.3 Module mới trong `index/` đọc `results.json`, kiểm điều kiện trước khi đọc, ghi câu đọc theo luật, có test (AC 3, 4, 6)
 - [ ] 2.4 Giao diện: trang Train, Đánh giá, Vòng hiện vòng `tray-jig-r1`; câu so với DA-34 có điểm khác đi kèm (AC 2, 3, 4, 6, 7)
-- [ ] 3.1 (Hiếu, vận hành) Ghi `results.json` của M cạnh outcome trên laptop, rồi chạy `fw console index` (AC 3)
+- [ ] 3.1 (Hiếu, vận hành) Ghi `results.json` của M và N cạnh outcome bằng hai lệnh ở mục "Điều chỉnh sau khi đọc dữ liệu", kéo `metrics.jsonl` đầy đủ của N từ Drive, rồi chạy `fw console index` (AC 3, 6)
 - [ ] 3.2 Cập nhật hợp đồng API và mẫu; chạy đủ kiểm tra (AC 8, 9)
 
 ## Phạm vi file
