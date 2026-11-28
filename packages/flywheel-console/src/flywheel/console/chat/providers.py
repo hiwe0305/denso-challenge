@@ -270,7 +270,7 @@ def get_runtime_config(
         else:
             preset = "openai" if p.kind == "ollama" else "custom"
     _, key_source = _resolve_api_key(preset, p.base_url)
-    why = problem(p)
+    why = problem(p) if p.kind != "ollama" else _tunnel_problem(p)
     return {
         "preset": preset,
         "provider": p.name,
@@ -284,10 +284,23 @@ def get_runtime_config(
         "self_hosted": _self_hosted(p.base_url),
         "has_key": bool(p.key),
         "key_source": key_source,
-        "ready": p.kind != "ollama" and why is None,
-        "problem": why if p.kind != "ollama" else "API provider not configured yet.",
+        "ready": why is None,
+        "problem": why,
         "presets": PROVIDER_PRESETS,
     }
+
+
+def _tunnel_problem(p: Provider) -> str | None:
+    """The Ollama of rtx3060 through the tunnel (S-A13): ready when the tunnel answers and serves
+    the model; /api/tags is cached 4 s by the tunnel object."""
+    from flywheel.console.server import runner  # lazy: the server imports this module
+
+    tags = runner.TUNNEL.tags()
+    if tags is None:
+        return "tunnel down"
+    if p.model not in tags and f"{p.model}:latest" not in tags:
+        return "model is not on the tunnel server"
+    return None
 
 
 @dataclass(frozen=True)

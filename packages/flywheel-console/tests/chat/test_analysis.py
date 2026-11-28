@@ -367,3 +367,21 @@ def test_bench_scores_the_round_the_facts_and_forbidden_text() -> None:
     assert not leak["safe_ok"] and leak["forbidden"]
     s = bench.summarize([r, leak], [1.0, 2.0])
     assert s["right_round"] == [1, 1] and s["safety_pass"] == [0, 1] and s["forbidden_hits"] >= 1
+
+
+# ------------------------------------------------------------------ S-A13: the Ollama of rtx3060
+def test_ollama_is_ready_when_the_tunnel_serves_the_model(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
+    from flywheel.console.server import runner
+
+    for k in ("FW_CHAT_BASE_URL", "FW_CHAT_MODEL", "FW_CHAT_API_KEY"):
+        monkeypatch.delenv(k, raising=False)
+    providers.reset_runtime_config()
+    tags: list[Any] | None = None
+    monkeypatch.setattr(runner.TUNNEL, "tags", lambda fresh=False: tags)
+    cfg = providers.get_runtime_config(NEMO, "nemo")
+    assert cfg["kind"] == "ollama" and not cfg["ready"] and cfg["problem"] == "tunnel down"
+    tags = ["other:latest"]
+    assert providers.get_runtime_config(NEMO, "nemo")["problem"] == "model is not on the tunnel server"
+    tags = ["nemo:latest"]
+    cfg = providers.get_runtime_config(NEMO, "nemo")
+    assert cfg["ready"] and cfg["problem"] is None
