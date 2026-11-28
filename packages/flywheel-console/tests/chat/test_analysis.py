@@ -161,11 +161,23 @@ def test_round_diagnosis_reads_story_diag_and_says_what_is_missing(idx: ConsoleP
     assert "Chi phí sinh và QA dữ liệu: chưa có trong index" in t
     p = idx.index / "story.json"
     s = json.loads(p.read_text(encoding="utf-8"))
-    s["diag"] = {"round": "r1", "source": "docs/he/tray.md §20.16",
-                 "gen_qa_cost": {"cu": 0, "host": "rtx3060", "gen_hours": 1.16, "qa_hours": 0.67}}  # fmt: skip
+    # the shape of PR #258 (docs/console/api-contract.md §2.2, docs/console/api-samples/data_story.json)
+    s["diag"] = {
+        "round": "r1", "source": "docs/he/tray.md §20.2, §20.11, §20.16 (seed/cited.yaml)",
+        "clusters": [{"id": "c1", "key": {"step": "place", "label": "L-PLACE-POSE", "level": 1}, "n_fail": 14,
+                      "diagnosis": "KỸ NĂNG YẾU 5/5", "intervention": "sinh quanh lỗi", "gets_data": True, "source": ["docs/he/tray.md §20.2"]},
+                     {"id": "c6", "key": {"step": "approach_a", "label": "L-APPROACH", "level": 1}, "n_fail": 6,
+                      "diagnosis": "ngưỡng bộ chấm", "gets_data": False}],
+        "step4": [{"id": "H1", "claim": "chuỗi bước gãy ở approach_a", "clusters": ["c6"], "verdict": "CHƯA RÕ (ngưỡng bộ chấm)",
+                   "ticket": "DA-37", "source": "docs/he/tray.md §20.11"}],
+        "gen_qa_cost": {"host": "rtx3060", "cu": 0, "diagnosis_cu": 0, "generation": {"attempts": 290, "recorded": 262, "hours": 1.16},
+                        "qa": {"hours": 0.67, "qa_pass": 261, "quality": 204}, "selected": 181, "source": ["docs/he/tray.md §20.16"]},
+    }  # fmt: skip
     p.write_text(json.dumps(s), encoding="utf-8")
     t = ask("Lỗi hệ thống nào đã loại trừ?", "r1", tool="round_diagnosis")["model"]
-    assert "0 CU trên rtx3060, sinh 1,16 giờ, QA 0,67 giờ" in t
+    assert "c1: bước đặt, 14 lượt; chẩn đoán KỸ NĂNG YẾU 5/5; nhận dữ liệu" in t
+    assert "c6:" in t and "thành phiếu DA-37" in t and "chuỗi bước gãy ở approach_a" in t
+    assert "0 CU trên rtx3060, sinh 1,16 giờ, QA 0,67 giờ" in t and "§20.16 (seed/cited.yaml)" in t
     assert "Thu dữ liệu 0 CU (sinh và QA trên rtx3060" in ask("chi phí", "r1")["model"]
     jig = ask("chẩn đoán", "jig-r1", tool="round_diagnosis")["model"]
     assert "chưa có bước 4" in jig
