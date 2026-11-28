@@ -19,9 +19,7 @@ import {
   runSharedTurn,
   selectSession,
   setSessionMode,
-  shortModelLabel,
   subscribeChatStore,
-  switchActiveApiModel,
 } from "./chat.js";
 import {
   canonicalDatasetTaxonomy,
@@ -29,6 +27,7 @@ import {
   el,
   ensureCatalog,
   ensureStoryRaw,
+  formatDateTime,
   formatNumber,
   getCurrentRound,
   getCurrentTask,
@@ -39,7 +38,9 @@ import {
   shortHashId,
   state,
   t,
+  tryGetJSON,
 } from "./core.js";
+import { icon } from "./icons.js";
 
 const MODES = [
   { id: "ask", labelKey: "studio.modeAsk", subKey: "studio.modeAskSub" },
@@ -105,7 +106,10 @@ export function renderChatStudioPage() {
       items.push({
         id: r.id,
         kind: "dataset",
-        label: `${tax.cleanTitle} (${r.episodes ?? 0} ep)`,
+        label: t("studio.mentionDatasetLabel", {
+          title: tax.cleanTitle,
+          eps: formatNumber(r.episodes ?? 0),
+        }),
       });
     }
     const runs = storyCache && Array.isArray(storyCache.runs) ? storyCache.runs : [];
@@ -114,7 +118,7 @@ export function renderChatStudioPage() {
         items.push({
           id: rn.branch,
           kind: "run",
-          label: `run · ${rn.branch}`,
+          label: t("studio.mentionRunLabel", { run: rn.branch }),
         });
       }
     }
@@ -146,7 +150,13 @@ export function renderChatStudioPage() {
               }),
               el("span", {
                 className: cls("tiny", "mono"),
-                text: `${turnCount} turns${artCount > 0 ? ` · ${artCount} art` : ""}`,
+                text:
+                  artCount > 0
+                    ? t("studio.sessionMetaArt", {
+                        turns: formatNumber(turnCount),
+                        arts: formatNumber(artCount),
+                      })
+                    : t("studio.sessionMeta", { turns: formatNumber(turnCount) }),
               }),
             ]),
             chatStore.sessions.length > 1
@@ -244,30 +254,14 @@ export function renderChatStudioPage() {
     );
   };
 
+  // Connection state only: the gateway and model id show in the API configuration panel
+  // (openApiConfigModal), not on this page (Q3, design audit P0-8).
   const renderRailApi = () => {
     const cfg = chatStore.apiConfig;
-    const isConfigured = cfg && cfg.active_kind && cfg.active_kind !== "ollama";
+    // A local Ollama model needs no key; it counts as configured and follows cfg.ready
+    // (server audit S-A13).
+    const isConfigured = Boolean(cfg && cfg.active_kind);
     const ready = Boolean(isConfigured && cfg.ready);
-    const provLabel = isConfigured ? cfg.provider : "API";
-    const fullModel = isConfigured ? cfg.active_model : "";
-    const modLabel = isConfigured ? shortModelLabel(fullModel) : "-";
-    const remModels = Array.isArray(chatStore.remoteModels) ? chatStore.remoteModels : [];
-    const modelOptions = Array.from(new Set([fullModel, ...remModels].filter(Boolean)));
-
-    const liveModelSelect =
-      ready && !state.locked && modelOptions.length > 0
-        ? el(
-            "select",
-            {
-              className: cls("field", "mono"),
-              style: "width:100%;font-size:12px;margin-top:4px",
-              onChange: (ev) => switchActiveApiModel(ev.target.value),
-            },
-            modelOptions.map((mId) =>
-              el("option", { value: mId, selected: mId === fullModel, text: mId })
-            )
-          )
-        : null;
 
     setChildren(
       railApiBox,
@@ -278,11 +272,9 @@ export function renderChatStudioPage() {
         }),
       ]),
       el("b", {
-        className: "mono",
-        style: "font-size:12px",
-        text: ready ? `${provLabel} · ${modLabel}` : t("studio.apiNeedsKey"),
+        className: "studio-api-state",
+        text: ready ? t("studio.apiReady") : t("studio.apiNeedsKey"),
       }),
-      liveModelSelect,
       el("span", {
         className: "tiny muted",
         text: t("studio.publicShield"),
@@ -336,13 +328,15 @@ export function renderChatStudioPage() {
         curTask
           ? el("span", {
               className: "tax-badge",
-              text: `task:${curTask.id}`,
+              title: curTask.id,
+              text: t("studio.pinTask", { name: pickLang(curTask.name) || curTask.id }),
             })
           : null,
         curRound
           ? el("span", {
               className: "tax-badge",
-              text: `round:${curRound.id}`,
+              title: curRound.id,
+              text: t("studio.pinRound", { name: pickLang(curRound.title) || curRound.id }),
             })
           : null,
         ...pins.map((p) =>
@@ -429,7 +423,7 @@ export function renderChatStudioPage() {
               });
               setChildren(resultBody, el("div", { className: "mini-table-wrap" }, [
                 el("table", { className: "table" }, [
-                  el("thead", {}, [el("tr", {}, [t("analysis.series"), "X", "Y"].map((label) =>
+                  el("thead", {}, [el("tr", {}, [t("analysis.series"), t("studio.colX"), t("studio.colY")].map((label) =>
                     el("th", { text: label })))]),
                   el("tbody", {}, rows),
                 ]),
@@ -468,7 +462,10 @@ export function renderChatStudioPage() {
 
     const tokMeta =
       tr.tokensIn || tr.tokensOut
-        ? `${formatNumber(tr.tokensIn || 0)} in · ${formatNumber(tr.tokensOut || 0)} out`
+        ? t("studio.tokensMeta", {
+            tin: formatNumber(tr.tokensIn || 0),
+            tout: formatNumber(tr.tokensOut || 0),
+          })
         : tr.msTotal
           ? `${(tr.msTotal / 1000).toFixed(2)} s`
           : "";
@@ -495,10 +492,10 @@ export function renderChatStudioPage() {
 
     const card = el("article", { className: cls("agent-turn", "studio-agent-card") }, [
       el("div", { className: "turn-header" }, [
-        el("span", {
-          className: "turn-header-brand",
-          text: tr.kind === "slash" ? `⚡ ${tr.question.split(/\s+/)[0]}` : `✦ ${t("chat.title")}`,
-        }),
+        el("span", { className: "turn-header-brand" }, [
+          icon(tr.kind === "slash" ? "jobs" : "chat"),
+          tr.kind === "slash" ? tr.question.split(/\s+/)[0] : t("chat.title"),
+        ]),
         isRunning
           ? el("span", { className: "turn-badge-live" }, [
               el("span", { className: "pulse-dot" }),
@@ -533,8 +530,7 @@ export function renderChatStudioPage() {
                     st.ms === null && "running",
                     st.ms !== null && !st.ok && "err"
                   ),
-                  text: st.ms === null ? "⚙" : st.ok ? "✓" : "!",
-                }),
+                }, [st.ms === null ? icon("dot") : st.ok ? "✓" : "!"]),
                 el("b", { text: st.ui?.title || st.name }),
                 st.ui?.type === "text" && st.ui.text ? el("small", { text: st.ui.text }) : null,
                 el("span", {
@@ -636,7 +632,7 @@ export function renderChatStudioPage() {
                     })
                   : null,
                 el("div", { className: "turn-actions" }, [
-                  agreeBtn,
+                  tr.error ? null : agreeBtn,
                   ovBtn,
                   tr.answer ? copyBtn : null,
                   retryBtn,
@@ -662,6 +658,8 @@ export function renderChatStudioPage() {
     if (turns.length === 0) {
       setChildren(streamBox, el("div", { className: "analysis-start" }, [
         el("h1", { text: t("analysis.title") }),
+        // what the assistant can read, in one line (design audit P2-6)
+        el("p", { className: cls("muted", "analysis-start-lead"), text: t("chat.welcome") }),
         el("div", { className: "analysis-prompts" }, [
           [t("analysis.summary"), t("analysis.summaryPrompt")],
           [t("analysis.compare"), t("analysis.comparePrompt")],
@@ -752,7 +750,7 @@ export function renderChatStudioPage() {
                 el("th", { text: "ID" }),
                 el("th", { text: t("common.source") }),
                 el("th", { text: t("ds.attrName") }),
-                el("th", { text: "Value" }),
+                el("th", { text: t("studio.colValue") }),
               ]),
             ]),
             el(
@@ -804,7 +802,27 @@ export function renderChatStudioPage() {
     if (wbTab === "trace") {
       const box = el("div", { className: "stack-sm" });
       setChildren(wbBody, box);
-      loadChatDiagnostics(box);
+      // W13: the harness scores carry the date and model they were measured with, taken from
+      // the same bench bundle; a missing field is said, not guessed.
+      Promise.all([loadChatDiagnostics(box), tryGetJSON("/api/chat/bench")])
+        .then(([, res]) => {
+          const b = res && res.ok ? res.data : null;
+          const first = box.firstElementChild;
+          if (!b || !first) return;
+          const model = b.model || b.tag || "";
+          const when = b.time ? formatDateTime(b.time) : "";
+          first.after(
+            el("p", {
+              className: cls("tiny", "muted", "bench-measured"),
+              text: !when
+                ? t("studio.benchNoDate")
+                : model
+                  ? t("studio.benchMeasured", { date: when, model })
+                  : t("studio.benchMeasuredNoModel", { date: when }),
+            })
+          );
+        })
+        .catch(() => {});
       return;
     }
 
