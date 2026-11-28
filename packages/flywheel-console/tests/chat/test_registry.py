@@ -161,7 +161,7 @@ def test_qa_summary_cut_says_it_has_no_reasons(idx: ConsolePaths) -> None:
 
 
 def test_analysis_question_offers_the_round_report_first(idx: ConsolePaths) -> None:
-    assert registry.offered_names("data", "nhận xét kết quả vòng 1") == ["round_report"]
+    assert registry.offered_names("data", "nhận xét kết quả vòng 1") == registry.ANALYSIS_TOOLS
     assert registry.offered_names("home", "what is here")[0] == "round_report"
     assert "round_report" not in registry.offered_names("runs", "loss của C_70")
 
@@ -219,11 +219,13 @@ def test_round_report_writes_the_round_in_the_language_asked(idx: ConsolePaths) 
     assert vi["ok"]
     t = vi["model"]
     # roles in plain words, counts from the index, the near-miss reading (15-12 -> 16-6) computed
-    assert "bản gốc M_BASE đạt 12/60 (20%)" in t and "bản sau vòng M_NEW" in t
+    # W1: a count of runs is "lượt thành công", never "đạt"
+    assert "bản gốc M_BASE: 12/60 (20%) lượt thành công" in t and "bản sau vòng M_NEW" in t
     assert "tăng từ 3 lên 10" in t and "từ -20.0 đến +3.0 điểm phần trăm" in t and "T-1" in t
-    assert "50.0 CU" in t and "ĐÃ LÀM RỒI" in t
+    assert "50,00 CU thực đo" in t and "ĐÃ LÀM RỒI" in t and " đạt 12" not in t
+    assert vi["round"] == "box-r1"  # the numbers are tagged with their round (A2)
     en = registry.call("round_report", {}, {**ctx, "lang": "en", "question": "comment"})["model"]
-    assert "the baseline M_BASE passed 12/60 (20%)" in en and "went from 3 to 10" in en
+    assert "the baseline M_BASE: 12/60 (20%) successful runs" in en and "went from 3 to 10" in en
     assert "bản gốc" not in en
 
 
@@ -234,14 +236,18 @@ def test_round_report_opens_with_what_the_question_asks(idx: ConsolePaths) -> No
         ctx = {"task": "box", "lang": "vi", "question": q}
         return registry.call("round_report", {}, ctx)["model"].split("\n")[2]
 
-    assert "Bản tốt nhất là bản gốc M_BASE" in first("bản nào tốt nhất?")
+    # W3: no "best", the highest count only
+    assert "Bản gốc M_BASE có số lượt thành công cao nhất, 12/60" in first("bản nào tốt nhất?")
+    assert "tốt nhất" not in first("bản nào tốt nhất?")
     assert "Lỗi nhiều nhất là đặt lệch vị trí (L-PLACE-POSE): 30 trong 48" in first(
         "robot hỏng ở đâu?"
     )
     assert "Chưa kết luận được" in first("vì sao kết quả chưa tốt lên?")
-    assert "50.0 CU" in first("vòng này tốn bao nhiêu?")
+    assert "Train và serve của vòng: 50,00 CU thực đo" in first("vòng này tốn bao nhiêu?")
     cost = registry.call("round_report", {}, {"task": "box", "lang": "vi", "question": "chi phí"})
-    assert "0.50 CU" in cost["model"] and "PHƯƠNG ÁN" not in cost["model"]  # no next steps
+    # N5: collecting the data apart from training; no cost per kept demonstration
+    assert "chưa có trong index" in cost["model"] and "CU cho mỗi bài" not in cost["model"]
+    assert "PHƯƠNG ÁN" not in cost["model"]  # no next steps
 
 
 def test_ego_summary_and_its_offer(idx: ConsolePaths) -> None:
@@ -254,7 +260,7 @@ def test_round_report_for_a_task_without_a_round(idx: ConsolePaths) -> None:
     # the task is named in the question; free text the model passes as "task" is ignored
     ctx = {"lang": "vi", "task": "box", "question": "Task mới đang ở đâu, thiếu gì?"}
     t = registry.call("round_report", {"task": "cái task mới ấy"}, ctx)["model"]
-    assert "chưa chạy vòng" in t and "đạt 6/10 (60%)" in t and "3 dạy model" in t
+    assert "chưa chạy vòng" in t and "6/10 (60%) lượt thành công" in t and "3 dạy model" in t
     assert "M_BASE" not in t  # never another task's numbers
 
 
@@ -285,7 +291,7 @@ def test_round_report_covers_steps_comparison_and_diagnosis(idx: ConsolePaths) -
             "model"
         ]
 
-    assert "bản gốc M_BASE đạt 12/60" in ask("So sánh các bản model").split("\n")[2]
+    assert "bản gốc M_BASE: 12/60" in ask("So sánh các bản model").split("\n")[2]
     assert "không cặp nào khác biệt chắc chắn" in ask("So sánh các bản model")
     assert "Chẩn đoán chia lỗi của bản gốc thành 2 nhóm" in ask("Chẩn đoán ra những nhóm lỗi nào?")
     assert "PHƯƠNG ÁN" not in ask("So sánh các bản model")
@@ -307,8 +313,10 @@ def test_withheld_result_is_never_given_to_the_model(idx: ConsolePaths) -> None:
         t = registry.call("round_report", {}, {"task": "box", "lang": "vi", "question": q})["model"]
         assert "6/60" not in t and "M_NEW" not in t and "tăng từ" not in t, (q, t)
     ctx = {"task": "box", "lang": "vi", "question": "M_NEW thi được bao nhiêu?"}
-    held = registry.call("round_report", {}, ctx)["model"]
-    assert "không trình bày" in held.split("\n")[2]
+    held = registry.call("round_report", {}, ctx)
+    # W5: one sentence, written by the code, no number of the round at all
+    assert held["answer"] == "Kết quả thi lại của lượt này không trình bày ở bản demo."
+    assert "12/60" not in held["model"]
     assert registry.forced_tool("loss của M_NEW") is None  # its training is still a normal lookup
 
 

@@ -73,6 +73,7 @@ def run_index() -> list[dict[str, Any]]:
     out = [
         {"id": f.parent.name, "branch": f.parent.parent.name, "dir": f.parent, "metrics": f}
         for f in sorted(pair_dir().glob("*/*/metrics.jsonl"))
+        if ".attempt" not in f.parent.parent.name  # an earlier try of a run, same job id (A12)
     ]
     tray_dir = active().fw_root / "tray"
     for f in sorted(tray_dir.glob("jig-*/*/metrics.jsonl")):
