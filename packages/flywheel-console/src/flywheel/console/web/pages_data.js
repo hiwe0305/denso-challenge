@@ -37,6 +37,7 @@ import {
   state,
   t,
   tryGetJSON,
+  onRouteCleanup,
 } from "./core.js";
 import { icon } from "./icons.js";
 
@@ -458,17 +459,22 @@ function mount3DHandCanvas(box, ep) {
     },
     { passive: false }
   );
+  const detach = () => {
+    window.removeEventListener("resize", onResize);
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+  };
   const onResize = () => {
     if (!document.body.contains(box)) {
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      detach();
       return;
     }
     fit();
     draw();
   };
   window.addEventListener("resize", onResize);
+  // Leaving the page removes the window listeners even when no resize happens (server audit S-P2-7).
+  onRouteCleanup(detach);
   requestAnimationFrame(() => {
     fit();
     draw();
@@ -2200,7 +2206,7 @@ export function renderDatasetDetailPage(ctx) {
         const reasons = qual && Array.isArray(qual.reasons) ? qual.reasons : [];
 
         tabBody =
-          !qual && !qaRes.ok && !row.qa_counts
+          !qual && !(qaRes.ok && qaRes.data) && !row.qa_counts
             ? el("div", { className: "empty", text: t("ds.qualityEmpty") })
             : el("div", { className: "stack" }, [
                 (qual && qual.qa) || row.qa_counts

@@ -29,7 +29,6 @@ import {
   renderCrumbHeading,
   renderErrorBlock,
   renderFlywheelOrbitalCanvas,
-  renderJobKindCell,
   renderLoadingView,
   renderSourceCitation,
   renderStatStrip,
@@ -44,6 +43,7 @@ import {
   tryGetJSON,
   uploadVideoFile,
 } from "./core.js";
+import { icon } from "./icons.js";
 
 const STAGE_NUMS = ["1", "2", "3", "4", "5", "6"];
 const JOB_TABS = ["all", "pipeline", "import", "export", "machines"];
@@ -61,6 +61,218 @@ function formatHowLine(howItems) {
     .join(" · ");
 }
 
+// Reader's name of a job stage code ("eval" → "Đánh giá"); the code when no name exists.
+function jobStageLabel(stage) {
+  if (!stage) return t("state.na");
+  return hasI18nKey("home.stageId." + stage) ? t("home.stageId." + stage) : String(stage);
+}
+
+// Job name cell: the reader's name, the kind code only in a tooltip (design audit P1-12).
+function jobKindCell(rawKind, extraNode = null) {
+  const { label, code } = formatJobKindLabel(rawKind);
+  return el("div", { className: "job-kind-cell", title: code || null }, [
+    el("div", { className: "actions" }, [el("b", { text: label }), extraNode]),
+  ]);
+}
+
+// A closed "Nâng cao" disclosure for command lines and raw parameters (design audit P1-12).
+function advancedBlock(children, label = t("ux.advanced")) {
+  const list = (Array.isArray(children) ? children : [children]).filter(Boolean);
+  if (list.length === 0) return null;
+  return el("details", { className: cls("studio-details", "ops-advanced") }, [
+    el("summary", { text: label }),
+    el("div", { className: "stack-sm" }, list),
+  ]);
+}
+
+function runTrained(run) {
+  const max = Number(run && run.max_steps);
+  const reached = Number(
+    run && (run.ckpt_step != null ? run.ckpt_step : run.step != null ? run.step + 1 : NaN)
+  );
+  return Number.isFinite(max) && max > 0 && Number.isFinite(reached) && reached >= max;
+}
+
+// Step 05 line(s) of the selected round, one per scene its index grants (content audit B5, W3):
+// round 1 names the run with the most successes and adds "(các khoảng chồng nhau)" only when its
+// Wilson interval overlaps another run's; the jig scene gives the featured run's count.
+function roundEvalLines(curRound, story, jigDoc, jigEval) {
+  const lines = [];
+  const pairRuns =
+    story.pair && Array.isArray(story.pair.runs)
+      ? story.pair.runs.filter((r) => r && Number(r.n) > 0)
+      : [];
+  if (pairRuns.length > 0) {
+    const top = pairRuns.reduce((a, b) => (Number(b.successes) > Number(a.successes) ? b : a));
+    const others = pairRuns.filter((r) => r !== top);
+    const overlap =
+      Array.isArray(top.wilson) &&
+      others.some((r) => Array.isArray(r.wilson) && Number(r.wilson[1]) >= Number(top.wilson[0]));
+    const vars = {
+      round: curRound.number != null ? formatNumber(curRound.number) : curRound.id,
+      run: top.run,
+      succ: formatNumber(top.successes),
+      n: formatNumber(top.n),
+    };
+    const key =
+      others.length === 0
+        ? "ux.homeEvalRoundOne"
+        : overlap
+          ? "ux.homeEvalRoundTopOverlap"
+          : "ux.homeEvalRoundTop";
+    lines.push(t(key, vars));
+  }
+  const head = jigEval && jigEval.status === "ready" ? jigEval.headline : null;
+  if (jigDoc && head) {
+    lines.push(
+      t("ux.homeEvalSceneLine", {
+        scene: jigDoc.scene || curRound.scene || curRound.id,
+        run: jigEval.run,
+        succ: formatNumber(head.successes),
+        n: formatNumber(head.n),
+      })
+    );
+  }
+  return lines;
+}
+
+// "{clusters} cụm · {fails} lượt hỏng" from the jig round's latest Agent QA assembly or the
+// round's failure clusters; "—" when the round has none (content audit A10).
+function diagnosisSummary(story, jigDoc) {
+  const asmList = jigDoc && Array.isArray(jigDoc.agentqa) ? jigDoc.agentqa : [];
+  const asm = asmList.length > 0 ? asmList[asmList.length - 1] : null;
+  const asmClusters =
+    asm && Array.isArray(asm.clusters) ? asm.clusters.filter((c) => Number(c && c.size) > 0) : [];
+  if (asmClusters.length > 0) {
+    return t("ux.homeDiagSummary", {
+      clusters: formatNumber(asmClusters.length),
+      fails: formatNumber(asmClusters.reduce((sum, c) => sum + Number(c.size), 0)),
+    });
+  }
+  const roundClusters =
+    story && story.round && Array.isArray(story.round.clusters)
+      ? story.round.clusters.filter((c) => Number(c && c.failures) > 0)
+      : [];
+  if (roundClusters.length > 0) {
+    return t("ux.homeDiagSummary", {
+      clusters: formatNumber(roundClusters.length),
+      fails: formatNumber(roundClusters.reduce((sum, c) => sum + Number(c.failures), 0)),
+    });
+  }
+  return "—";
+}
+
+const HOME_STAGE_IDS = ["collect", "process", "release", "train", "eval", "loop"];
+
+// The six home steps of the selected round (content audit A15). Each step comes from the
+// round's scoped story (train, eval, loop, release of its runs) or task-level data (catalog,
+// QA checks); a step neither gives falls back to the server's machine-wide stage, marked
+// scope "machine" so the page labels it "toàn máy". No number is made up.
+function deriveRoundStages({ serverStages, curTask, curRound, story, jigDoc, jigEval, jigRunId }) {
+  const byId = new Map(serverStages.filter((s) => s && s.id).map((s) => [s.id, s]));
+  const ids = serverStages.length > 0 ? serverStages.map((s) => s && s.id) : HOME_STAGE_IDS;
+  const own = (id, scope, fields) => ({
+    ...(byId.get(id) || { id }),
+    task: curTask.id,
+    issue: null,
+    nowLines: null,
+    scope,
+    ...fields,
+  });
+  const machine = (id) =>
+    byId.has(id)
+      ? { ...byId.get(id), scope: "machine" }
+      : { id, state: "idle", now: t("state.na"), task: curTask.id, scope: "machine" };
+
+  const roundRunIds = new Set((curRound.runs || []).map((r) => r && r.id).filter(Boolean));
+  const trainRuns = jigDoc
+    ? Array.isArray(jigDoc.runs)
+      ? jigDoc.runs.filter(Boolean)
+      : []
+    : Array.isArray(story.runs)
+      ? story.runs.filter((r) => r && roundRunIds.has(r.branch))
+      : [];
+  const totals = (curTask.catalog_totals && curTask.catalog_totals.all) || {};
+  const heat = Array.isArray(story.heat) ? story.heat : [];
+  const chain = story.round && story.round.chain ? story.round.chain : null;
+  const withheld = Array.isArray(curRound.withhold_eval) && curRound.withhold_eval.length > 0;
+
+  return ids.map((id) => {
+    if (id === "collect" && Number(totals.episodes) > 0) {
+      return own(id, "task", {
+        state: "done",
+        now: t("ux.homeStageCollectNow", {
+          episodes: formatNumber(totals.episodes),
+          sets: formatNumber(totals.sets ?? 0),
+        }),
+      });
+    }
+    if (id === "process" && heat.length > 0) {
+      return own(id, "task", {
+        state: "done",
+        now: t("ux.homeStageProcessNow", {
+          checks: formatNumber(new Set(heat.map((row) => row[0])).size),
+          sources: formatNumber(new Set(heat.map((row) => row[1])).size),
+        }),
+      });
+    }
+    if (id === "release" && trainRuns.length > 0) {
+      const done = trainRuns.filter((r) => r.release).length;
+      return own(id, "round", {
+        state: done === trainRuns.length ? "done" : "partial",
+        now: t("ux.homeStageReleaseNow", {
+          done: formatNumber(done),
+          total: formatNumber(trainRuns.length),
+        }),
+      });
+    }
+    if (id === "train" && trainRuns.length > 0) {
+      const done = trainRuns.filter(runTrained).length;
+      return own(id, "round", {
+        state: done === trainRuns.length ? "done" : "partial",
+        now: t("ux.homeStageTrainNow", {
+          done: formatNumber(done),
+          total: formatNumber(trainRuns.length),
+        }),
+      });
+    }
+    if (id === "eval") {
+      const lines = roundEvalLines(curRound, story, jigDoc, jigEval);
+      if (jigDoc) {
+        const status = jigEval ? jigEval.status : "missing";
+        if (status === "ready" && lines.length > 0) {
+          return own(id, "round", { state: "done", now: lines.join(" · "), nowLines: lines });
+        }
+        return own(id, "round", {
+          state: status === "missing" ? "waiting" : "partial",
+          now:
+            status === "blocked"
+              ? t("ux.homeJigEvalBlocked", { run: jigEval.run })
+              : status === "withheld"
+                ? t("ux.homeEvalWithheldNote")
+                : t("exp.evalMissing", { run: jigRunId || "-" }),
+        });
+      }
+      if (lines.length > 0) {
+        return own(id, "round", { state: "done", now: lines.join(" · "), nowLines: lines });
+      }
+    }
+    if (id === "loop") {
+      if (chain && chain.selected != null) {
+        return own(id, "round", {
+          state: "done",
+          now: t("ux.homeStageLoopNow", { selected: formatNumber(chain.selected) }),
+          issue: withheld ? t("ux.homeEvalWithheldNote") : null,
+        });
+      }
+      if (jigDoc && !curRound.after_round) {
+        return own(id, "round", { state: "idle", now: t("ux.homeStageLoopNone") });
+      }
+    }
+    return machine(id);
+  });
+}
+
 // ============================================================================
 // #/home — Visual Closed-Loop Flywheel Command Center
 // ============================================================================
@@ -73,6 +285,10 @@ export function renderHomePage() {
 
   let disposed = false;
   let statusPollTimer = null;
+  const connMarker = el("div", { className: "conn-lost", role: "status", hidden: true }, [
+    icon("alert"),
+    el("span", { text: t("ux.connLost") }),
+  ]);
   onRouteCleanup(() => {
     disposed = true;
     if (statusPollTimer) window.clearInterval(statusPollTimer);
@@ -91,7 +307,46 @@ export function renderHomePage() {
     const curTask = getCurrentTask();
     const curRound = getCurrentRound();
     const statusDoc = state.statusDoc || {};
-    const stages = Array.isArray(statusDoc.stages) ? statusDoc.stages : [];
+    const serverStages = Array.isArray(statusDoc.stages) ? statusDoc.stages : [];
+
+    const scopedStory = state.storyRawDoc ? scopeStoryForTask(state.storyRawDoc) : {};
+    const pairDoc = scopedStory && scopedStory.pair ? scopedStory.pair : null;
+    const pairRuns = pairDoc && Array.isArray(pairDoc.runs) ? pairDoc.runs : [];
+    const pairBest =
+      pairRuns.find((r) => pairDoc && r.run === pairDoc.best) || pairRuns[0] || null;
+    const withheldList =
+      curRound && Array.isArray(curRound.withhold_eval) ? curRound.withhold_eval : [];
+    // The jig round (tray-jig-r1) has its own result: the featured eval when ready, else the
+    // baseline's eval status; never a tray-r1 number (decision 4 of story DA-53).
+    const jigDoc =
+      hasIndexAccess("story.jig") && scopedStory && scopedStory.jig ? scopedStory.jig : null;
+    const jigEvals = jigDoc && Array.isArray(jigDoc.evals) ? jigDoc.evals : [];
+    const jigRunId =
+      (jigDoc && jigDoc.featured) ||
+      (curRound && curRound.baseline) ||
+      (jigEvals[0] && jigEvals[0].run) ||
+      null;
+    const jigEval = jigEvals.find((e) => e.run === jigRunId) || null;
+    const jigTrainRuns = jigDoc && Array.isArray(jigDoc.runs) ? jigDoc.runs : [];
+    const jigTrain =
+      jigTrainRuns.find((r) => r.branch === jigRunId) ||
+      jigTrainRuns.find((r) => jigDoc && r.branch === jigDoc.log_run) ||
+      null;
+
+    // The six steps follow the selected round (content audit A15); without a round, or before
+    // any data arrives, the ring shows the server's machine-wide stages as before.
+    const stages =
+      curTask && curRound && (serverStages.length > 0 || state.storyRawDoc)
+        ? deriveRoundStages({
+            serverStages,
+            curTask,
+            curRound,
+            story: scopedStory || {},
+            jigDoc,
+            jigEval,
+            jigRunId,
+          })
+        : serverStages;
     const recentJobs = Array.isArray(statusDoc.jobs) ? statusDoc.jobs : [];
     const catTotals = (curTask && curTask.catalog_totals) || {};
     const allTotals = catTotals.all || {};
@@ -168,38 +423,14 @@ export function renderHomePage() {
             activeStates.includes(String(s.state || "").toLowerCase())
         );
       }
-      if (pick < 0 && isPureCurrentTask && doneStages === stages.length) {
+      if (pick < 0 && isPureCurrentTask) {
         const evalIdx = stages.findIndex((s) => s && s.id === "eval");
         if (evalIdx >= 0) pick = evalIdx;
       }
       selectedStageIdx = pick >= 0 ? pick : 0;
     }
 
-    const scopedStory = state.storyRawDoc ? scopeStoryForTask(state.storyRawDoc) : {};
-    const pairDoc = scopedStory && scopedStory.pair ? scopedStory.pair : null;
-    const pairRuns = pairDoc && Array.isArray(pairDoc.runs) ? pairDoc.runs : [];
-    const pairBest =
-      pairRuns.find((r) => pairDoc && r.run === pairDoc.best) || pairRuns[0] || null;
-    const withheldList =
-      curRound && Array.isArray(curRound.withhold_eval) ? curRound.withhold_eval : [];
-    // The jig round (tray-jig-r1) has its own result: the featured eval when ready, else the
-    // baseline's eval status; never a tray-r1 number (decision 4 of story DA-53).
-    const jigDoc =
-      hasIndexAccess("story.jig") && scopedStory && scopedStory.jig ? scopedStory.jig : null;
-    const jigEvals = jigDoc && Array.isArray(jigDoc.evals) ? jigDoc.evals : [];
-    const jigRunId =
-      (jigDoc && jigDoc.featured) ||
-      (curRound && curRound.baseline) ||
-      (jigEvals[0] && jigEvals[0].run) ||
-      null;
-    const jigEval = jigEvals.find((e) => e.run === jigRunId) || null;
-    const jigTrainRuns = jigDoc && Array.isArray(jigDoc.runs) ? jigDoc.runs : [];
-    const jigTrain =
-      jigTrainRuns.find((r) => r.branch === jigRunId) ||
-      jigTrainRuns.find((r) => jigDoc && r.branch === jigDoc.log_run) ||
-      null;
-
-    const spotlightBox = el("div", { className: "stage-spotlight" });
+    const spotlightBox = el("div", { className: "stage-spotlight", "aria-live": "polite" });
 
     const updateSpotlight = (idx) => {
       selectedStageIdx = idx;
@@ -225,13 +456,17 @@ export function renderHomePage() {
       const taskProcMissing = taskProc ? pickLang(taskProc.missing) : "";
       const taskProcHow = taskProc ? formatHowLine(taskProc.how) : "";
       const numStr = String(idx + 1).padStart(2, "0");
+      const nowLines =
+        sameTask && Array.isArray(st.nowLines) && st.nowLines.length > 0
+          ? st.nowLines
+          : [sameTask ? st.now || t("state.na") : scopeNote];
 
       setChildren(
         spotlightBox,
         el("div", { className: "eyebrow", text: t("ux.stageFocusEyebrow") }),
         el("div", { className: "task-head" }, [
           el("div", { className: "actions" }, [
-            el("b", { style: "font-size:14px", text: `${numStr} · ${stTitle}` }),
+            el("b", { className: "spotlight-title", text: `${numStr} · ${stTitle}` }),
             isMixedStageScope || !sameTask
               ? el("span", {
                   className: cls("chip", sameTask ? "" : "neutral"),
@@ -240,14 +475,21 @@ export function renderHomePage() {
                     : t("ux.scopeBadgeUnscoped"),
                 })
               : null,
+            st.scope === "machine" || st.scope === "task"
+              ? el("span", {
+                  className: cls("chip", "neutral"),
+                  text: t(st.scope === "machine" ? "ux.stageScopeMachine" : "ux.stageScopeTask"),
+                })
+              : null,
           ]),
           renderStateChip(st.state),
         ]),
-        el("div", {
-          style: "font-size:13px;line-height:1.45",
-          className: sameTask ? "" : "muted",
-          text: sameTask ? st.now || t("state.na") : scopeNote,
-        }),
+        ...nowLines.map((line) =>
+          el("div", {
+            className: cls("spotlight-line", !sameTask && "muted"),
+            text: line,
+          })
+        ),
         sameTask && st.issue
           ? el("div", { className: "sources-note", text: st.issue })
           : !sameTask && (taskProcMissing || taskProcHow)
@@ -354,24 +596,19 @@ export function renderHomePage() {
               "div",
               { className: "meta-strip", style: "margin-top:10px" },
               [
-                { label: t("ux.mileBaseline"), value: curRound.baseline || t("state.na") },
-                {
-                  label: t("ux.mileDiagnose"),
-                  value:
-                    (curRound.plan ? compactPath(curRound.plan) : "") ||
-                    (curRound.rollouts ? compactPath(curRound.rollouts) : "") ||
-                    curRound.id ||
-                    t("state.na"),
-                },
+                { label: t("ux.mileBaseline"), value: curRound.baseline || "—", mono: true },
+                // a diagnosis summary, never the round id or a file name (content audit A10)
+                { label: t("ux.mileDiagnose"), value: diagnosisSummary(scopedStory, jigDoc) },
                 {
                   label: t("ux.mileCut"),
-                  value: curRound.cut ? compactPath(curRound.cut) : t("state.na"),
+                  value: curRound.cut ? compactPath(curRound.cut) : "—",
+                  mono: true,
                 },
-                { label: t("ux.mileAfter"), value: curRound.after_round || t("state.na") },
+                { label: t("ux.mileAfter"), value: curRound.after_round || "—", mono: true },
               ].map((m) =>
                 el("div", { className: "meta-box" }, [
                   el("span", { text: m.label }),
-                  el("b", { className: "mono", text: m.value }),
+                  el("b", { className: cls(m.mono && "mono"), text: m.value }),
                 ])
               )
             ),
@@ -380,11 +617,11 @@ export function renderHomePage() {
       el("section", { className: "card" }, [
         el("div", { className: "grid" }, [
           el("a", { className: "sample-ep-card", href: "#/data" }, [
-            el("b", { text: `▤ ${t("home.quickData1")}` }),
+            el("b", { className: "quick-card-title" }, [icon("data"), t("home.quickData1")]),
             el("span", { className: "tiny", text: t("home.quickData1Sub") }),
           ]),
           el("a", { className: "sample-ep-card", href: "#/eval" }, [
-            el("b", { text: `◉ ${t("home.quickExp1")}` }),
+            el("b", { className: "quick-card-title" }, [icon("eval"), t("home.quickExp1")]),
             el("span", { className: "tiny", text: t("home.quickExp1Sub") }),
           ]),
         ]),
@@ -398,20 +635,40 @@ export function renderHomePage() {
               el("h2", { text: t("home.stageSection") }),
               scopeBadge,
             ]),
+            renderStageRing(),
             spotlightBox,
-            renderFlywheelOrbitalCanvas({
-              stages,
-              selectedIdx: selectedStageIdx,
-              centerTitle: hubCenterTitle,
-              centerSub: hubCenterSub,
-              showTaskTag: isMixedStageScope,
-              onSelect: (idx) => {
-                userSelectedStage = true;
-                updateSpotlight(idx);
-              },
-            }),
           ])
         : null;
+
+    // The ring is keyboard-operable (arrow keys, Enter) and the spotlight below announces the
+    // chosen step, so the six duplicate step buttons under it are dropped (design audit P1-2).
+    function renderStageRing() {
+      const ringWrap = renderFlywheelOrbitalCanvas({
+        stages,
+        selectedIdx: selectedStageIdx,
+        centerTitle: hubCenterTitle,
+        centerSub: hubCenterSub,
+        showTaskTag: isMixedStageScope,
+        onSelect: (idx) => {
+          userSelectedStage = true;
+          updateSpotlight(idx);
+        },
+      });
+      const pillBar = ringWrap.querySelector(".stage-pill-bar");
+      if (pillBar) pillBar.remove();
+      const canvas = ringWrap.querySelector("canvas");
+      if (canvas) {
+        canvas.setAttribute(
+          "aria-label",
+          t("ux.stageRingAria", {
+            steps: stages
+              .map((st, i) => `${i + 1} ${getStageTitle(st)}: ${formatStateLabel(st.state)}`)
+              .join("; "),
+          })
+        );
+      }
+      return ringWrap;
+    }
 
     const taskReadinessCard =
       isSingleOtherTask && procKeys.length > 0
@@ -661,22 +918,22 @@ export function renderHomePage() {
       const trainStage = stages.find((s) => s && s.id === "train");
       const fallbackEvalLine = evalStage && evalStage.now ? evalStage.now : t("state.na");
       const jigHead = jigEval && jigEval.headline ? jigEval.headline : null;
+      // W1: counts of successful rollouts read "lượt thành công", with the share and "sơ bộ"
+      const succLine = (run, succ, n) =>
+        t("ux.homeEvalSuccLine", {
+          run,
+          succ: formatNumber(succ),
+          n: formatNumber(n),
+          pct: Number(n) > 0 ? formatPercent(Number(succ) / Number(n)) : t("state.na"),
+        });
       const bestEvalText = jigDoc
         ? jigEval && jigEval.status === "ready" && jigHead
-          ? t("ux.homeEvalBestVal", {
-              run: jigEval.run,
-              succ: formatNumber(jigHead.successes),
-              n: formatNumber(jigHead.n),
-            })
+          ? succLine(jigEval.run, jigHead.successes, jigHead.n)
           : jigEval && jigEval.status === "blocked"
             ? t("ux.homeJigEvalBlocked", { run: jigEval.run })
             : t("exp.evalMissing", { run: jigRunId || "-" })
         : pairBest
-          ? t("ux.homeEvalBestVal", {
-              run: pairBest.run,
-              succ: formatNumber(pairBest.successes),
-              n: formatNumber(pairBest.n),
-            })
+          ? succLine(pairBest.run, pairBest.successes, pairBest.n)
           : fallbackEvalLine;
       const bestEvalSub = jigDoc
         ? jigEval && jigEval.status === "ready"
@@ -732,9 +989,10 @@ export function renderHomePage() {
                     total: formatNumber(stages.length),
                   }),
             }),
-            // the server's train line lists every scene's runs; the jig round shows its own below
-            trainStage && trainStage.now && !jigDoc
-              ? el("div", { className: cls("tiny", "mono"), text: trainStage.now })
+            // the round's own train line; the server's machine-wide line is not repeated here,
+            // and the jig round shows its run in the third column
+            trainStage && trainStage.now && trainStage.scope === "round" && !jigDoc
+              ? el("div", { className: "tiny", text: trainStage.now })
               : null,
           ]),
           el("div", { className: "outcome-col" }, [
@@ -830,10 +1088,45 @@ export function renderHomePage() {
         .filter(Boolean)
         .join(" · ") || t("home.lead");
 
-    const apiSub =
-      state.modelsDoc && state.modelsDoc.chat && state.modelsDoc.chat.provider && state.modelsDoc.chat.model
-        ? `${state.modelsDoc.chat.provider} · ${state.modelsDoc.chat.model}`
-        : "";
+    // Third tile: the selected round's evaluation size, read from the scoped story; the local
+    // job slots only when the round has no evaluation. No gateway or model name (Q3, P0-8).
+    const roundEvalTile = (() => {
+      const h = jigEval && jigEval.headline ? jigEval.headline : null;
+      if (jigDoc && jigEval && jigEval.status === "ready" && h) {
+        return {
+          label: t("ux.homeRoundEvalLabel"),
+          value: t("ux.homeRolloutsVal", { n: formatNumber(h.n) }),
+          sub:
+            h.conditions != null
+              ? t("ux.homeRolloutsSubCond", {
+                  runs: formatNumber(1),
+                  conditions: formatNumber(h.conditions),
+                })
+              : t("ux.homeRolloutsSub", { runs: formatNumber(1) }),
+        };
+      }
+      const counted = jigDoc ? [] : pairRuns.filter((r) => r && Number(r.n) > 0);
+      if (counted.length > 0) {
+        return {
+          label: t("ux.homeRoundEvalLabel"),
+          value: t("ux.homeRolloutsVal", {
+            n: formatNumber(counted.reduce((sum, r) => sum + Number(r.n), 0)),
+          }),
+          sub: t("ux.homeRolloutsSub", { runs: formatNumber(counted.length) }),
+        };
+      }
+      const laptop = statusDoc.machines && statusDoc.machines.laptop;
+      return {
+        label: t("ux.homeLocalSlots"),
+        value: laptop
+          ? t("ux.slotUsage", {
+              used: formatNumber(laptop.running_jobs),
+              total: formatNumber(laptop.slots),
+            })
+          : t("state.na"),
+        sub: "",
+      };
+    })();
 
     const preferReportCta = Boolean(
       !hasAnyIncident &&
@@ -857,7 +1150,8 @@ export function renderHomePage() {
         ],
       }),
 
-      state.locked ? el("div", { className: "empty", text: t("state.lockedReadOnly") }) : null,
+      // the header badge already says the server is locked (design audit P1-14)
+      connMarker,
 
       taskAttentionBanner,
 
@@ -878,17 +1172,7 @@ export function renderHomePage() {
           value: curRound ? curRound.id : t("header.noRounds"),
           sub: curRound ? pickLang(curRound.title) : "",
         },
-        {
-          label: t("ux.homeServerAndApi"),
-          value:
-            statusDoc.machines && statusDoc.machines.laptop
-              ? t("ux.slotUsage", {
-                  used: formatNumber(statusDoc.machines.laptop.running_jobs),
-                  total: formatNumber(statusDoc.machines.laptop.slots),
-                })
-              : t("state.na"),
-          sub: apiSub,
-        },
+        roundEvalTile,
       ]),
 
       serverIncidentBanner,
@@ -952,10 +1236,10 @@ export function renderHomePage() {
                       })
                     : null;
                   return el("tr", {}, [
-                    el("td", {}, [renderJobKindCell(j.kind, ownerBadge)]),
+                    el("td", {}, [jobKindCell(j.kind, ownerBadge)]),
                     el("td", {}, [renderStateChip(j.state)]),
                     el("td", { text: formatDateTime(j.created) }),
-                    el("td", { text: j.stage || t("state.na") }),
+                    el("td", { text: jobStageLabel(j.stage) }),
                     el("td", {}, [copyBtn]),
                     el("td", { style: "white-space:nowrap" }, [
                       el(
@@ -1028,15 +1312,25 @@ export function renderHomePage() {
       .catch(() => {});
   }
 
+  // A failed poll shows a small "connection lost" marker instead of silently keeping the old
+  // state; the next successful poll removes it (stability audit S-P2-15).
   statusPollTimer = window.setInterval(() => {
     if (disposed || document.hidden) return;
-    tryGetJSON("/api/status").then((res) => {
-      if (!disposed && res.ok && res.data) {
-        state.statusDoc = res.data;
-        state.statusLoaded = true;
-        renderContent();
-      }
-    });
+    tryGetJSON("/api/status")
+      .then((res) => {
+        if (disposed) return;
+        if (res.ok && res.data) {
+          connMarker.hidden = true;
+          state.statusDoc = res.data;
+          state.statusLoaded = true;
+          renderContent();
+        } else {
+          connMarker.hidden = false;
+        }
+      })
+      .catch(() => {
+        if (!disposed) connMarker.hidden = false;
+      });
   }, 15000);
 
   renderContent();
@@ -1196,23 +1490,31 @@ function buildKindRunnerCard(kindSpec, onCreated) {
         )
       : null;
 
+  // A locked server shows a neutral "Chỉ đọc" chip, not a red blocked chip with the CLI flag in
+  // the reason (design audit P1-14); command, raw fields and outputs fold into "Nâng cao" (P1-12).
+  const stateChip = state.locked
+    ? el("span", { className: cls("chip", "neutral"), text: t("ux.readOnlyChip") })
+    : kindSpec.available
+      ? el("span", { className: "chip", text: t("ux.kindReadyChip") })
+      : renderStateChip("blocked");
+  const canRun = !state.locked && kindSpec.available;
   return el("article", { className: "card" }, [
     el("div", { className: "task-head" }, [
-      el("div", {}, [
-        el("h3", { text: pickLang(kindSpec.title) || kindSpec.kind }),
-        el("div", { className: cls("tiny", "mono"), text: `${kindSpec.kind} · ${kindSpec.command}` }),
-      ]),
+      el("h3", { title: kindSpec.kind || null, text: pickLang(kindSpec.title) || kindSpec.kind }),
       el("div", { className: "actions" }, [
         kindSpec.typical_seconds != null
-          ? el("span", { className: cls("chip", "neutral"), text: `~${kindSpec.typical_seconds}s` })
+          ? el("span", {
+              className: cls("chip", "neutral"),
+              text: t("ux.secondsApprox", { val: formatNumber(kindSpec.typical_seconds) }),
+            })
           : null,
-        renderStateChip(kindSpec.available ? "ok" : "blocked"),
+        stateChip,
       ]),
     ]),
-    !kindSpec.available && kindSpec.reason
+    !state.locked && !kindSpec.available && kindSpec.reason
       ? el("p", { className: "muted", text: pickLang(kindSpec.reason) })
       : null,
-    !state.locked && kindSpec.available
+    canRun
       ? el("div", {}, [
           sampleSelect
             ? el("div", { className: "form-field" }, [
@@ -1220,14 +1522,19 @@ function buildKindRunnerCard(kindSpec, onCreated) {
                 sampleSelect,
               ])
             : null,
-          el("div", { className: "form-grid" }, argFields),
           el("div", { className: "actions" }, [submitBtn]),
           msgNode,
         ])
       : null,
-    kindSpec.outputs
-      ? el("p", { className: cls("muted", "mono"), text: pickLang(kindSpec.outputs) })
-      : null,
+    advancedBlock([
+      canRun && argFields.length > 0 ? el("div", { className: "form-grid" }, argFields) : null,
+      kindSpec.command
+        ? el("pre", { className: cls("log-box", "mono"), text: scrubPath(kindSpec.command) })
+        : null,
+      kindSpec.outputs
+        ? el("p", { className: cls("muted", "mono"), text: scrubPath(pickLang(kindSpec.outputs)) })
+        : null,
+    ]),
   ]);
 }
 
@@ -1283,7 +1590,6 @@ export function renderJobsPage(ctx) {
         crumbs: [{ label: t("app.crumbRoot"), href: "#/tasks" }, { label: t("jobs.title") }],
         title: activeTab === "all" ? t("jobs.title") : t("jobs.tab." + activeTab),
       }),
-      state.locked ? el("div", { className: "empty", text: t("state.lockedReadOnly") }) : null,
       tabBar,
     ];
 
@@ -1343,18 +1649,16 @@ export function renderJobsPage(ctx) {
             const { label: jobTitleLabel } = formatJobKindLabel(job.kind);
             detailCard = el("section", { className: "card" }, [
               el("div", { className: "task-head" }, [
-                el("div", {}, [
+                el("div", { title: job.kind || null }, [
                   el("h2", { text: `${jobTitleLabel} · ${shortHashId(job.id)}` }),
-                  el("div", {
-                    className: cls("tiny", "mono"),
-                    text: `${job.kind} · ${formatDateTime(job.created)}`,
-                  }),
+                  el("div", { className: "tiny", text: formatDateTime(job.created) }),
                 ]),
                 el("div", { className: "actions" }, [stateHolder, cancelBtn]),
               ]),
-              outEntries.length > 0
-                ? el("div", { style: "margin-top:10px" }, [
-                    el(
+              // raw outputs and the command line stay one click away (design audit P1-12)
+              advancedBlock([
+                outEntries.length > 0
+                  ? el(
                       "div",
                       { className: "meta-strip" },
                       outEntries.map(([k, v]) => {
@@ -1362,22 +1666,22 @@ export function renderJobsPage(ctx) {
                         return el("div", { className: "meta-box", title: scrubPath(fullStr) }, [
                           el("span", { text: k }),
                           el("b", {
-                            className: "mono",
-                            style: "font-size:12px;overflow-wrap:anywhere",
+                            className: cls("mono", "ops-raw-value"),
                             text: fullStr.includes("/") ? compactPath(fullStr) : fullStr,
                           }),
                         ]);
                       })
-                    ),
-                  ])
-                : null,
-              el("details", { className: "studio-details", style: "margin-top:10px" }, [
-                el("summary", { text: t("fly.cliToggle") }),
-                el("pre", {
-                  className: cls("log-box", "mono"),
-                  style: "margin-top:6px",
-                  text: scrubPath((job.argv || []).join(" ")),
-                }),
+                    )
+                  : null,
+                job.argv && job.argv.length > 0
+                  ? el("div", {}, [
+                      el("b", { className: "tiny", text: t("fly.cliToggle") }),
+                      el("pre", {
+                        className: cls("log-box", "mono"),
+                        text: scrubPath(job.argv.join(" ")),
+                      }),
+                    ])
+                  : null,
               ]),
               el("div", { className: "sect" }, [el("h3", { text: t("jobs.logTitle") })]),
               logPre,
@@ -1429,15 +1733,17 @@ export function renderJobsPage(ctx) {
                     {},
                     filtered.slice((page - 1) * 20, page * 20).map((j) =>
                       el("tr", {}, [
-                        el("td", {}, [renderJobKindCell(j.kind)]),
+                        el("td", {}, [jobKindCell(j.kind)]),
                         el("td", {}, [renderStateChip(j.state)]),
                         el("td", { text: formatDateTime(j.created) }),
-                        el("td", { text: j.stage || t("state.na") }),
+                        el("td", { text: jobStageLabel(j.stage) }),
                         el("td", {
                           className: "num",
                           text:
                             j.seconds != null
-                              ? `${formatNumber(j.seconds, { maximumFractionDigits: 1 })}s`
+                              ? t("ux.seconds", {
+                                  val: formatNumber(j.seconds, { maximumFractionDigits: 1 }),
+                                })
                               : t("state.na"),
                         }),
                         el("td", {}, [
@@ -1498,7 +1804,14 @@ export function renderJobsPage(ctx) {
                         el("span", { className: cls("chip", "neutral"), text: pickLang(rm.where) }),
                       ]),
                       el("p", { className: "muted", text: pickLang(rm.why) }),
-                      el("p", { className: "sources-note", text: pickLang(rm.observe) }),
+                      advancedBlock([
+                        rm.observe
+                          ? el("p", {
+                              className: "sources-note",
+                              text: scrubPath(pickLang(rm.observe)),
+                            })
+                          : null,
+                      ]),
                     ])
                   )
                 ),
@@ -1545,15 +1858,15 @@ export function renderJobsPage(ctx) {
 
           uploadCard = el("section", { className: "card" }, [
             el("h2", { text: t("jobs.uploadTitle") }),
-            el("div", { className: "form-grid" }, [
+            el("div", { className: "form-field" }, [
+              el("label", { text: t("nav.item.egoflow") }),
+              fileInput,
+              filePreview,
+            ]),
+            advancedBlock([
               el("div", { className: "form-field" }, [
                 el("label", { text: t("jobs.uploadDirLabel") }),
                 dirInput,
-              ]),
-              el("div", { className: "form-field" }, [
-                el("label", { text: t("nav.item.egoflow") }),
-                fileInput,
-                filePreview,
               ]),
             ]),
             el("div", { className: "actions" }, [
@@ -1621,7 +1934,10 @@ export function renderJobsPage(ctx) {
                         const chk = await getJSON(
                           `/api/dir_check?path=${encodeURIComponent(data.path)}`
                         );
-                        checkOut.textContent = `device.json: ${chk.has_device} · tasks: ${(chk.tasks || []).join(", ") || "-"}`;
+                        checkOut.textContent = t("ux.fsCheckResult", {
+                          device: chk.has_device ? t("ux.yes") : t("ux.no"),
+                          tasks: (chk.tasks || []).join(", ") || "—",
+                        });
                       },
                     },
                     [t("jobs.fsCheckBtn")]
@@ -1636,10 +1952,10 @@ export function renderJobsPage(ctx) {
                     "button",
                     {
                       type: "button",
-                      className: "topbtn",
+                      className: cls("topbtn", "fs-dir-btn"),
                       onClick: () => loadFs(d.path),
                     },
-                    [`📁 ${d.name}`]
+                    [icon("folder"), d.name]
                   )
                 )
               ),
@@ -1649,7 +1965,7 @@ export function renderJobsPage(ctx) {
 
           fsCard = el("section", { className: "card" }, [
             el("div", { className: "task-head" }, [
-              el("h2", { text: t("jobs.fsTitle") }),
+              el("h3", { text: t("jobs.fsTitle") }),
               el(
                 "button",
                 {
@@ -1668,7 +1984,6 @@ export function renderJobsPage(ctx) {
           wrap,
           ...headerNodes,
           uploadCard,
-          fsCard,
           el(
             "div",
             { className: "stack" },
@@ -1677,7 +1992,11 @@ export function renderJobsPage(ctx) {
                 window.location.hash = `#/jobs?job=${encodeURIComponent(created.id)}`;
               })
             )
-          )
+          ),
+          // the source-folder browser is a raw tool: folded under "Nâng cao" (P1-12)
+          fsCard
+            ? advancedBlock([fsCard], t("ux.advancedNamed", { name: t("jobs.fsTitle") }))
+            : null
         );
         return;
       }
@@ -1778,9 +2097,14 @@ export function renderJobsPage(ctx) {
               el("h2", { text: t("jobs.machines3060") }),
               renderStateChip(mDoc.tunnel),
             ]),
+            // no gateway or model id outside the API configuration panel (Q3)
             el("p", {
-              className: cls("muted", "mono"),
-              text: `${mDoc.chat ? `${mDoc.chat.provider}: ${mDoc.chat.model}` : mDoc.agent_model || ""}`,
+              className: "muted",
+              text: t(
+                (mDoc.chat && mDoc.chat.ready) || mDoc.agent_ready
+                  ? "ux.assistantReady"
+                  : "ux.assistantNotReady"
+              ),
             }),
             el("div", { className: "actions" }, [
               renderStateChip(mDoc.nemotron),
@@ -1827,7 +2151,10 @@ export function renderJobsPage(ctx) {
               className: "muted",
               text:
                 colab.balance != null
-                  ? `${formatNumber(colab.balance, { maximumFractionDigits: 2 })} CU · ${formatDateTime(colab.time)}`
+                  ? t("ux.colabBalanceLine", {
+                      cu: formatNumber(colab.balance, { maximumFractionDigits: 2 }),
+                      time: formatDateTime(colab.time),
+                    })
                   : t("state.na"),
             }),
           ]),
@@ -1840,6 +2167,78 @@ export function renderJobsPage(ctx) {
 
   loadAndRender();
   return wrap;
+}
+
+// Check × source matrix of rule QA flags (design audit P0-5). story.heat rows are
+// [check, source, n]: each cell shows n and is shaded by n against the largest n; 0 is a faint
+// dot and a pair never checked stays blank. Column heads use the source's catalog title when
+// one exists, else its short id. It stays a plain table, so screen readers read every number.
+function renderHeatMatrix(heat, works, catRows, ds) {
+  const rows = (Array.isArray(heat) ? heat : []).filter((r) => Array.isArray(r) && r.length >= 2);
+  const checks = Array.from(new Set(rows.map((r) => r[0]))).sort();
+  const srcs = Array.from(new Set(rows.map((r) => r[1]))).sort();
+  const cells = new Map(rows.map((r) => [`${r[0]}::${r[1]}`, Number(r[2]) || 0]));
+  const max = Math.max(0, ...cells.values());
+  const known = [
+    ...(Array.isArray(catRows) ? catRows : []),
+    ...(ds && Array.isArray(ds.rows) ? ds.rows : []),
+  ];
+  const srcTitle = (sid) => {
+    const prefix = `src_${sid}`;
+    const hit = known.find(
+      (r) => r && typeof r.id === "string" && r.id.startsWith(prefix) && r.title
+    );
+    if (hit) return String(hit.title).replace(/^Pipeline\s*·\s*/i, "");
+    const work = (Array.isArray(works) ? works : []).find(
+      (w) => w && typeof w.name === "string" && w.name.startsWith(prefix)
+    );
+    return work ? shortHashId(work.name) : String(sid).slice(0, 8);
+  };
+  const named = srcs.map((sid) => ({ sid, name: srcTitle(sid) }));
+
+  return el("section", { className: cls("card", "table-wrap") }, [
+    el("h2", { text: t("qa.heatTitle") }),
+    el("p", { className: cls("tiny", "muted"), text: t("qa.heatNote") }),
+    el("table", { className: cls("table", "heat-table") }, [
+      el("thead", {}, [
+        el("tr", {}, [
+          el("th", { scope: "col", text: t("qa.matrixCheckCol") }),
+          ...named.map(({ sid, name }) =>
+            el("th", { scope: "col", className: "heat-col", title: sid, text: name })
+          ),
+        ]),
+      ]),
+      el(
+        "tbody",
+        {},
+        checks.map((ck) =>
+          el("tr", {}, [
+            el("th", { scope: "row", className: "mono", text: ck }),
+            ...named.map(({ sid, name }) => {
+              const key = `${ck}::${sid}`;
+              if (!cells.has(key)) {
+                return el("td", { className: cls("heat-cell", "is-none"), text: "" });
+              }
+              const n = cells.get(key);
+              const ratio = max > 0 ? n / max : 0;
+              const title = t("qa.heatCellTitle", { check: ck, source: name, n: formatNumber(n) });
+              return n === 0
+                ? el("td", { className: cls("heat-cell", "is-zero"), title }, [
+                    el("span", { className: "heat-zero", "aria-hidden": "true", text: "·" }),
+                    el("span", { className: "sr-only", text: formatNumber(0) }),
+                  ])
+                : el("td", {
+                    className: cls("heat-cell", ratio > 0.6 && "is-strong"),
+                    style: `--heat:${(0.15 + 0.85 * ratio).toFixed(2)}`,
+                    title,
+                    text: formatNumber(n),
+                  });
+            }),
+          ])
+        )
+      ),
+    ]),
+  ]);
 }
 
 // ============================================================================
@@ -1875,7 +2274,7 @@ export function renderQaPage() {
                   el("th", { text: t("ds.colEp") }),
                   el("th", { text: t("qa.colDeid") }),
                   el("th", { className: "num", text: t("qa.colFrames") }),
-                  el("th", { text: "QA" }),
+                  el("th", { text: t("qa.colQa") }),
                 ]),
               ]),
               el(
@@ -2001,7 +2400,11 @@ export function renderQaPage() {
                   : null,
                 bench.agent_layer_nemotron && bench.agent_layer_nemotron.value
                   ? el("div", { className: "meta-box" }, [
-                      el("span", { text: `Nemotron (${bench.agent_layer_nemotron.value.date || ""})` }),
+                      el("span", {
+                        text: t("qa.agentLayerTitle", {
+                          date: bench.agent_layer_nemotron.value.date || "—",
+                        }),
+                      }),
                       el("b", {
                         text: `${formatNumber(bench.agent_layer_nemotron.value.caught)} / ${formatNumber(bench.agent_layer_nemotron.value.planted)}`,
                       }),
@@ -2029,44 +2432,7 @@ export function renderQaPage() {
           : null,
 
         Array.isArray(story.heat) && story.heat.length > 0
-          ? (() => {
-              const checks = Array.from(new Set(story.heat.map(([c]) => c))).sort();
-              const srcs = Array.from(new Set(story.heat.map(([, s]) => s))).sort();
-              const pairSet = new Set(story.heat.map(([c, s]) => `${c}::${s}`));
-              return el("section", { className: cls("card", "table-wrap") }, [
-                el("h2", { style: "margin-bottom:8px", text: t("qa.heatTitle") }),
-                el("table", { className: "table" }, [
-                  el("thead", {}, [
-                    el("tr", {}, [
-                      el("th", { text: t("qa.matrixCheckCol") }),
-                      ...srcs.map((s) =>
-                        el("th", {
-                          className: "mono",
-                          style: "text-align:center",
-                          text: `#${String(s).slice(0, 4)}`,
-                        })
-                      ),
-                    ]),
-                  ]),
-                  el(
-                    "tbody",
-                    {},
-                    checks.map((ck) =>
-                      el("tr", {}, [
-                        el("td", { className: "mono", text: ck }),
-                        ...srcs.map((s) =>
-                          el("td", { style: "text-align:center" }, [
-                            pairSet.has(`${ck}::${s}`)
-                              ? el("span", { className: "heat-dot", title: `${ck} × ${s}` })
-                              : el("span", { className: "heat-empty", text: "·" }),
-                          ])
-                        ),
-                      ])
-                    )
-                  ),
-                ]),
-              ]);
-            })()
+          ? renderHeatMatrix(story.heat, works, catRows, story.ds)
           : null,
 
         story.qa_sample
@@ -2134,7 +2500,12 @@ export function renderQaPage() {
                         ]),
                         el("span", {
                           className: cls("tiny", "mono"),
-                          text: `${formatNumber(w.episodes)} ep · ${p}P · ${fl}F · ${rj}R`,
+                          text: t("qa.workCounts", {
+                            eps: formatNumber(w.episodes),
+                            pass: formatNumber(p),
+                            flag: formatNumber(fl),
+                            reject: formatNumber(rj),
+                          }),
                         }),
                       ]),
                     ]);

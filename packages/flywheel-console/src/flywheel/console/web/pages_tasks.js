@@ -303,7 +303,7 @@ function renderTaskCard(task, roundsById, media) {
           el("b", { text: task.model || t("state.na") }),
         ]),
         el("div", { className: "meta-box" }, [
-          el("span", { text: "ID" }),
+          el("span", { text: t("common.id") }),
           copyIdBtn,
         ]),
       ]),
