@@ -23,7 +23,8 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from flywheel.console.index import cited, demo, hidden, jig, tasks
+import yaml
+from flywheel.console.index import cited, demo, hidden, jig, tasks, timeline
 from flywheel.console.paths import ConsolePaths
 
 _SERIES_CAP = 400
@@ -645,6 +646,23 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
     except (OSError, KeyError, TypeError, ValueError):
         diag = {}
     h1m = _h1m(fw)
+    demo_block = demo.build(fw, pair, round_cited, h1m, demo_cited, rnd)
+    try:  # project progression (seed/timeline.yaml; audit 05, 28/11/2026)
+        events = timeline.timeline(paths)
+        steps = timeline.next_steps(paths)
+        known = timeline.tickets(paths)
+    except (OSError, KeyError, TypeError, ValueError, yaml.YAMLError):
+        events, steps, known = [], [], {}
+    # round 1's tickets are history, never a next step
+    if isinstance(round_cited.get("clusters"), list):
+        round_cited["clusters"] = timeline.mark_historical(round_cited["clusters"], known)
+    for key in ("clusters", "step4"):
+        if isinstance(diag.get(key), list):
+            diag[key] = timeline.mark_historical(diag[key], known)
+    dx = demo_block.get("diagnose") if isinstance(demo_block, dict) else None
+    if isinstance(dx, dict) and isinstance(dx.get("checks"), list):
+        dx["checks"] = timeline.mark_historical(dx["checks"], known)
+    shown = timeline.presented(manifest, pair, jig_block or {})
     data: dict[str, Any] = {
         "runs": runs,
         "train_log_tail": tail,
@@ -661,9 +679,13 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         "pair": pair,
         "round": round_cited,
         "follow": _follow(fw, eval_dir, rnd.follow) if rnd and eval_dir else {},
-        "demo": demo.build(fw, pair, round_cited, h1m, demo_cited, rnd),
+        "demo": demo_block,
         "jig": jig_block,
         "diag": diag,
+        "timeline": events,
+        "latest": timeline.latest(manifest, shown, events),
+        "next_steps": steps,
+        "failure_table": timeline.failure_table(manifest, pair, jig_block or {}),
     }
     data = hidden.story(data, hide)  # belt and braces: nothing above should carry a hidden run
     out.mkdir(parents=True, exist_ok=True)
@@ -674,5 +696,5 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         k: len(v)
         for k, v in data.items()
         if isinstance(v, (list, dict))
-        and k not in ("ds", "eval", "pair", "round", "follow", "demo", "jig", "diag")
+        and k not in ("ds", "eval", "pair", "round", "follow", "demo", "jig", "diag", "latest")
     } | {"ds_rows": len(ds.get("rows", [])), "pair_runs": len(data["pair"].get("runs", []))}

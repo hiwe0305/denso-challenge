@@ -1,0 +1,86 @@
+# Project timeline for the chat and the Home page (story.json · timeline, latest, next_steps).
+#
+# Every entry cites its doc: each quote must appear word for word in `doc` (test_timeline), and
+# every number in `result` must be written in one of its quotes, or be one of `sums` (a sum of
+# quoted numbers). `*.en` says the same as `*.vi` with the same numbers.
+#
+# Presentable work only, 12/11 (round 1) and 18/11 → 28/11/2026. Never run N, its story DA-50,
+# its sessions or folders, and never a test result of C70_R1 (withhold_runs, withhold_eval in
+# tasks.yaml): hidden.story drops such an entry anyway.
+version: 1
+timeline:
+  - date: 2026-11-12
+    story: DA-34
+    round: tray-r1
+    title: {vi: "Vòng 1: chẩn đoán lỗi của C_70 sau giai đoạn 1", en: "Round 1: diagnosis of the failures of C_70 after stage 1"}
+    result: {vi: "C_70: 10 thành công, 50 lỗi; lỗi chính ở bước đặt", en: "C_70: 10 successes, 50 failures; most failures at the place step"}
+    sources:
+      - {doc: docs/he/tray.md, section: '20.2', quote: '- 10 thành công, 50 lỗi.'}
+  - date: 2026-11-19
+    story: DA-42
+    round: tray-jig-r1
+    title: {vi: "Bộ chấm khay bản 2", en: "Tray scorer version 2"}
+    result: {vi: "Bản 2 sửa approach_a và L-TRAY-TILT; bản 1 vẫn chạy được để so", en: "Version 2 fixes approach_a and L-TRAY-TILT; version 1 still runs for comparison"}
+    sources:
+      - {doc: docs/g0/tray/scorer-v2.md, section: '1', quote: 'Bản 1 vẫn chạy được: `StepTracker(cfg, sample, version=1)`. Mặc định là bản 2 (`SCORER_VERSION`).'}
+  - date: 2026-11-22
+    story: DA-41
+    round: tray-jig-r1
+    title: {vi: "Cảnh đồ gá jig2 và lô khoảng 600 episode", en: "Jig scene jig2 and a batch of about 600 episodes"}
+    result: {vi: "632 lượt chạy, 595 ghi được, giữ 568 episode (403 mức 1, 165 mức 2)", en: "632 runs, 595 recorded, 568 episodes kept (403 level 1, 165 level 2)"}
+    sources:
+      - {doc: docs/g0/tray/jig.md, section: '4.12', quote: '### 4.12 Lô khoảng 600 episode trên `rtx3060`'}
+      - {doc: docs/g0/tray/jig.md, section: '4.12', quote: '| Lượt chạy (seed) | 442 (500000–500441) | 190 (501000–501189) | 632 |'}
+      - {doc: docs/g0/tray/jig.md, section: '4.12', quote: '| Ghi được (bước 1) | 420 (95,0 %) | 175 (92,1 %) | 595 (94,1 %) |'}
+      - {doc: docs/g0/tray/jig.md, section: '4.12', quote: '| | Mức 1 | Mức 2 | Tổng |'}
+      - {doc: docs/g0/tray/jig.md, section: '4.12', quote: '| Tập `ALL` (bước 8) | 403 | 165 | 568 |'}
+  - date: 2026-11-25
+    story: DA-46
+    round: tray-jig-r1
+    title: {vi: "Dữ liệu riêng cho bước đặt", en: "Data for the place step"}
+    result: {vi: "612 bản cắt đoạn đặt, lệch đích ±10 cm; run M dùng 539 (377 + 162) sau lọc ≤ 3 cm", en: "612 place-segment cuts, target offset ±10 cm; run M uses 539 (377 + 162) after the ≤ 3 cm filter"}
+    sums: [[377, 162]]
+    sources:
+      - {doc: docs/g0/tray/place-data.md, section: '7', quote: '| Tập `ALL` | 431 | 181 | 612 (86,2 % số lượt) |'}
+      - {doc: docs/he/tray-jig.md, section: '1', quote: '| Phần 3, 4 | Bản cắt đoạn đặt của lô DA-46 (lệch đích CARRY ±10 cm): `tray_s1place_a1797e480160` (377), `tray_s1place_56e6d006d8d1` (162) |'}
+      - {doc: docs/he/tray-jig.md, section: '1', quote: 'chỉ giữ episode đặt lệch ≤ 3 cm và ≤ 5°'}
+  - date: 2026-11-26
+    story: DA-48
+    round: tray-jig-r1
+    title: {vi: "Train run M trên cảnh đồ gá", en: "Training of run M on the jig scene"}
+    result: {vi: "100 000 bước trên tập 1 037 episode; 56,15 CU, khoảng 21 giờ", en: "100000 steps on a set of 1037 episodes; 56.15 CU, about 21 hours"}
+    sources:
+      - {doc: docs/he/tray-jig.md, section: '4', quote: '| Số bước | 100 000 / 100 000, `result.json` ghi `status: ok` |'}
+      - {doc: docs/he/tray-jig.md, section: '4', quote: '| Tổng | 56,15 CU (số dư 214,88 xuống 158,73), khoảng 21 giờ train.'}
+      - {doc: docs/he/tray-jig.md, section: '1', quote: '| Dữ liệu | Một tập ghép từ bốn phần, 1 037 episode, 948 639 khung (thực đo 25/11/2026) |'}
+  - date: 2026-11-26
+    story: DA-47
+    round: tray-jig-r1
+    title: {vi: "Eval run M: 180 rollout trên cảnh đồ gá", en: "Eval of run M: 180 rollouts on the jig scene"}
+    result: {vi: "136/180 thành công (75,6 %), bước đặt 89,4 % (161/180); mức 1 85,6 %, mức 2 65,6 %", en: "136/180 successes (75.6%), place step 89.4% (161/180); level 1 85.6%, level 2 65.6%"}
+    sources:
+      - {doc: docs/he/tray-jig.md, section: '5', quote: '| 1. Cả task, mức 1 và 2 (60 điều kiện) | 75,6 % (136/180) | 70,0–81,1 | **Chưa đạt mốc 80 %** |'}
+      - {doc: docs/he/tray-jig.md, section: '5', quote: '| 2. Mức 1 (30 điều kiện) | 85,6 % (77/90) | 78,9–92,2 | **Đạt mốc 70 %** |'}
+      - {doc: docs/he/tray-jig.md, section: '5', quote: '| 2. Mức 2 (30 điều kiện) | 65,6 % (59/90) | 55,6–75,6 | **Chưa đạt mốc 70 %** |'}
+      - {doc: docs/he/tray-jig.md, section: '5', quote: '| 3. Bước `place`, mức 1 và 2 | 89,4 % (161/180) | 85,0–93,9 | **Bước đặt trên 50 %** |'}
+
+# What the docs name as the next step. Nothing from tray-jig.md §6–§9 (run N).
+next_steps:
+  - round: tray-jig-r1
+    text:
+      vi: "Train run đối chứng K: 498 episode đầy đủ, không có bản cắt, cùng cảnh jig2 và cùng tập điều kiện, để tách phần do đồ gá và phần do dữ liệu bước đặt"
+      en: "Train the control run K: 498 full episodes, no cuts, same jig2 scene and condition set, to separate the effect of the jig from that of the place data"
+    sources:
+      - {doc: docs/he/tray-jig.md, section: '1', quote: 'Run đối chứng K (498 episode đầy đủ, không có bản cắt) là tùy chọn, Hiếu quyết sau'}
+      - {doc: docs/he/tray-jig.md, section: '2', quote: 'Chỉ khi run K được train và eval trên cùng tập điều kiện mới so M với K'}
+
+# Tickets of round 1's diagnosis (tray.md 20.11). They are history now: the chat never offers
+# them as a next step (story.json marks each intervention or check naming one `historical`).
+tickets:
+  - id: DA-38
+    closed: 2026-11-06
+    source: {doc: docs/product/stories/DA-38-hook-trace-simple.md, section: 'Trạng thái', quote: '| Trạng thái | Xong (PR #80, 6/11/2026;'}
+  - id: DA-37
+    closed: null
+    handled_by: DA-42
+    source: {doc: docs/product/stories/DA-42-bo-cham-outcome-eval-nhieu-luot.md, section: 'Quan hệ với DA-36, DA-37, DA-38', quote: 'Phiếu "DA-37" soạn ở tray.md 20.11 nhắm vào `predicates.py`, nằm ngoài phạm vi file của DA-37, nên DA-42 nhận phiếu đó.'}

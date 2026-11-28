@@ -252,6 +252,12 @@ def tasks_doc(doc: Any, h: Hidden) -> Any:
             for key in ("controls", "withhold_eval"):
                 if isinstance(r.get(key), list):
                     r[key] = [x for x in r[key] if not h.run(x)]
+            if isinstance(r.get("links"), dict):  # a link never leads to a hidden run
+                r["links"] = {
+                    k: None if isinstance(v, dict) and (h.run(v.get("run")) or h.mentions(
+                        json.dumps(v, ensure_ascii=False))) else v
+                    for k, v in r["links"].items()
+                }  # fmt: skip
         rounds.append(r)
     return {**doc, "rounds": rounds}
 
@@ -423,4 +429,30 @@ def story(doc: Any, h: Hidden) -> Any:
             out["pair"]["best"] = _fallback({"runs": runs}, "best")
     if isinstance(out.get("jig"), dict) and out["jig"]:
         out["jig"] = _jig(out["jig"], h)
+    for key in ("timeline", "next_steps"):
+        if isinstance(out.get(key), list):
+            out[key] = [x for x in out[key] if not _names_hidden(x, h)]
+    latest = out.get("latest")
+    if isinstance(latest, dict) and (h.run(latest.get("run")) or _names_hidden(latest, h)):
+        out["latest"] = None
+    table = out.get("failure_table")
+    if isinstance(table, dict):
+        out["failure_table"] = {
+            rid: {**t, "runs": {k: v for k, v in t["runs"].items() if not h.run(k)}}
+            if isinstance(t, dict) and isinstance(t.get("runs"), dict) else t
+            for rid, t in table.items()
+        }  # fmt: skip
     return out
+
+
+def _names_hidden(x: Any, h: Hidden) -> bool:
+    """A timeline entry, next step or ``latest`` that belongs to a hidden story or names a
+    hidden run anywhere in its text (``run N``, ``da50-*``, ``jig-n``...)."""
+    if not isinstance(x, dict):
+        return False
+    if h.story(x.get("story")) or h.run(x.get("run")):
+        return True
+    text = json.dumps(x, ensure_ascii=False, default=str)
+    if any(re.search(rf"(?<![\w-]){re.escape(s)}(?![\w])", text) for s in h.stories):
+        return True
+    return h.mentions(text)
