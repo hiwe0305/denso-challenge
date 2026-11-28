@@ -114,4 +114,5 @@ def test_the_shares_verify_and_the_prompt_sets_the_format(idx: ConsolePaths, mon
     done = evs[-1][1]
     assert evs[-1][0] == "done" and done["unverified"] == [], done["unverified"]
     assert "COMPARE60 rows" in llm.SYSTEM and "'47/60 (78,3 %)'" in llm.SYSTEM and "In deep analysis only, add one bar chart" in llm.SYSTEM
-    assert "the one exception is the COMPARE60 chart" in llm.SYSTEM and "Never write 'tốt hơn'" in llm.SYSTEM
+    assert "the one exception is the COMPARE60 chart" in llm.SYSTEM
+    assert "the NOTE text word for word as the last line" in llm.SYSTEM and "never 'tốt hơn', 'cao hơn', 'thấp hơn'" in llm.SYSTEM
