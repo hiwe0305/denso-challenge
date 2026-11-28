@@ -12,10 +12,16 @@ from __future__ import annotations
 import re
 
 # " đạt 136/180", ", đạt được 47/60", " met **10/60": the word and its spaces, before a count
-_FIX = re.compile(r"(?<!chưa)(?<!not)(?<!\|)(,?)[ \t]+(?:đạt(?:[ \t]+được)?|met)[ \t]+(?=\**[ \t]*\d+[ \t]*/[ \t]*\d)", re.I)
+_FIX = re.compile(
+    r"(?<!chưa)(?<!not)(?<!\|)(,?)[ \t]+(?:đạt(?:[ \t]+được)?|met)[ \t]+"
+    r"(?=\**[ \t]*\d+[ \t]*/[ \t]*\d)",
+    re.I,
+)
 # what the stream keeps back: trailing spaces (a "đạt" may follow), the last, unfinished word,
 # and a "đạt" still waiting for its count
-_TAIL = re.compile(r",?[ \t]*(?:(?:đạt(?:[ \t]+được)?|met)\b[ \t]*\**[ \t]*(?:\d+[ \t]*/?[ \t]*)?)?[^\s]*$", re.I)
+_TAIL = re.compile(
+    r",?[ \t]*(?:(?:đạt(?:[ \t]+được)?|met)\b[ \t]*\**[ \t]*(?:\d+[ \t]*/?[ \t]*)?)?[^\s]*$", re.I
+)
 _CTX = 4  # released characters kept for the look-behinds ("chưa", "not", "|")
 
 
