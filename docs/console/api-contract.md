@@ -38,13 +38,23 @@ Vòng có danh sách `withhold_eval` trong [seed/tasks.yaml](../../packages/flyw
 - Giao diện mới **vẫn phải lọc lần nữa** theo `rounds[].withhold_eval` của `data/tasks.json`, giống hàm `unhide` trong `web/core.js` hiện tại: bỏ run khỏi `pair.runs`, bỏ so sánh có run đó khỏi `pair.comparisons`, bỏ khóa run khỏi `follow.runs`, xóa `follow.r3`, xóa `demo.round1_reading`, bỏ khóa run khỏi `demo.ladder.runs` và `demo.ladder.on_table_b.value`.
 - Thông tin train, bản cắt dữ liệu và chi phí của run vẫn được hiện.
 
+### 1.3. Run bị ẩn (`withhold_runs`)
+
+Vòng có danh sách `withhold_runs` trong [seed/tasks.yaml](../../packages/flywheel-console/src/flywheel/console/seed/tasks.yaml) (hiện là run `N` của vòng `tray-jig-r1`, quyết định của Hiếu 28/11/2026, story [DA-53](../product/stories/DA-53-console-hien-run-canh-do-ga.md)). Khác `withhold_eval`, run này **không được trình bày gì cả**: không đường cong train, tập cắt, phiên Colab, eval đang chạy, kết quả eval hay phép so với run khác.
+
+- Index không ghi run này. Server lọc thêm `data/story.json` và `data/tasks.json` trước khi gửi, kể cả khi index trên đĩa được dựng trước thay đổi ([index/hidden.py](../../packages/flywheel-console/src/flywheel/console/index/hidden.py); danh sách đọc từ seed, không từ index).
+- `data/tasks.json`: run bị bỏ khỏi `rounds[].runs`; vòng có run sau vòng bị ẩn ghi `after_round: null`; không có khóa `withhold_runs`.
+- `data/story.json`: run bị bỏ khỏi `runs`, `colab_sessions` (theo mẫu tên phiên) và mọi phần của khối `jig` (`runs`, `evals`, `outcomes`, `rollouts`, `conditions`, `cuts`, `live_evals`, `active_sessions`, cụm `agentqa`); `jig.paired`, `jig.next_cut`, `jig.n_ckpt_done` là `null`.
+- `/api/status` (danh sách run train, máy Colab) và chat cũng không có run này. Dòng tổng của sổ chi phí (`ledger`) giữ nguyên vì đó là tiền đã tiêu.
+- Giao diện không cần lọc thêm, nhưng phải chịu được `after_round: null`, `jig.paired: null`, `jig.next_cut: null` (không hiện "undefined", không hiện khung trống).
+
 ## 2. File chỉ mục (đọc, không có tham số)
 
 Do `fw console index` tạo trong `fwdata/console/index/`, server phục vụ ở `/data/`. Giao diện tải các file này khi mở trang.
 
 | URL | Mẫu | Nội dung |
 |---|---|---|
-| `data/tasks.json` | [data_tasks.json](api-samples/data_tasks.json) | `{version, source, tasks[], rounds[]}`. Mỗi task: `id` (`tray`, `two_table`…), `name`/`word`/`description` song ngữ `{vi, en}`, `robot`, `model`, `simulator`, `stages[]`, `success`, `rounds[]` (id vòng), `index[]` (khóa của `story.json` mà task được thấy), `process` (stage 0–6: thiếu gì, chạy ở đâu, lệnh), `catalog_totals`, `catalog_rows`. Mỗi round: `id`, `task`, `title`, `runs[]`, `baseline`, `after_round`, `controls[]`, `withhold_eval[]`, `follow`, `max_steps`, `index[]` |
+| `data/tasks.json` | [data_tasks.json](api-samples/data_tasks.json) | `{version, source, tasks[], rounds[]}`. Mỗi task: `id` (`tray`, `two_table`…), `name`/`word`/`description` song ngữ `{vi, en}`, `robot`, `model`, `simulator`, `stages[]`, `success`, `rounds[]` (id vòng), `index[]` (khóa của `story.json` mà task được thấy), `process` (stage 0–6: thiếu gì, chạy ở đâu, lệnh), `catalog_totals`, `catalog_rows`. Mỗi round: `id`, `task`, `title`, `runs[]`, `baseline`, `after_round` (có thể `null`, mục 1.3), `controls[]`, `withhold_eval[]`, `follow`, `max_steps`, `index[]`. Run trong `withhold_runs` không có mặt (mục 1.3) |
 | `data/catalog.json` | [data_catalog.json](api-samples/data_catalog.json) | `{generated, rows[], edges[], runs[], totals}`. Mỗi row là một tập dữ liệu: `id`, `title`, `kind`, `group`, `data_type`, `task`, `episodes`, `frames`, `hours`, `fps`, `format`, `licence`, `data_class`, `status`, `parents[]`, `children[]`, `view`, `thumbs[]`. `edges` là cặp `[cha, con]` của cây nguồn gốc. `totals` theo nhóm (`egocentric`, `teleop`, `s1`, `s2`, `all`) |
 | `data/story.json` | [data_story.json](api-samples/data_story.json) | Số liệu cho các trang câu chuyện: `runs`, `train_log_tail`, `sources`, `heat`, `reasons`, `ledger`, `colab_balance`, `colab_sessions`, `eval`, `loop_chain`, `loop_detail`, `pair`, `round`, `follow`, `demo`, `h1m`, `ds`, `vm_phases`, `qa_sample`. Mỗi task chỉ được đọc các khóa có trong `index[]` của task và round (`story.<khóa>`); không hiện số của task khác |
 | `data/sim.json` | [data_sim.json](api-samples/data_sim.json) | Tập episode mô phỏng: `source`, `sha8`, `parts[]`, `cuts{}`, `batch{}`, `episodes[]`, `round`, `format`, `teleop[]`. Task không có khóa `sim` trong `index[]` chỉ thấy `teleop[]` lọc theo task |
@@ -140,7 +150,7 @@ Khi model hosted (`/api/models` → `chat.hosted: true`), server tự không cho
 
 - Không gọi URL ngoài file này, không gọi trực tiếp Ollama, Colab hay rtx3060.
 - Không đọc `vault/`, đường dẫn có `holdout`, hay video egocentric chưa che danh tính.
-- Không trình bày kết quả của run trong `withhold_eval` (mục 1.2).
+- Không trình bày kết quả của run trong `withhold_eval` (mục 1.2), và không trình bày gì của run trong `withhold_runs` (mục 1.3).
 - Không lưu dữ liệu ngoài `localStorage` cho tùy chọn của người xem (theme, ngôn ngữ, tab đang mở).
 - Không thêm server, cơ sở dữ liệu hay bước build vào Console (CLAUDE.md, mục "Không làm").
 

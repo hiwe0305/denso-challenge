@@ -310,3 +310,35 @@ def test_withheld_result_is_never_given_to_the_model(idx: ConsolePaths) -> None:
     held = registry.call("round_report", {}, ctx)["model"]
     assert "không trình bày" in held.split("\n")[2]
     assert registry.forced_tool("loss của M_NEW") is None  # its training is still a normal lookup
+
+
+def test_hidden_run_is_not_resolved_or_reported(idx: ConsolePaths) -> None:
+    """``withhold_runs`` (run N, Hiếu 28/11/2026): the chat answers as for an unknown run."""
+    import json
+
+    from flywheel.console.chat import common
+    from flywheel.console.chat.resolve import resolve_run, run_index
+
+    for folder, loss in (("tray/jig-m/da48-ft-m-s0", 0.11), ("tray/jig-n/da50-ft-n-s0", 0.0987)):
+        d = idx.fw_root / folder
+        d.mkdir(parents=True)
+        rows = [{"split": "train", "step": s, "loss": loss} for s in (0, 100_000)]
+        (d / "metrics.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    assert [r["branch"] for r in run_index() if r["dir"].parent.name.startswith("jig-")] == ["M"]
+    assert resolve_run("N")[0] == "none" and resolve_run("da50-ft-n-s0")[0] == "none"
+    assert resolve_run("M") == ("ok", "da48-ft-m-s0")
+    ctx = {"lang": "vi", "question": "loss của run N"}
+    for name, args in (("run_metrics", {"run": "N"}), ("run_compare", {"run_ids": ["M", "N"]}),
+                       ("run_metrics", {"run": "da50-ft-n-s0"})):  # fmt: skip
+        r = registry.call(name, args, ctx)
+        assert not r["ok"] and "0.0987" not in r["model"], (name, r)
+    listed = registry.call("run_list", {}, ctx)["model"]
+    assert "da50" not in listed and "0.0987" not in listed and "da48-ft-m-s0" in listed
+    # a story.json indexed before the switch: the chat's single loader cleans it
+    cut = {"name": "N", "source": "fwdata/tray/jig-n/N.tar.json"}
+    stale = {"jig": {"runs": [{"run": "M", "successes": 136}, {"run": "N", "successes": 124}],
+                     "best": "M", "next_cut": cut},
+             "runs": [{"branch": "N", "job": "da50-ft-n-s0"}]}  # fmt: skip
+    (idx.index / "story.json").write_text(json.dumps(stale), encoding="utf-8")
+    text = json.dumps(common.story())
+    assert "124" not in text and "da50" not in text and "jig-n" not in text

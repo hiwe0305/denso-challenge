@@ -30,6 +30,14 @@ def _round(fw: ConsolePaths) -> tasks.Round:
     return tasks.load(fw).round("tray-jig-r1")
 
 
+def _open(fw: ConsolePaths) -> tasks.Round:
+    """The seed round without ``withhold_runs``: run N shown, so the N-minus-M code stays tested
+    while the seed hides N (Hiếu, 28/11/2026)."""
+    raw = copy.deepcopy(_round(fw).raw)
+    raw.pop("withhold_runs", None)
+    return tasks._round(raw, 0)
+
+
 def _put(fw: ConsolePaths, run: str, doc: dict[str, Any] | None = None) -> None:
     folder = fw.fw_root / f"tray/outcomes/jig-{run.lower()}-100000-r3"
     folder.mkdir(parents=True, exist_ok=True)
@@ -104,7 +112,9 @@ def test_missing_results_gives_the_command_and_no_number(fw: ConsolePaths) -> No
     assert ev["status"] == "missing" and ev["command"] == rnd.runs[0].results_cmd
     assert "headline" not in ev and "readings" not in ev and "place" not in ev
     assert block["featured"] is None
-    assert block["paired"]["status"] == "missing" and "--baseline" in block["paired"]["command"]
+    assert block["paired"] is None  # the seed hides N: no N minus M at all
+    p = _block(fw, _open(fw))["paired"]
+    assert p["status"] == "missing" and "--baseline" in p["command"]
 
 
 def _blocked(fw: ConsolePaths, problem: str) -> None:
@@ -157,7 +167,7 @@ def test_n_against_m_reads_rules_n2_and_n3(fw: ConsolePaths) -> None:
     _set(fw)
     _put(fw, "M")
     _put(fw, "N")
-    block = _block(fw)
+    block = _block(fw, _open(fw))
     assert [e["status"] for e in block["evals"]] == ["ready", "ready"]
     assert block["featured"] == "N"
     p = block["paired"]
@@ -174,7 +184,7 @@ def test_n_against_m_reads_rules_n2_and_n3(fw: ConsolePaths) -> None:
 def test_paired_is_missing_without_n_results(fw: ConsolePaths) -> None:
     _set(fw)
     _put(fw, "M")
-    block = _block(fw)
+    block = _block(fw, _open(fw))
     assert block["featured"] == "M"
     assert block["paired"]["status"] == "missing" and "headline" not in block["paired"]
 
@@ -185,7 +195,7 @@ def test_paired_is_missing_when_n_was_read_without_baseline(fw: ConsolePaths) ->
     doc = _results("N")
     doc.pop("paired")
     _put(fw, "N", doc)
-    assert _block(fw)["paired"]["status"] == "missing"
+    assert _block(fw, _open(fw))["paired"]["status"] == "missing"
 
 
 def test_paired_is_blocked_when_a_side_is_blocked(fw: ConsolePaths) -> None:
@@ -194,7 +204,7 @@ def test_paired_is_blocked_when_a_side_is_blocked(fw: ConsolePaths) -> None:
     doc["rollouts"] = 179
     _put(fw, "M", doc)
     _put(fw, "N")
-    p = _block(fw)["paired"]
+    p = _block(fw, _open(fw))["paired"]
     assert p["status"] == "blocked" and "M: rollouts 179 != 180" in p["problems"]
     assert all(r["verdict"] is None for r in p["readings"])
 
@@ -203,7 +213,7 @@ def test_withheld_run_gives_status_only(fw: ConsolePaths) -> None:
     _set(fw)
     _put(fw, "M")
     _put(fw, "N")
-    raw = copy.deepcopy(_round(fw).raw)
+    raw = copy.deepcopy(_open(fw).raw)
     raw["withhold_eval"] = ["N"]
     rnd = tasks._round(raw, 0)
     block = _block(fw, rnd)
@@ -253,8 +263,8 @@ def test_story_carries_the_jig_round(fw: ConsolePaths, tmp_path: Path) -> None:
     j = d["jig"]
     assert j["round"] == "tray-jig-r1" and j["scene"] == "jig2" and j["rules"]["place"] == 0.5
     assert [r["branch"] for r in j["runs"]] == ["M"] and d["runs"] == []
-    assert j["vm_phases"] == {"train": 100.0, "persist": 30.0}  # N has no log: falls back to M
-    assert _eval(j, "M")["status"] == "ready" and _eval(j, "N")["status"] == "missing"
+    assert j["vm_phases"] == {"train": 100.0, "persist": 30.0} and j["log_run"] == "M"
+    assert _eval(j, "M")["status"] == "ready" and [e["run"] for e in j["evals"]] == ["M"]
     text = json.dumps(j, ensure_ascii=False)
     assert "tốt hơn" not in text and "better than" not in text
 

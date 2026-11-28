@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
+from flywheel.console.index import hidden
 from flywheel.console.paths import ConsolePaths, PathDenied, active, guard, set_active
 from flywheel.console.server import kinds, media, runner, withhold
 
@@ -296,12 +297,30 @@ class Handler(BaseHTTPRequestHandler):
             fp = fp / "index.html"
         if fp is None or not fp.is_file():
             return self.jerr(404, "not found")
-        if unquote(u.path) == "/data/story.json":
-            held = runner._withheld_runs()
-            if held:  # the result blocks of a held run never reach the browser
-                doc = withhold.story(json.loads(fp.read_text(encoding="utf-8")), held)
-                return self.send_bytes(json.dumps(doc, ensure_ascii=False).encode())
+        if unquote(u.path) in ("/data/story.json", "/data/tasks.json"):
+            return self.send_index(fp, unquote(u.path) == "/data/story.json")
         self.send_file(fp)
+
+    def send_index(self, fp: Path, is_story: bool) -> None:
+        """``story.json`` / ``tasks.json`` without the runs a round does not present.
+
+        ``withhold_runs`` (hidden.py, read from the seed): nothing of the run, even from an index
+        built before the switch. ``withhold_eval`` (withhold.py, read from the index tasks.json):
+        the result blocks of a held run never reach the browser.
+        """
+        hide = hidden.load(self.paths)
+        held = runner._withheld_runs() if is_story else set()
+        if not hide and not held:
+            return self.send_file(fp)
+        try:
+            doc = json.loads(fp.read_text(encoding="utf-8"))
+        except ValueError:
+            return self.jerr(500, "index file is not valid JSON")
+        if is_story:
+            doc = withhold.story(hidden.story(doc, hide), held)
+        else:
+            doc = hidden.tasks_doc(doc, hide)
+        self.send_bytes(json.dumps(doc, ensure_ascii=False).encode())
 
     def send_file(self, fp: Path) -> None:
         size = fp.stat().st_size

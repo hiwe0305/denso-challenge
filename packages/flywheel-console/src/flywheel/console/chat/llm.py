@@ -23,6 +23,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from flywheel.console.index import hidden
 from flywheel.console.paths import active
 from flywheel.console.server import runner
 
@@ -199,12 +200,22 @@ def save_trace(tr: dict[str, Any]) -> None:
         f.write(json.dumps(tr, ensure_ascii=False) + "\n")
 
 
+def _plain(ln: str) -> str:
+    """A stored trace line as JSON text without \\u escapes ("run nào" must not read as "run n")."""
+    try:
+        return json.dumps(json.loads(ln), ensure_ascii=False)
+    except ValueError:
+        return ln
+
+
 def list_traces(limit: int = 20, hide: Collection[str] = ()) -> list[dict[str, Any]]:
-    """The newest turns; a turn that names a run in ``hide`` (held results) is left out."""
+    """The newest turns; a turn that names a run in ``hide`` (held results) is left out, and so
+    is a turn naming a run in ``withhold_runs`` (``hidden.Hidden.mentions``)."""
+    gone = hidden.load(active())
     out: list[dict[str, Any]] = []
     for f in _trace_files():
         for ln in reversed(f.read_text(encoding="utf-8").splitlines()):
-            if any(h in ln for h in hide):
+            if any(h in ln for h in hide) or gone.mentions(_plain(ln)):
                 continue
             try:
                 t = json.loads(ln)
@@ -250,9 +261,10 @@ def latest_bench() -> dict[str, Any] | None:
 
 
 def get_trace(turn_id: str, hide: Collection[str] = ()) -> dict[str, Any] | None:
+    gone = hidden.load(active())  # a hidden run's id ("N") cannot be tested as a substring
     for f in _trace_files():
         for ln in f.read_text(encoding="utf-8").splitlines():
-            if turn_id in ln and not any(h in ln for h in hide):
+            if turn_id in ln and not any(h in ln for h in hide) and not gone.mentions(_plain(ln)):
                 try:
                     t = json.loads(ln)
                 except ValueError:

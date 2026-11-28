@@ -322,6 +322,22 @@ def test_train_runs_skip_abandoned_attempts(rn: ConsolePaths) -> None:
     assert [r["branch"] for r in runner.train_runs()] == ["C70_R1"]
 
 
+def test_train_runs_and_colab_leave_out_a_hidden_run(rn: ConsolePaths) -> None:
+    """``withhold_runs`` (run N, Hiếu 28/11/2026): not in the train listing nor the Colab VMs."""
+    for folder in ("tray/jig-m/da48-ft-m-s0", "tray/jig-n/da50-ft-n-s0"):
+        d = rn.fw_root / folder
+        d.mkdir(parents=True)
+        (d / "metrics.jsonl").write_text(json.dumps({"step": 9, "loss": 0.1}) + "\n")
+    assert [r["branch"] for r in runner.train_runs()] == ["M"]
+    batch = rn.fw_root / "colab/batch-1"
+    batch.mkdir(parents=True)
+    (batch / "da50-n.json").write_text(json.dumps({"name": "da50-n", "endpoint": "gpu-l4-n"}))
+    (batch / "da48-m.json").write_text(json.dumps({"name": "da48-m", "endpoint": "gpu-a100-m"}))
+    poll = {"event": "poll", "balance": 5.0, "listed": ["gpu-l4-n", "gpu-a100-m"], "time": "t"}
+    (batch / "guard.jsonl").write_text(json.dumps(poll) + "\n")
+    assert runner.colab_state()["sessions"] == ["gpu-a100-m"]
+
+
 def test_cancel_stops_a_job_left_by_an_earlier_server(rn: ConsolePaths) -> None:
     """A running job reloaded from disk has no thread here: Cancel kills its process group."""
     proc = subprocess.Popen(["sleep", "30"], start_new_session=True)

@@ -237,14 +237,18 @@ rounds:
   # round. Each run names its own folders; the eval numbers are copied from the `results.json`
   # that `flywheel_psi0.tray.eval_results --json` writes beside each outcome (never recomputed in
   # the console), and the index only compares their CI lower bounds with `rules` below.
+  # Hiếu, 28/11/2026 (later the same day): run N is not presented (`withhold_runs` below); only
+  # run M is shown. N stays declared so the filters know its folders and sessions, and so the
+  # M → N round is ready if the decision is reversed (then add §6 / jig-n-rules back to `doc`
+  # and `rules.source`).
   - id: tray-jig-r1
     task: tray
     number: 2
-    title: {vi: "Vòng trên cảnh đồ gá: run M → run N", en: "Jig-scene round: run M → run N"}
-    doc: docs/he/tray-jig.md §2, §5, §6
+    title: {vi: "Vòng trên cảnh đồ gá: run M", en: "Jig-scene round: run M"}
+    doc: docs/he/tray-jig.md §2, §5
     eval: {levels: [1, 2], level_key: "levels 1-2"}
     max_steps: 100000
-    log_run: N                       # whose VM log the training page shows (else any run with one)
+    log_run: M                       # whose VM log the training page shows (else any run with one)
     scene: jig2
     # the eval set both runs were scored on; results are read only when the set's
     # conditions.sha256 file holds this value, the file counts this many rollouts with none
@@ -253,16 +257,16 @@ rounds:
     conditions_sha256: bbec07e31ee022ac46d59e5322628c226519abe76363160ccbdb78b68725d348
     rollouts_expected: 180
     scorer_version: 2
-    # thresholds of rules 1, 2, 3 of jig-m-rules (rule 1 of jig-n-rules applies them to N);
-    # a reading says "met" only when the CI lower bound is at or above the threshold
+    # thresholds of rules 1, 2, 3 of jig-m-rules; a reading says "met" only when the CI lower
+    # bound is at or above the threshold
     rules:
       whole_task: 0.80
       per_level: 0.70
       place: 0.50
       read_at: lower_bound
       source:
-        vi: "docs/he/tray-jig.md mục 2 (khối jig-m-rules) và mục 6 (khối jig-n-rules)"
-        en: "docs/he/tray-jig.md §2 (block jig-m-rules) and §6 (block jig-n-rules)"
+        vi: "docs/he/tray-jig.md mục 2 (khối jig-m-rules)"
+        en: "docs/he/tray-jig.md §2 (block jig-m-rules)"
     runs:                            # display order; paths under FW_ROOT
       - id: M
         train_set: M
@@ -289,5 +293,9 @@ rounds:
     baseline: M
     after_round: N
     controls: []
-    withhold_eval: []                # Hiếu, 28/11/2026: M and N are shown (decision 3)
+    # Hiếu, 28/11/2026: run N is not presented at all (training, data cut, Colab sessions, eval,
+    # N minus M). Unlike withhold_eval, nothing of the run is shown and tasks.json does not list
+    # it. Its files stay in fwdata; docs/he/tray-jig.md and the ledger keep their records.
+    withhold_runs:
+      - {id: N, sessions: ["da50-*"]}
     index: [story.jig]

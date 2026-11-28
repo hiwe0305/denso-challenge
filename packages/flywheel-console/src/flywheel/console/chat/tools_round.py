@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from flywheel.console.index import hidden
 from flywheel.console.paths import active
 
 from .common import HOSTED, Result, catalog, cols, fail, jload, result, story, table, totals
@@ -77,6 +78,8 @@ def focus_of(question: Any) -> str:
 def manifest() -> dict[str, Any]:
     d = jload(active().index / "tasks.json", {})
     d = d if isinstance(d, dict) else {}
+    shown = hidden.tasks_doc(d, hidden.load(active()))  # withhold_runs, even in a stale index
+    d = shown if isinstance(shown, dict) else d
     if not HOSTED.get():
         return d
     # with a hosted model each task lists and totals its public rows only, as catalog() does

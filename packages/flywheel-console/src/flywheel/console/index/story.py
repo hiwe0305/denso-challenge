@@ -1,6 +1,8 @@
 """Story index: runs, eval, loop, cost. Ported from the v5 ``build_story.py`` spike.
 
 Every input may be missing on a laptop; a missing input gives an empty value, never an error.
+A run in a round's ``withhold_runs`` (``hidden.py``) is never written: not as a train entry, a
+Colab session or anything of the ``jig`` block; the ledger rows stay (money spent).
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from flywheel.console.index import cited, demo, jig, tasks
+from flywheel.console.index import cited, demo, hidden, jig, tasks
 from flywheel.console.paths import ConsolePaths
 
 _SERIES_CAP = 400
@@ -213,11 +215,11 @@ def round_runs(fw: Path, rnd: tasks.Round) -> tuple[list[dict[str, Any]], list[P
     says about the local copy: ``fetched_final`` (its ``final``), ``fetched_train`` (the VM's
     training state when it was pulled, e.g. "done" or "running") and ``fetched_step`` (its
     ``progress.step``), all None without the file. A run whose ``metrics.jsonl`` is absent or
-    empty is left out. Runs come in manifest order.
+    empty is left out, and so is a run in ``withhold_runs``. Runs come in manifest order.
     """
     runs: list[dict[str, Any]] = []
     dirs: list[Path] = []
-    for run in rnd.runs:
+    for run in rnd.shown_runs:
         if not run.train:
             continue
         job = fw / run.train
@@ -239,20 +241,29 @@ def round_runs(fw: Path, rnd: tasks.Round) -> tuple[list[dict[str, Any]], list[P
     return runs, dirs
 
 
+def _log_owner(
+    run_dirs: list[Path], log_run: str | None, names: list[str] | None = None
+) -> tuple[str | None, Path | None]:
+    """The run (name, job folder) whose VM log the page shows: ``log_run``, else the first run
+    with a VM log. A run is named by ``names`` (same order as ``run_dirs``) or by its job's
+    parent folder."""
+    named = list(zip(names or [d.parent.name for d in run_dirs], run_dirs, strict=True))
+    pick = [(n, d) for n, d in named if n == log_run and (d / "vm-logs").is_dir()]
+    pick = pick or [(n, d) for n, d in named if (d / "vm-logs").is_dir()]
+    return pick[0] if pick else (None, None)
+
+
 def _train_log(
     run_dirs: list[Path], log_run: str | None, names: list[str] | None = None
 ) -> tuple[list[str], dict[str, float]]:
-    """Log tail and VM phase seconds of the round's ``log_run``, else of a run with a VM log.
+    """Log tail and VM phase seconds of the run ``_log_owner`` picks.
 
-    A run is named by ``names`` (same order as ``run_dirs``) or by its job's parent folder.
     Phase seconds as in ``_phase_seconds`` (``persist`` is the sync after training).
     """
-    named = list(zip(names or [d.parent.name for d in run_dirs], run_dirs, strict=True))
-    pick = [d for n, d in named if n == log_run and (d / "vm-logs").is_dir()]
-    pick = pick or [d for _, d in named if (d / "vm-logs").is_dir()]
-    if not pick:
+    _name, job = _log_owner(run_dirs, log_run, names)
+    if job is None:
         return [], {}
-    return _read_vm_log(pick[0])
+    return _read_vm_log(job)
 
 
 def _sources(fw: Path) -> dict[str, Any]:
@@ -455,6 +466,7 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
     """Write ``out/story.json``; return the size of each list-valued part."""
     fw = paths.fw_root
     manifest = tasks.load(paths)
+    hide = hidden.from_manifest(manifest)
     rnd = manifest.story_round()
     tray_steps: tuple[str, ...] = ()
     try:
@@ -463,11 +475,14 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         pass
     if rnd is not None and rnd.train_dir:
         runs, run_dirs = _runs(fw, rnd.train_dir, rnd.max_steps)
+        kept = [(e, d) for e, d in zip(runs, run_dirs, strict=True) if not hide.run(e["branch"])]
+        runs, run_dirs = [e for e, _ in kept], [d for _, d in kept]
         tail, phases = _train_log(run_dirs, rnd.log_run)
     else:
         runs, run_dirs, tail, phases = [], [], [], {}
     ego = _sources(fw)
     bal, sessions = _colab(fw)
+    sessions = [s for s in sessions if not hide.session(s["session"])]
     try:
         eval_block: dict[str, Any] = cited.eval_block(paths)
         chain: list[int] = cited.loop_chain(paths)
@@ -486,12 +501,15 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
     eval_dir = rnd.eval_dir if rnd else None  # a story.pair round always names it (tasks.py)
     pair = _pair(fw, eval_dir, rnd.run_ids) if rnd and eval_dir else {}
     jrnd = manifest.jig_round()
+    jlog: str | None = None
     if jrnd is not None:
         jruns, jdirs = round_runs(fw, jrnd)
-        jtail, jphases = _train_log(jdirs, jrnd.log_run, [r["branch"] for r in jruns])
+        jnames = [r["branch"] for r in jruns]
+        jlog = _log_owner(jdirs, jrnd.log_run, jnames)[0]
+        jtail, jphases = _train_log(jdirs, jrnd.log_run, jnames)
     else:
         jruns, jtail, jphases = [], [], {}
-    jig_block = jig.build(fw, jrnd, jruns, jtail, jphases, tray_steps, sessions)
+    jig_block = jig.build(fw, jrnd, jruns, jtail, jphases, tray_steps, sessions, jlog)
     h1m = _h1m(fw)
     data: dict[str, Any] = {
         "runs": runs,
@@ -512,6 +530,7 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         "demo": demo.build(fw, pair, round_cited, h1m, demo_cited, rnd),
         "jig": jig_block,
     }
+    data = hidden.story(data, hide)  # belt and braces: nothing above should carry a hidden run
     out.mkdir(parents=True, exist_ok=True)
     (out / "story.json").write_text(
         json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"

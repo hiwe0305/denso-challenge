@@ -14,6 +14,12 @@ thresholds.
 ``tasks.json`` carries the manifest plus what the indexer resolves for each task: its catalog
 totals (origin "file"), the evaluations it lists (read from their summary file, origin "file") and
 its cited clusters (``seed/cited.yaml``, origin "cited").
+
+A round may list ``withhold_runs`` (Hiếu, 28/11/2026, story DA-53): runs it does not present at
+all, each with optional ``sessions`` (fnmatch patterns of its Colab session and eval watcher
+names). Unlike ``withhold_eval`` (only the retest result is held), nothing of such a run reaches a
+page: ``tasks.json`` drops it from the round's ``runs``, writes ``after_round: null`` when it is
+the after-round run and carries no ``withhold_runs`` key (``hidden.py`` holds the filters).
 """
 
 from __future__ import annotations
@@ -25,7 +31,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from flywheel.console.index import catalog, cited
+from flywheel.console.index import catalog, cited, hidden
 from flywheel.console.paths import ConsolePaths
 
 FILE = "tasks.yaml"
@@ -84,6 +90,9 @@ class Round:
     index: tuple[str, ...]
     raw: dict[str, Any] = field(repr=False, compare=False)
     withhold_eval: tuple[str, ...] = ()
+    # runs not presented at all (``withhold_runs``) and their session/watcher name patterns
+    withhold_runs: tuple[str, ...] = ()
+    hidden_sessions: tuple[str, ...] = ()
     # a ``story.jig`` round: scene, eval set, rollouts and scorer the results must match, rules
     scene: str | None = None
     eval_set: str | None = None
@@ -91,6 +100,16 @@ class Round:
     rollouts_expected: int | None = None
     scorer_version: int | None = None
     rules: dict[str, Any] | None = None
+
+    @property
+    def shown_runs(self) -> tuple[Run, ...]:
+        """The runs a page may show: every run but those in ``withhold_runs``."""
+        return tuple(r for r in self.runs if r.id not in self.withhold_runs)
+
+    @property
+    def shown_after_round(self) -> str | None:
+        """``after_round`` unless that run is hidden (``withhold_runs``)."""
+        return None if self.after_round in self.withhold_runs else self.after_round
 
     @property
     def run_ids(self) -> tuple[str, ...]:
@@ -185,6 +204,39 @@ def _text(d: Any, key: str, where: str) -> dict[str, str]:
         if not isinstance(v.get(lang), str) or not v[lang].strip():
             raise ManifestError(f"{where}.{key}: needs a non-empty '{lang}' text")
     return {str(k): str(x) for k, x in v.items()}
+
+
+def _withhold_runs(
+    v: Any, where: str, ids: list[str], kept: dict[str, str]
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Ids and session patterns of ``withhold_runs``; ``kept`` maps the roles a hidden run may
+    not hold (baseline, controls, log_run) to their run id."""
+    if v is None:
+        return (), ()
+    if not isinstance(v, list):
+        raise ManifestError(f"{where}: expected a list of {{id, sessions}}")
+    out: list[str] = []
+    patterns: list[str] = []
+    for j, x in enumerate(v):
+        w = f"{where}[{j}]"
+        rid = _need(x, "id", w)
+        if not rid.strip():
+            raise ManifestError(f"{w}.id: must not be empty")
+        if rid not in ids:
+            raise ManifestError(f"{w}.id: '{rid}' is not one of its runs {ids}")
+        if rid in out:
+            raise ManifestError(f"{w}.id: '{rid}' is listed twice")
+        for role, run in kept.items():
+            if run == rid:
+                raise ManifestError(f"{w}.id: '{rid}' is the round's {role} and cannot be hidden")
+        ss = x.get("sessions")
+        if ss is not None and (
+            not isinstance(ss, list) or not all(isinstance(p, str) and p.strip() for p in ss)
+        ):
+            raise ManifestError(f"{w}.sessions: expected a list of non-empty strings")
+        out.append(rid)
+        patterns += list(ss or [])
+    return tuple(out), tuple(dict.fromkeys(patterns))
 
 
 def _stage(s: Any, where: str) -> Stage:
@@ -302,6 +354,11 @@ def _round(r: Any, i: int) -> Round:
             raise ManifestError(f"{where}.withhold_eval: '{v}' is not one of its runs {ids}")
     if r.get("log_run") is not None and r["log_run"] not in ids:
         raise ManifestError(f"{where}.log_run: '{r['log_run']}' is not one of its runs {ids}")
+    kept = {"baseline": baseline} | {f"control '{c}'": c for c in controls}
+    if r.get("log_run") is not None:
+        kept["log_run"] = r["log_run"]
+    w_hide = f"{where}.withhold_runs"
+    hide, hide_sessions = _withhold_runs(r.get("withhold_runs"), w_hide, ids, kept)
     pair = "story.pair" in index  # the stage-1 reads need one train folder and one eval folder
     sha = _opt(r, "conditions_sha256", where, jig)
     if sha is not None and not _SHA256.match(sha):
@@ -329,6 +386,8 @@ def _round(r: Any, i: int) -> Round:
         index=index,
         raw=r,
         withhold_eval=withhold,
+        withhold_runs=hide,
+        hidden_sessions=hide_sessions,
         scene=_opt(r, "scene", where, False),
         eval_set=_opt(r, "eval_set", where, jig),
         conditions_sha256=sha,
@@ -449,7 +508,11 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         pairs = zip(r.raw["runs"], r.runs, strict=True)
         raw["runs"] = [{**x, "role": run.role} for x, run in pairs]
         rounds.append(raw)
-    doc = {"version": 1, "source": "seed/tasks.yaml", "tasks": tasks, "rounds": rounds}
+    # a run in withhold_runs never reaches the browser (hidden.tasks_doc)
+    doc = hidden.tasks_doc(
+        {"version": 1, "source": "seed/tasks.yaml", "tasks": tasks, "rounds": rounds},
+        hidden.from_manifest(m),
+    )
     out.mkdir(parents=True, exist_ok=True)
     (out / "tasks.json").write_text(
         json.dumps(doc, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"

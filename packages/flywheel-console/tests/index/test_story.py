@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 
@@ -203,8 +204,15 @@ def _metrics(job: Path, last: int = 100_000, every: int = 10_000) -> None:
     (job / "metrics.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
 
 
+def _open_jig_round(fw: ConsolePaths) -> tasks.Round:
+    """The seed's jig round without ``withhold_runs`` (run N shown), so the code stays tested."""
+    raw = copy.deepcopy(tasks.load(fw).round("tray-jig-r1").raw)
+    raw.pop("withhold_runs", None)
+    return tasks._round(raw, 0)
+
+
 def test_round_runs_name_the_jig_run_by_its_manifest_id(fw: ConsolePaths) -> None:
-    rnd = tasks.load(fw).round("tray-jig-r1")
+    rnd = _open_jig_round(fw)
     root = fw.fw_root
     _metrics(root / "tray/jig-m/da48-ft-m-s0")
     stats = {"episode_index": {"max": [1036]}, "index": {"max": [948638]}}
