@@ -16,7 +16,8 @@
         [--record <dir> [--run <run dir>]]                 with the record tools (DA-54)
     fw agentqa chat --pack <pack.json> --record <dir> [--run <run dir>] [--session <id>]
         [TASK | -] [--dsh <path>] [--harness-home <dir>] [--patch <file>]
-        [--key-env NAME ...] [--timeout S] [--json]        one turn through the harness (DA-54)
+        [--key-env NAME ...] [--timeout S] [--json | --events]
+        [--workdir-root <dir>]                             one turn through the harness (DA-54)
     fw agentqa chat-page --run <run dir> --record <dir> --out <dir>
                                                            a chat record on the run's page
 
@@ -326,30 +327,60 @@ def chat_command(
         help="Name of a key variable handed to the harness (repeatable)."),
     timeout: float = typer.Option(chat_harness.DEFAULT_TIMEOUT, "--timeout", min=1),
     as_json: bool = typer.Option(False, "--json", help="Print the turn as one JSON object."),
+    events: bool = typer.Option(
+        False, "--events", help="Print the turn's events as NDJSON while it runs, one object "
+        "per line, the last one done (DA-55)."),
+    workdir_root: Path | None = typer.Option(
+        None, "--workdir-root", help="Keep the harness's working directory under this "
+        "directory instead of the system temp dir (default: env AGENTQA_CHAT_WORKDIR_ROOT). "
+        "The harness shows the path to the model: pick one that names no person or project."),
 ) -> None:
     """One chat turn through the agent harness. Only a text that answer_submit accepted
     is shown as checked; the model's own words are labelled unchecked."""
+
+    def emit(event: chat_harness.Event) -> None:
+        typer.echo(json.dumps(event, ensure_ascii=False))  # click flushes each line
+
+    def refuse(message: str) -> None:
+        if events:
+            hidden = [os.environ.get(k, "") for k in key_env]
+            hidden += [str(p) for p in (home, home.absolute(), home.resolve())] if home else []
+            try:
+                for event in chat_harness.refused_events(message, session, hidden):
+                    emit(event)
+            except OSError:
+                pass
+        _fail(message)
+
+    if as_json and events:
+        _fail("--json and --events cannot be used together")
+        return
     dsh_path = dsh or (Path(os.environ["AGENTQA_DSH_BIN"])
                        if os.environ.get("AGENTQA_DSH_BIN") else None)
     home = harness_home or (Path(os.environ["AGENTQA_DSH_HOME"])
                             if os.environ.get("AGENTQA_DSH_HOME") else None)
+    root = workdir_root or (Path(os.environ["AGENTQA_CHAT_WORKDIR_ROOT"])
+                            if os.environ.get("AGENTQA_CHAT_WORKDIR_ROOT") else None)
     if dsh_path is None:
-        _fail("no harness executable: set --dsh or AGENTQA_DSH_BIN")
+        refuse("no harness executable: set --dsh or AGENTQA_DSH_BIN")
         return
     if home is None:
-        _fail("no harness home: set --harness-home or AGENTQA_DSH_HOME")
+        refuse("no harness home: set --harness-home or AGENTQA_DSH_HOME")
         return
     text = sys.stdin.read() if task == "-" else task
     try:
         result = chat_harness.turn(text, pack=pack, record=record, dsh=dsh_path,
                                 harness_home=home, patch=patch, repo=Path.cwd(),
-                                session=session, key_env=key_env, timeout=timeout, run=run)
+                                session=session, key_env=key_env, timeout=timeout, run=run,
+                                on_event=emit if events else None, workdir_root=root)
     except chat_harness.ChatRefused as error:
-        _fail(str(error))
+        refuse(str(error))
         return
+    except chat_harness.EventSinkClosed:
+        raise typer.Exit(1) from None  # the reader left; the harness was stopped
     if as_json:
         typer.echo(json.dumps(result.to_json(), ensure_ascii=False))
-    else:
+    elif not events:  # with --events every line, `done` last, is already out
         typer.echo("\n".join(_chat_lines(result)))
     raise typer.Exit(0 if result.completed and result.answers else 1)
 

@@ -77,8 +77,8 @@ Console không import `flywheel.eval`. Backend Console chạy `fw agentqa chat` 
 ## Nhiệm vụ
 
 - [x] 1.1 Viết story (file này)
-- [ ] 2.1 Chế độ sự kiện của `fw agentqa chat`, có test (AC 1, 7)
-- [ ] 2.2 Ghi câu hỏi vào `answers.jsonl` và hiện trên trang; thư mục làm việc bền (AC 2)
+- [x] 2.1 Chế độ sự kiện của `fw agentqa chat`, có test (AC 1, 7)
+- [x] 2.2 Ghi câu hỏi vào `answers.jsonl` và hiện trên trang; thư mục làm việc bền (AC 2)
 - [ ] 3.1 Đường API chat của agent ở backend Console: tìm gói, gắn lần chạy, chạy tiến trình con, ánh xạ sang SSE, có test (AC 3, 4, 5, 6, 7, 8)
 - [ ] 3.2 Giao diện trên trang Agent QA/QC (AC 4)
 - [ ] 4.1 Hợp đồng API, mẫu, tài liệu; một lượt thật trên run M; chạy đủ kiểm tra (AC 9, 10, 11)

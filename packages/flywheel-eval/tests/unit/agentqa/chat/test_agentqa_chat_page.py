@@ -32,6 +32,7 @@ from flywheel.eval.agentqa.mcp.records import (  # noqa: E402
     ANSWERS_FILE,
     PROPOSE,
     Recorder,
+    record_question,
 )
 from flywheel.eval.agentqa.mcp.server import open_public_session  # noqa: E402
 from flywheel.eval.agentqa.round.assemble import ASSEMBLY_FILE  # noqa: E402
@@ -229,6 +230,19 @@ def test_a_question_recorded_with_an_answer_is_shown(
     chat_record(pack, record, floor)
     line = json.loads((record / ANSWERS_FILE).read_text())
     (record / ANSWERS_FILE).write_text(json.dumps({**line, "question": QUESTION}) + "\n")
+    out = tmp_path / "page"
+    record_page(floor, record, out)
+    assert _assembly(out).chat_answers[0].question == QUESTION
+    assert f"<strong>Question:</strong> {QUESTION}" in (out / INDEX_FILE).read_text()
+
+
+def test_the_question_of_the_chat_reaches_the_answer_line_and_the_page(
+        pack: Path, floor: Path, tmp_path: Path) -> None:
+    record = tmp_path / "record"
+    _recorder(pack, record, floor)  # the head first, as `fw agentqa chat` binds it
+    record_question(record, QUESTION)
+    chat_record(pack, record, floor)
+    assert json.loads((record / ANSWERS_FILE).read_text())["question"] == QUESTION
     out = tmp_path / "page"
     record_page(floor, record, out)
     assert _assembly(out).chat_answers[0].question == QUESTION

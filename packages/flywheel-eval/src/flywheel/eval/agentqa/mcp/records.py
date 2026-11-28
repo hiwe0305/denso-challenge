@@ -32,6 +32,12 @@ all as the round's investigate step does; `fw agentqa chat-page` can then lay th
 over that run. `record.json` keeps the binding (the run's id, the sha256 of its
 `facts.jsonl`, its resolved path); a later open without `--run` follows it, and a run
 whose facts changed since is refused. An unbound record is what it was before.
+
+DA-55 task 2.2: `fw agentqa chat` appends each turn's question to `questions.jsonl` before
+it spawns the harness (`record_question`; the only file here that is appended to, never
+rewritten). `answer_submit` copies the latest question, when the file holds one, into the
+`question` of the answer line it writes; a record used without `chat` has no such file and
+its answer lines are what they were before.
 """
 
 from __future__ import annotations
@@ -92,8 +98,9 @@ RECORD_FILE = "record.json"
 VERDICTS_LIVE_FILE = "verdicts_live.jsonl"
 ANSWERS_FILE = "answers.jsonl"
 DROPPED_FILE = "dropped.jsonl"
+QUESTIONS_FILE = "questions.jsonl"  # the chat's questions, one per turn (DA-55 task 2.2)
 FILES = (RECORD_FILE, INVESTIGATION_FACTS_FILE, INVESTIGATION_CALLS_FILE, INVESTIGATED_FILE,
-         VERDICTS_LIVE_FILE, ANSWERS_FILE, DROPPED_FILE)
+         VERDICTS_LIVE_FILE, ANSWERS_FILE, DROPPED_FILE, QUESTIONS_FILE)
 BINDING = ("run_id", "run_facts_sha256", "run_dir")  # the keys of record.json a run binds
 PROPOSE, DROP, ANSWER = "hypothesis_propose", "hypothesis_drop", "answer_submit"
 RECORD_TOOLS = (PROPOSE, DROP, ANSWER)
@@ -301,6 +308,40 @@ def _write(path: Path, text: str) -> None:
         handle.flush()
         os.fsync(handle.fileno())
     os.replace(tmp, path)
+
+
+def record_question(directory: Path, text: str,
+                    now: Callable[[], datetime] = _now) -> dict[str, Any]:
+    """Append `text` as the next turn's question to `directory/questions.jsonl`; the line."""
+    turn = 1 + sum(1 for x in _lines(directory / QUESTIONS_FILE) if _row(x) is not None)
+    line = {"turn": turn, "question": text, "ts": now().isoformat()}
+    directory.mkdir(parents=True, exist_ok=True)
+    with open(directory / QUESTIONS_FILE, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(line, ensure_ascii=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    return line
+
+
+def latest_question(directory: Path) -> str | None:
+    """The question of the last readable line of `directory/questions.jsonl`, if any."""
+    try:
+        lines = _lines(directory / QUESTIONS_FILE)
+    except (OSError, UnicodeDecodeError):
+        return None
+    for raw in reversed(lines):
+        row = _row(raw)
+        if row is not None and isinstance(row.get("question"), str) and row["question"]:
+            return str(row["question"])
+    return None
+
+
+def _row(line: str) -> dict[str, Any] | None:
+    try:
+        row = json.loads(line)
+    except ValueError:
+        return None
+    return row if isinstance(row, dict) else None
 
 
 def _jsonl(lines: Sequence[BaseModel | Mapping[str, Any]]) -> str:
@@ -779,6 +820,9 @@ class Recorder:
         answer_id = f"A{self._next_answer}"
         line = {"answer_id": answer_id, "text": text, "cites": cites, "rendered": rendered,
                 "facts": facts, "ts": self._now().isoformat()}
+        question = latest_question(self.directory)  # written by `fw agentqa chat`
+        if question is not None:
+            line["question"] = question
         _write(self.directory / ANSWERS_FILE, _jsonl([*self._answers, line]))
         self._answers.append(line)
         self._next_answer += 1
@@ -786,7 +830,7 @@ class Recorder:
                                               "facts": facts}, cites=tuple(cites))
 
 
-__all__ = ["ANSWERS_FILE", "BINDING", "DROPPED_FILE", "FILES", "RECORD_FILE", "RECORD_TOOLS",
-           "VERDICTS_LIVE_FILE", "RecordOutcome", "RecordRefused", "Recorder",
-           "answer_value", "bind_record", "fill_answer", "full_value", "record_schemas",
-           "rendered_answer", "run_binding"]
+__all__ = ["ANSWERS_FILE", "BINDING", "DROPPED_FILE", "FILES", "QUESTIONS_FILE", "RECORD_FILE",
+           "RECORD_TOOLS", "VERDICTS_LIVE_FILE", "RecordOutcome", "RecordRefused", "Recorder",
+           "answer_value", "bind_record", "fill_answer", "full_value", "latest_question",
+           "record_question", "record_schemas", "rendered_answer", "run_binding"]
