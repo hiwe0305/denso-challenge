@@ -250,3 +250,7 @@ def test_the_trace_carries_labels_rows_and_ms_and_no_model_thinking(idx: Console
     assert isinstance(res["rows"], int) and res["rows"] > 0 and isinstance(res["ms"], int)
     # no event carries the system prompt or the tools' instructions
     assert llm.SYSTEM[:60] not in repr(evs)
+
+def test_the_prompt_keeps_an_unasked_re_test_out_of_the_answer() -> None:
+    # live panel check 28/11/2026: a failure-chart answer ended with "chưa có kết quả kiểm tra lại sau vòng"
+    assert "never write a note about a re-test (kiểm tra lại, thi lại) the user did not ask about" in llm.SYSTEM
