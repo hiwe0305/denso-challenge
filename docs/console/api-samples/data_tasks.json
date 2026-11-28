@@ -41,8 +41,8 @@
     "source": "configs/eval/scorer/tray.yaml thresholds (giả định, chưa hiệu chỉnh)"
    },
    "rounds": [
-    "tray-jig-r1",
-    "tray-r1"
+    "tray-r1",
+    "tray-jig-r1"
    ],
    "index": [
     "story.sources",
@@ -54,7 +54,6 @@
     "story.colab_balance",
     "story.colab_sessions",
     "story.ds",
-    "story.eval",
     "story.loop_chain",
     "story.loop_detail"
    ],
@@ -247,9 +246,9 @@
      "hours": 0.124
     },
     "all": {
-     "sets": 10,
-     "episodes": 3025,
-     "hours": 24.896
+     "sets": 8,
+     "episodes": 2376,
+     "hours": 19.386
     },
     "s2": {
      "sets": 2,
@@ -257,9 +256,9 @@
      "hours": 9.222
     },
     "s1": {
-     "sets": 6,
-     "episodes": 1896,
-     "hours": 15.55
+     "sets": 4,
+     "episodes": 1247,
+     "hours": 10.04
     }
    },
    "catalog_rows": [
@@ -612,7 +611,9 @@
     "sim",
     "story.runs",
     "story.train_log_tail",
-    "story.vm_phases"
+    "story.vm_phases",
+    "story.eval",
+    "story.diag"
    ]
   },
   {
@@ -634,6 +635,7 @@
    "max_steps": 100000,
    "log_run": "M",
    "scene": "jig2",
+   "cut": "da48/cuts/M.tar",
    "eval_set": "tray/eval-sets/jig-m-rp_a410d01efa62",
    "conditions_sha256": "bbec07e31ee022ac46d59e5322628c226519abe76363160ccbdb78b68725d348",
    "rollouts_expected": 180,
@@ -666,8 +668,13 @@
    "baseline": "M",
    "after_round": null,
    "controls": [],
+   "cost_stories": {
+    "train": "DA-48",
+    "eval": "DA-47"
+   },
    "index": [
-    "story.jig"
+    "story.jig",
+    "sim"
    ]
   }
  ]
