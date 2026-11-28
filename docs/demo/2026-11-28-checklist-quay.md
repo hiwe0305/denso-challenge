@@ -2,6 +2,7 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 28/11/2026 | 0.3 | Theo PR #265–#267 và quyết định tối 28/11 của Hiếu: vòng mặc định đổi sang `tray-jig-r1`, mạch quay đi vòng đồ gá trước; thêm bảng so sánh 60 lượt, tập train run M ở trang Dữ liệu và khối "Quá trình suy luận"; bảng câu đã thử hỏi lại trên bản `dea4e6de` | Hiếu (soạn với Claude) |
 | 28/11/2026 | 0.2 | Câu "run nào tốt nhất" đã sửa (PR #263, xếp theo kết quả thi): bỏ dòng "tránh hỏi khi quay", thêm câu này vào bảng câu đã thử | Hiếu (soạn với Claude) |
 | 28/11/2026 | 0.1 | Bản đầu, sau đợt đánh giá console ngày 28/11/2026 và các PR #258–#261. Thay mục 6 của [kịch bản 17/11](2026-11-17-kich-ban-video.md) về cách bật server, chat và những gì không được lộ | Hiếu (soạn với Claude) |
 
@@ -11,7 +12,7 @@ File này chỉ thay phần chuẩn bị máy, server và chat. Lời nói và t
 
 **[Đã chốt]** Một server duy nhất, bật bằng script `scripts/console/console-demo.sh`. Script chạy `fw console serve --lock --chat` trên cổng 4178: mọi việc ghi bị từ chối, chat vẫn trả lời. Script không in khóa API hay nội dung `.env`.
 
-- [ ] Dựng lại index nếu `fwdata` vừa đổi: `uv run fw console index`. Index dựng ngày 28/11/2026 đã gồm CI của bước đặt cho run M.
+- [ ] Dựng lại index nếu `fwdata` vừa đổi: `uv run fw console index`. Index dựng ngày 28/11/2026 từ bản `dea4e6de` đã gồm CI của bước đặt cho run M, bảng so sánh 60 lượt và tập train run M.
 - [ ] Đóng các phiên Claude và trình duyệt khác. Script cảnh báo nếu RAM trống dưới 4 GB hoặc có console khác đang chạy. Ngày 28/11/2026 laptop từng treo khi chạy nhiều server cùng lúc.
 - [ ] Ở thư mục gốc của repo, bật server bằng lệnh dưới đây. Lệnh chỉ in `OK` khi mọi kiểm tra đều qua.
 
@@ -45,23 +46,31 @@ scripts/console/console-demo.sh stop
 - Nếu cổng CKEY lỗi: `CHAT=nemotron scripts/console/console-demo.sh start` dùng Nemotron tự host trên `rtx3060`. Cách này không đọc `.env` và không dùng khóa hosted.
 - [ ] Nhãn khung chat là "Trợ lý phân tích". Tên cổng và tên model không hiện trên các trang quay; chỉ trang cấu hình chat có, nên không mở trang đó khi quay.
 - [ ] Khung chat đóng khi tải trang. Chỉ mở ở cảnh hỏi trợ lý.
-- [ ] Hỏi thử từng câu của cảnh một lượt, rồi bấm "new" để xóa trước khi quay.
+- [ ] Hỏi thử từng câu của cảnh một lượt, rồi bấm "Phiên làm việc" → "+ Phiên mới" để bắt đầu sạch trước khi quay.
+- [ ] Mỗi câu trả lời mở đầu bằng khối "Quá trình suy luận · N bước · M số đã đối chiếu", gập sẵn. Khi đang trả lời khối mở ra và hiện từng bước tra dữ liệu, không có prompt hay suy nghĩ ẩn của model. Muốn cho người xem thấy cách trợ lý suy luận thì bấm mở khối sau khi câu trả lời xong.
+- [ ] Hai chế độ: "Hỏi nhanh" trả lời ngắn (dòng đầu trả lời thẳng, bảng, một dòng "Lưu ý"); "Phân tích sâu" trả lời theo khuôn Kết luận, Bằng chứng (bảng, biểu đồ), Diễn giải, Giới hạn, Hướng tiếp theo.
 
-Các câu đã hỏi thử trên bản khóa ngày 28/11/2026. Câu trả lời có thể đổi vài chữ giữa các lần hỏi, nhưng phải giữ đúng ý ở cột phải:
+Các câu đã hỏi lại trên server 4178 khóa, bản `dea4e6de`, tối 28/11/2026. Câu trả lời có thể đổi vài chữ giữa các lần hỏi, nhưng phải giữ đúng ý ở cột phải:
 
-| Vòng | Câu hỏi | Câu trả lời phải có |
-|---|---|---|
-| `tray-jig-r1` | Run M đạt mốc ở những mức nào? | 75,6 % (136/180), CI 70,0–81,1, chưa đạt mốc 80 %; mức 1 đạt mốc 70 %; mức 2 chưa đạt mốc 70 %; bước đặt CI 85,0–93,9, đạt mốc 50 % |
-| `tray-r1` | Vòng 1 so với vòng đồ gá khác nhau thế nào? | "chỉ đặt cạnh nhau, không so như một kết quả"; bốn bản của vòng 1 có khoảng tin cậy chồng nhau |
-| `tray-r1` | Vì sao run C_70 hỏng nhiều ở bước đặt? | 32 trong 50 lượt hỏng của C_70 là đặt lệch; cụm c1, c2; "chưa kiểm… phỏng đoán"; đóng phiếu DA-38, DA-37 |
-| `tray-r1` | Tổng chi phí cả dự án là bao nhiêu? | Ước tính và thực đo tách riêng, không cộng gộp |
-| `tray-r1` | Run nào tốt nhất? | (bản 0.2) Xếp theo kết quả thi, không theo loss train: "C_70 có số lượt thành công cao nhất, 10/60, nhưng khoảng tin cậy của bốn bản chồng nhau, nên chưa phân biệt được"; không có C70_R1 |
+| Vòng | Chế độ | Câu hỏi | Câu trả lời phải có |
+|---|---|---|---|
+| `tray-jig-r1` | Hỏi nhanh | Run M đạt mốc ở những mức nào? | 136/180 lượt thành công (75,6 %), CI 70,0–81,1, chưa đạt mốc 80 %; mức 1 đạt mốc 70 %; mức 2 chưa đạt mốc 70 %; bước đặt CI 85,0–93,9, đạt mốc 50 % |
+| `tray-jig-r1` | Hỏi nhanh | Run nào tốt nhất, vì sao? | "M: 136/180 lượt thành công (75,6 %)", chưa đạt mốc 80 %; bảng năm run, không có C70_R1; dòng "M đến từ đâu" (C_70 tới bàn B 50/60 nhưng đặt đúng 10/60; đồ gá jig2, dữ liệu bước đặt, 100 000 bước); "Lưu ý" chỉ đặt cạnh nhau, chưa có run đối chứng K |
+| `tray-jig-r1` | Phân tích sâu | So sánh run M với các run vòng 1 trên 60 lượt: thành công, nới ≤ 7,5/10/15/20 cm, tới bàn B và độ lệch | Bảng có số lượt và phần trăm, M 47/60 (78,3 %), tới bàn B 60/60; bảng độ lệch p50/p90; biểu đồ cột; "M khác cảnh (jig2) và bộ chấm (bản 2), chỉ đặt cạnh nhau; ba lượt lặp của M: 42–47/60" |
+| `tray-r1` | Hỏi nhanh | Vòng 1 so với vòng đồ gá khác nhau thế nào? | Khác cảnh, tập eval, bộ chấm và số bước train nên "chỉ đứng cạnh nhau, không so sánh trực tiếp"; chưa có run đối chứng K |
+| `tray-r1` | Hỏi nhanh | Vì sao run C_70 hỏng nhiều ở bước đặt? | 32/50 lượt thất bại là đặt lệch; tới bàn B 50/60 nhưng đặt đúng 10/60; "nguyên nhân… chưa được kiểm tra… phỏng đoán". Không còn khuyên đóng phiếu DA-38, DA-37 (đã đóng) |
+| `tray-r1` | Hỏi nhanh | Tổng chi phí cả dự án là bao nhiêu? | Ước tính và đo được tách riêng, không cộng gộp; dòng "Thí nghiệm khác (không trình bày)" |
+| `tray-r1` | Hỏi nhanh | Trong vòng 1, run nào có số lượt thành công cao nhất? | "C_70 có số lượt thành công cao nhất: 10/60 (16,7 %)"; bảng bốn run, không có C70_R1; "khoảng tin cậy của bốn run chồng lấp… chưa thể phân biệt" |
+
+**Lưu ý khi quay:** hỏi "Run nào tốt nhất?" khi ô "Vòng" đang là `tray-r1` thì trợ lý vẫn dẫn bằng run M của vòng đồ gá (kết quả trình bày mới nhất), không còn trả lời "C_70 cao nhất 10/60" như bản 0.2. Muốn nói riêng về vòng 1 thì dùng câu "Trong vòng 1, run nào có số lượt thành công cao nhất?" ở bảng trên.
 
 ## 3. Trình duyệt
 
 - [ ] Mở một tab mới sau khi bật server. Tab cũ có thể còn giữ file JS của bản trước dù server trả `no-store`.
 - [ ] Ngôn ngữ VI, nền sáng, zoom 125 % ở màn 1920×1080 như kịch bản 17/11.
-- [ ] **[Đã chốt]** Vòng mặc định là `tray-r1`. Mạch quay đi `tray-r1` trước, rồi đổi ô "Vòng" sang `tray-jig-r1`.
+- [ ] **[Đã chốt]** (Hiếu, tối 28/11/2026, thay quyết định sáng cùng ngày) Vòng mặc định là `tray-jig-r1` (run M, kết quả trình bày mới nhất). Trang Tổng quan có lối nối hai chiều giữa hai vòng: muốn kể vòng 1 tìm ra lỗi bước đặt thì bấm lối "Vòng trước", rồi quay lại vòng đồ gá.
+- [ ] Trang Đánh giá của vòng đồ gá có bảng "So sánh 60 lượt: run M (lượt 0) và bốn run vòng 1" và biểu đồ cột đi kèm. Bảng rộng: ở zoom 125 % kiểm cả năm cột hiện hết hoặc cuộn ngang trước khi quay.
+- [ ] Trang Dữ liệu có "Tập train run M · 4 phần, lọc ≤ 3 cm, ≤ 5° (1037)" và chuỗi nguồn gốc bốn phần → M → Run DA-48.
 - [ ] Mở sẵn mỗi trang một lần ở cả hai vòng để video và ảnh vào bộ đệm, ít nhất `#/tasks`, `#/report`, `#/eval`, `#/diagnose`, `#/loop`, `#/cost`, `#/sim`.
 
 ## 4. Không được lộ trên màn hình
@@ -75,6 +84,6 @@ Các câu đã hỏi thử trên bản khóa ngày 28/11/2026. Câu trả lời 
 
 ## 5. Chưa kiểm ở lượt này
 
-- Lời nói từng cảnh của kịch bản 17/11 so với trang mới.
+- Lời nói từng cảnh của kịch bản 17/11 so với trang mới, nhất là thứ tự cảnh: kịch bản còn đi vòng 1 trước.
 - Bản tiếng Anh của từng trang.
 - Phát video ở `#/follow` và trình xem 180 rollout của run M khi khóa.
