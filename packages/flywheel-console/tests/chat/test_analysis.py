@@ -10,8 +10,7 @@ from typing import Any
 
 import pytest
 from chat_index import make_idx  # noqa: F401
-from flywheel.console.chat import common, llm, providers, registry, tools_round
-from flywheel.console.index import hidden
+from flywheel.console.chat import common, llm, providers, registry, tools_round, tools_runs
 from flywheel.console.paths import ConsolePaths
 
 NEMO = "http://127.0.0.1:11435"
@@ -464,7 +463,7 @@ def test_ledger_by_story_reads_the_cu_and_usd_rows_and_names_the_other_row_by_it
 
 def test_the_older_ledger_shape_passes_only_through_hidden_ledger(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
     _edit_story(idx, ledger=[["DA-34", 12.0, 9.5], ["DA-50", 1.0, 2.5]])
-    monkeypatch.delattr(hidden, "ledger", raising=False)  # a console before PR #258
+    monkeypatch.setattr(tools_runs, "_ledger_merger", lambda: None)  # a console before PR #258
     res = registry.call("ledger_query", {"group_by": "story"}, {"lang": "vi"})
     assert res["ok"] is False and "DA-50" not in res["model"] and "Rebuild the index" in res["model"]
 
@@ -472,7 +471,7 @@ def test_the_older_ledger_shape_passes_only_through_hidden_ledger(idx: ConsolePa
         kept = [r for r in rows if r[0] != "DA-50"]
         return kept + [["other", 1.0, 2.5]]
 
-    monkeypatch.setattr(hidden, "ledger", merge, raising=False)
+    monkeypatch.setattr(tools_runs, "_ledger_merger", lambda: merge)
     res = registry.call("ledger_query", {"group_by": "story"}, {"lang": "vi"})
     assert res["ok"] and "DA-50" not in json.dumps(res, ensure_ascii=False)
     assert {"story": "DA-34", "measure_kind": "measured", "cu": None, "usd": 9.5} in res["ui"]["rows"]
