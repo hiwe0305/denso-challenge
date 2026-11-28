@@ -276,24 +276,57 @@ def test_status_and_kinds_are_cached_until_a_post(
     assert calls["status"] == 2
 
 
-def test_sigterm_closes_the_tunnel(tmp_path: Path) -> None:
+# The signal can arrive at any point once the handler is in place. These two make the child
+# send it to itself at the points a `kill` from outside only hits by chance.
+IN_THE_BANNER = """
+import builtins
+real_print = builtins.print
+def print_then_term(*a, **k):
+    real_print(*a, **k)
+    if str(a[0]).startswith("console on "):
+        signal.raise_signal(signal.SIGTERM)
+builtins.print = print_then_term
+"""
+AGAIN_IN_THE_CLEANUP = """
+real_close, fired = runner.TUNNEL.close, []
+def term_then_close():
+    if not fired:
+        fired.append(1)
+        signal.raise_signal(signal.SIGTERM)
+    real_close()
+runner.TUNNEL.close = term_then_close
+"""
+
+
+@pytest.mark.parametrize(
+    "setup, kill",
+    [("", True), (IN_THE_BANNER, False), (AGAIN_IN_THE_CLEANUP, True)],
+    ids=["while-serving", "in-the-banner", "again-in-the-cleanup"],
+)
+def test_sigterm_closes_the_tunnel(tmp_path: Path, setup: str, kill: bool) -> None:
     code = (
-        "import subprocess, sys\n"
+        "import signal, subprocess, sys\n"
         "from flywheel.console.paths import ConsolePaths\n"
         "from flywheel.console.server import app, runner\n"
         "runner.TUNNEL.proc = subprocess.Popen(['sleep', '60'], start_new_session=True)\n"
         "print(runner.TUNNEL.proc.pid, flush=True)\n"
+        f"{setup}\n"
         "app.serve(ConsolePaths.from_env(), port=0, lock=True)\n"
     )
     env = os.environ | {"FW_ROOT": str(tmp_path)}
-    p = subprocess.Popen([sys.executable, "-c", code], env=env, stdout=subprocess.PIPE, text=True)
+    p = subprocess.Popen(
+        [sys.executable, "-c", code],
+        env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )  # fmt: skip
     child = 0
     try:
         assert p.stdout is not None
         child = int(p.stdout.readline())
         assert p.stdout.readline().startswith("console on ")
-        p.send_signal(signal.SIGTERM)
-        assert p.wait(20) == 0
+        if kill:
+            p.send_signal(signal.SIGTERM)
+        _, err = p.communicate(timeout=20)
+        assert p.returncode == 0 and "Traceback" not in err, err
         try:
             state = Path(f"/proc/{child}/stat").read_text().rsplit(")", 1)[1].split()[0]
         except OSError:
