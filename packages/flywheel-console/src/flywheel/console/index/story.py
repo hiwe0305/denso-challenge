@@ -78,19 +78,6 @@ def _series(rows: list[dict[str, Any]], key: str, nd: int | None = None) -> list
     ]
 
 
-def _job_max_steps(job_dir: Path, fallback: int) -> int:
-    launch = _dict(job_dir / "launch.json")
-    for arg in launch.get("argv") or [] if isinstance(launch, dict) else []:
-        m = re.match(r"^--train\.max_training_steps=(\d+)$", str(arg))
-        if m:
-            return int(m.group(1))
-    for fn, key in (("result.json", "checkpoint_step"), ("expected-100000.json", "ckpt_step")):
-        res = _dict(job_dir / fn)
-        if isinstance(res.get(key), int) and res[key] > 0:
-            return int(res[key])
-    return fallback
-
-
 def _stat_max_plus_one(stats_doc: dict[str, Any], key: str) -> int | None:
     slot = stats_doc.get(key)
     if not isinstance(slot, dict):
@@ -114,7 +101,24 @@ def _wilson_ci(succ: int, n: int, z: float = 1.959964) -> list[float]:
     return [round(max(0.0, center - half), 4), round(min(1.0, center + half), 4)]
 
 
+def _phase_seconds(report: dict[str, Any]) -> dict[str, float]:
+    """Seconds per VM phase of a ``vm-logs/report.json``.
+
+    ``setup*`` and ``train`` are their own durations and stay as written. ``persist`` is not: it
+    runs in ``--watch`` mode beside ``train`` (``flywheel_psi0.trainer.colab.persist``) from the
+    start of training, so its seconds cover the whole training plus the sync after it. When
+    ``persist >= train`` the page shows ``persist - train``, the sync after training (C_70:
+    38262.6 - 38049.2 = 213.4 s); otherwise the raw value. Story DA-53, "Điều chỉnh" point 2.
+    """
+    phases = report.get("phases") or {}
+    out = {k: round(_num(v.get("seconds")), 1) for k, v in phases.items() if isinstance(v, dict)}
+    if "persist" in out and "train" in out and out["persist"] >= out["train"]:
+        out["persist"] = round(out["persist"] - out["train"], 1)
+    return out
+
+
 def _read_vm_log(job_dir: Path) -> tuple[list[str], dict[str, float]]:
+    """Last 14 lines of ``vm-logs/train.log`` and the VM phase seconds (``_phase_seconds``)."""
     logs = job_dir / "vm-logs"
     if not logs.is_dir():
         return [], {}
@@ -125,15 +129,14 @@ def _read_vm_log(job_dir: Path) -> tuple[list[str], dict[str, float]]:
         tail = [ln[:170] for ln in lines if ln][-14:]
     except OSError:
         pass
-    phases = _dict(logs / "report.json").get("phases") or {}
-    return tail, {
-        k: round(_num(v.get("seconds")), 1) for k, v in phases.items() if isinstance(v, dict)
-    }
+    return tail, _phase_seconds(_dict(logs / "report.json"))
 
 
 def _parse_metrics_dir(
-    f: Path, branch: str, max_steps: int
+    f: Path, branch: str, max_steps: int, stats: Path | None = None
 ) -> tuple[dict[str, Any] | None, Path | None]:
+    """One training run from its ``metrics.jsonl``; episode and frame counts from ``stats``
+    (default ``<job>/../<branch>-stats_psi0.json``)."""
     rows = _jl(f)
     train = [r for r in rows if r.get("split") == "train" and "step" in r]
     if not train:
@@ -165,7 +168,7 @@ def _parse_metrics_dir(
         ),
         None,
     )
-    stats_file = f.parent.parent / f"{branch}-stats_psi0.json"
+    stats_file = stats or f.parent.parent / f"{branch}-stats_psi0.json"
     stats_doc = _dict(stats_file) if stats_file.is_file() else {}
     ep_count = _stat_max_plus_one(stats_doc, "episode_index")
     fr_count = _stat_max_plus_one(stats_doc, "index")
@@ -203,7 +206,7 @@ def _parse_metrics_dir(
 
 
 def _runs(fw: Path, train_dir: str, max_steps: int) -> tuple[list[dict[str, Any]], list[Path]]:
-    """Training runs of a round (``<train_dir>/<run>/<job>/metrics.jsonl``) plus ``tray/jig-*``."""
+    """Training runs of a round (``<train_dir>/<run>/<job>/metrics.jsonl``)."""
     runs: list[dict[str, Any]] = []
     dirs: list[Path] = []
     for f in sorted(fw.glob(f"{train_dir}/*/*/metrics.jsonl")):
@@ -211,38 +214,55 @@ def _runs(fw: Path, train_dir: str, max_steps: int) -> tuple[list[dict[str, Any]
         if entry is not None and d is not None:
             dirs.append(d)
             runs.append(entry)
-    for f in sorted(fw.glob("tray/jig-*/*/metrics.jsonl")):
-        parent_name = f.parent.parent.name
-        if ".attempt" in parent_name:
-            continue
-        branch = parent_name.removeprefix("jig-").upper() or parent_name
-        jmax = _job_max_steps(f.parent, 100_000)
-        entry, d = _parse_metrics_dir(f, branch, jmax)
-        if entry is not None and d is not None:
-            entry["scene"] = "jig2"
-            dirs.append(d)
-            runs.append(entry)
     return runs, dirs
 
 
-def _train_log(run_dirs: list[Path], log_run: str | None) -> tuple[list[str], dict[str, float]]:
-    """Log tail and VM phase seconds of the round's ``log_run``, else of a run with a VM log."""
-    pick = [d for d in run_dirs if d.parent.name == log_run and (d / "vm-logs").is_dir()]
-    pick = pick or [d for d in run_dirs if (d / "vm-logs").is_dir()]
+def round_runs(fw: Path, rnd: tasks.Round) -> tuple[list[dict[str, Any]], list[Path]]:
+    """Training runs of a round that names a train job folder per run (``tray-jig-r1``).
+
+    Same entry as ``_parse_metrics_dir`` with ``branch`` = the run id of the manifest (``M``,
+    not the folder name ``jig-m``), plus ``scene`` (the round's) and what ``<job>/fetched.json``
+    says about the local copy: ``fetched_final`` (its ``final``) and ``fetched_step`` (its
+    ``progress.step``), both None without the file. A run whose ``metrics.jsonl`` is absent or
+    empty is left out. Runs come in manifest order.
+    """
+    runs: list[dict[str, Any]] = []
+    dirs: list[Path] = []
+    for run in rnd.runs:
+        if not run.train:
+            continue
+        job = fw / run.train
+        stats = fw / run.stats if run.stats else None
+        entry, d = _parse_metrics_dir(job / "metrics.jsonl", run.id, rnd.max_steps, stats)
+        if entry is None or d is None:
+            continue
+        fetched = _dict(job / "fetched.json")
+        progress = fetched.get("progress")
+        step = progress.get("step") if isinstance(progress, dict) else None
+        final = fetched.get("final")
+        entry["scene"] = rnd.scene
+        entry["fetched_final"] = final if isinstance(final, bool) else None
+        whole = isinstance(step, int) and not isinstance(step, bool)
+        entry["fetched_step"] = step if whole else None
+        runs.append(entry)
+        dirs.append(d)
+    return runs, dirs
+
+
+def _train_log(
+    run_dirs: list[Path], log_run: str | None, names: list[str] | None = None
+) -> tuple[list[str], dict[str, float]]:
+    """Log tail and VM phase seconds of the round's ``log_run``, else of a run with a VM log.
+
+    A run is named by ``names`` (same order as ``run_dirs``) or by its job's parent folder.
+    Phase seconds as in ``_phase_seconds`` (``persist`` is the sync after training).
+    """
+    named = list(zip(names or [d.parent.name for d in run_dirs], run_dirs, strict=True))
+    pick = [d for n, d in named if n == log_run and (d / "vm-logs").is_dir()]
+    pick = pick or [d for _, d in named if (d / "vm-logs").is_dir()]
     if not pick:
         return [], {}
-    logs = pick[0] / "vm-logs"
-    tail: list[str] = []
-    try:
-        text = (logs / "train.log").read_text(errors="replace")
-        lines = [seg.split("\r")[-1].strip() for seg in text.splitlines()]
-        tail = [ln[:170] for ln in lines if ln][-14:]
-    except OSError:
-        pass
-    phases = _dict(logs / "report.json").get("phases") or {}
-    return tail, {
-        k: round(_num(v.get("seconds")), 1) for k, v in phases.items() if isinstance(v, dict)
-    }
+    return _read_vm_log(pick[0])
 
 
 def _sources(fw: Path) -> dict[str, Any]:
@@ -516,9 +536,7 @@ def _agentqa_assemblies(fw: Path) -> list[dict[str, Any]]:
     return out
 
 
-def _jig(
-    fw: Path, step_ids: tuple[str, ...], sessions: list[dict[str, Any]]
-) -> dict[str, Any]:
+def _jig(fw: Path, step_ids: tuple[str, ...], sessions: list[dict[str, Any]]) -> dict[str, Any]:
     """Latest jig2 training/eval outcomes, rollout physics, and next-round status under fwdata."""
     eval_runs: list[dict[str, Any]] = []
     all_rollouts: list[dict[str, Any]] = []
@@ -553,9 +571,7 @@ def _jig(
             rep_val = int(raw_rep) if isinstance(raw_rep, (int, float, str)) else (idx_row % 3)
             is_ok = sr.get("success") is True
             fk = (
-                None
-                if is_ok
-                else str(sr.get("failure_kind") or sr.get("failure_class") or "OTHER")
+                None if is_ok else str(sr.get("failure_kind") or sr.get("failure_class") or "OTHER")
             )
 
             slot = by_lvl.setdefault(lv, {"n": 0, "successes": 0})
@@ -683,9 +699,7 @@ def _jig(
                 }
             )
 
-        step_pass = {
-            step_ids[idx]: round(step_hits[idx] / n, 4) for idx in range(len(step_ids))
-        }
+        step_pass = {step_ids[idx]: round(step_hits[idx] / n, 4) for idx in range(len(step_ids))}
         levels_step_pass = {
             lv: {
                 step_ids[idx]: round(l_hits[idx] / max(1, int(by_lvl[lv]["n"])), 4)

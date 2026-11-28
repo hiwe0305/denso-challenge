@@ -183,3 +183,84 @@ def test_follow_is_empty_without_the_folder(fw: ConsolePaths) -> None:
     rnd = _round(fw)
     assert story._follow(fw.fw_root, rnd.eval_dir, rnd.follow) == {}
     assert story._follow(fw.fw_root, rnd.eval_dir, None) == {}
+
+
+# ------------------------------------------------------------------ DA-53: per-run train folders
+def _metrics(job: Path, last: int = 100_000, every: int = 10_000) -> None:
+    job.mkdir(parents=True, exist_ok=True)
+    rows: list[dict[str, object]] = []
+    for step in range(0, last + 1, every):
+        rows.append(
+            {"split": "train", "step": step, "loss": 1.0 - step / 200_000, "throughput": 21.5,
+             "vram_gb": 17.0, "grad_norm_action": 0.5, "release_id": "M", "run_plan_id": "rp_x"}
+        )  # fmt: skip
+        rows.append({"split": "val", "step": step, "loss": 0.25})
+    (job / "metrics.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+
+
+def test_round_runs_name_the_jig_run_by_its_manifest_id(fw: ConsolePaths) -> None:
+    rnd = tasks.load(fw).round("tray-jig-r1")
+    root = fw.fw_root
+    _metrics(root / "tray/jig-m/da48-ft-m-s0")
+    stats = {"episode_index": {"max": [1036]}, "index": {"max": [948638]}}
+    (root / "tray/jig-m/M-stats_psi0.json").write_text(json.dumps(stats))
+    _metrics(root / "tray/jig-n/da50-ft-n-s0", last=8000, every=1000)  # copy stopped early
+    (root / "tray/jig-n/da50-ft-n-s0/fetched.json").write_text(
+        json.dumps({"final": False, "progress": {"step": 8198}})
+    )
+    runs, dirs = story.round_runs(root, rnd)
+    m, n = runs
+    assert [r["branch"] for r in runs] == ["M", "N"] and dirs[0].name == "da48-ft-m-s0"
+    assert (m["step"], m["max_steps"], m["scene"]) == (100_000, 100_000, "jig2")
+    assert m["loss_last"] == round(
+        sum(1.0 - s / 200_000 for s in range(0, 100_001, 10_000)) / 11, 3
+    )
+    assert m["loss"][-1] == [100_000, 0.5] and m["val"][-1] == [100_000, 0.25]
+    assert m["thr"][0] == [0, 21.5] and m["vram"][0] == [0, 17.0] and m["gn"][0] == [0, 0.5]
+    assert (m["episodes"], m["frames"]) == (1037, 948639)
+    assert (m["fetched_final"], m["fetched_step"]) == (None, None)
+    assert (n["step"], n["max_steps"], n["fetched_final"], n["fetched_step"]) == (
+        8000,
+        100_000,
+        False,
+        8198,
+    )
+
+
+def test_story_runs_leave_out_the_jig_folders(fw: ConsolePaths, tmp_path: Path) -> None:
+    _metrics(fw.fw_root / "tray/pair60k/C_70/job1", last=100, every=50)
+    _metrics(fw.fw_root / "tray/jig-m/da48-ft-m-s0")
+    out = tmp_path / "out"
+    story.build(fw, out)
+    d = json.loads((out / "story.json").read_text())
+    assert [r["branch"] for r in d["runs"]] == ["C_70"]
+
+
+# report.json of C_70 (fwdata/tray/pair60k/C_70/da34-t6-ft-c-70-s0/vm-logs/report.json)
+C70_REPORT = {
+    "phases": {
+        "setup_tray_c_70": {"seconds": 119.3},
+        "train": {"seconds": 38049.2},
+        "persist": {"seconds": 38262.6},
+    }
+}
+
+
+def test_persist_phase_is_the_sync_after_training(fw: ConsolePaths, tmp_path: Path) -> None:
+    assert story._phase_seconds(C70_REPORT) == {
+        "setup_tray_c_70": 119.3, "train": 38049.2, "persist": 213.4
+    }  # fmt: skip
+    short = {"phases": {"train": {"seconds": 50.0}, "persist": {"seconds": 20.0}}}
+    assert story._phase_seconds(short) == {"train": 50.0, "persist": 20.0}  # raw when < train
+    assert story._phase_seconds({"phases": {"setup_tray_n": {"seconds": 43.0}}}) == {
+        "setup_tray_n": 43.0
+    }
+    job = fw.fw_root / "tray/pair60k/C_70/da34-t6-ft-c-70-s0"
+    _metrics(job, last=100, every=50)
+    (job / "vm-logs").mkdir()
+    (job / "vm-logs/report.json").write_text(json.dumps(C70_REPORT))
+    out = tmp_path / "out"
+    story.build(fw, out)
+    d = json.loads((out / "story.json").read_text())
+    assert d["vm_phases"]["persist"] == 213.4 and d["vm_phases"]["train"] == 38049.2
+    assert d["runs"][0]["vm_phases"]["persist"] == 213.4
