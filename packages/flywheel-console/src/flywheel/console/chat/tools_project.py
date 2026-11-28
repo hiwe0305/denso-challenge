@@ -337,6 +337,13 @@ def _share(say: Say, k: Any, n: Any) -> str | None:
     return f"{k}/{n} ({say.num(100 * k / n, 1)}{say(' %', '%')})"
 
 
+def _float(t: Any) -> float | None:
+    try:
+        return float(t)
+    except (TypeError, ValueError):
+        return None
+
+
 def _cm(say: Say, t: Any) -> str:
     """A threshold in cm as the reader writes it: "7,5" in Vietnamese."""
     try:
@@ -368,9 +375,12 @@ def compare_runs_60(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     lo, hi = (rr + [None, None])[:2]
     outcome = next((o for o in jig.get("outcomes") or [] if isinstance(o, dict) and o.get("run") == new), {})
     reps = len(outcome.get("repeats") or []) or None
-    ths = [str(t) for t in lad.get("thresholds_cm") or []]
+    # the relaxed thresholds above the 5 cm standard: "≤ 5 cm" relaxed is the success row again
+    std = 5.0
+    ths = [str(t) for t in lad.get("thresholds_cm") or [] if _float(t) is not None and _float(t) > std]
     lines = [
-        row("COMPARE60", [("n", n), ("runs", ",".join(ids)), ("thresholds_cm", ",".join(_cm(say, t) for t in ths)),
+        row("COMPARE60", [("n", n), ("runs", ",".join(ids)), ("standard_cm", _cm(say, std)),
+                          ("relaxed_cm", ",".join(_cm(say, t) for t in ths)),
                           ("repeat_of", f"{new} {c60.get('repeat', 0)}" if new else None),
                           ("repeats_of", new or None), ("repeats_count", reps), ("repeats_min", lo), ("repeats_max", hi),
                           ("comparable", "no"), ("reading", say("chỉ đặt cạnh nhau", "side by side only"))]),
@@ -414,7 +424,9 @@ def compare_runs_60(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
                    f"{reps or 'all'} repeats of {new}: {lo}–{hi}/{n}.")  # fmt: skip
         lines.append(row("NOTE", [("text", note)]))
     title = say(f"So sánh {n} lượt", f"{n} rollouts compared")
-    out = result(table(title, cols("measure", *ids), ui_rows, link="#/eval"), "\n".join(lines))
+    # run ids keep their underscore (cols() would write "C ALL"); the first column in words
+    columns = [{"key": "measure", "label": say("Chỉ số", "Measure")}, *({"key": i, "label": i} for i in ids)]
+    out = result(table(title, columns, ui_rows, link="#/eval"), "\n".join(lines))
     out["sources"] = _sources(c60.get("doc"), "docs/he/tray-jig.md §2")
     return out
 
