@@ -82,6 +82,12 @@ def test_identity_is_a_fixed_answer_that_names_no_model(idx: ConsolePaths, monke
     assert not [d for e, d in evs if e == "tool_start"]
 
 
+def test_a_result_question_naming_a_model_is_not_an_identity_question() -> None:
+    # live run 28/11: "mô hình nào tốt nhất" took the identity answer
+    for q in ("Tóm tắt ngắn gọn kết quả vòng hiện tại và mô hình nào tốt nhất?", "Mô hình nào tốt nhất?", "Which model is best?"):
+        assert not llm.asks_identity(q), q
+
+
 def test_follow_ups_keep_the_topic_of_the_question_before() -> None:
     body = {"messages": [
         {"role": "user", "content": "Thống kê các toàn bộ loại lỗi cho tôi xem nào?"},

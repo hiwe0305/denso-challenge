@@ -65,12 +65,12 @@ SYSTEM = (
     "In a table the header names each run or round once; a cell holds only its value, never the run name again. "
     "(3) When the question asks why (vì sao, tại sao, why) and the rows have ORIGIN or ORIGIN_STEP, add a bold line '<run> đến từ đâu:' / 'Where <run> comes from:' with at most two bullets: what the earlier round found (carried versus placed) and what this round changed (scene, data, training steps). It says where the result comes from, never a proven cause. "
     "(4) One line starting 'Lưu ý:' (Vietnamese) or 'Note:' (English) only when a limit changes the reading, such as a different scene or scorer, preliminary numbers or no control run. "
-    "(5) Next steps only when the question asks what to do, as one bold 'Việc nên làm:' / 'Next step:' line taken from the OPTION or NEXT rows; never offer a ticket or intervention the rows mark closed or handled. "
+    "(5) Next steps only when the question asks what to do, as one bold 'Việc nên làm:' / 'Next step:' line after the facts (never the first line), taken from the OPTION or NEXT rows; never offer a ticket or intervention the rows mark closed or handled. "
     "(6) No source line: the interface shows the sources. No rule numbers (luật 1, rule 2) and no internal ids (failure codes such as L-PLACE-POSE, job or session ids, cluster ids unless the user asks about clusters). "
     "(7) Short: about 120 words, at most 200. "
     "Answer only the newest question: earlier questions of the conversation are already answered, so never answer or repeat them. "
     "A follow-up such as 'chi tiết hơn', 'thành bảng', 'vì sao', 'more detail', 'as a table' or 'why' applies to the topic of the previous question; for 'thành bảng' / 'as a table' give the same facts as a table. "
-    "READING. Name the round once at the start and the run next to each number; every number belongs to that round unless you name another. Never give a number of one round for another round. "
+    "READING. Name the round once at the start and the run next to each number when the answer gives numbers of a round; every number belongs to that round unless you name another. Never give a number of one round for another round. "
     "When the rows say comparable=no (different scene, eval set or scorer), put the numbers side by side and never write that one is better or up by an amount. "
     "When intervals overlap, give the highest count and say the runs cannot be told apart. Never call a run 'tốt nhất' / 'best'; 'cao nhất' / 'highest' with its number is fine. "
     "Keep each verdict (met or not met) next to the number it reads, one per level: never one verdict after two levels. "
@@ -333,8 +333,8 @@ FOLLOW_RX = re.compile(r"chi tiết hơn|cụ thể hơn|rõ hơn|thành bảng|
                        r"giải thích|nói thêm|thêm nữa|more detail|in detail|elaborate|as a table|in a table|make (it )?a table|\btable\b|\bwhy\b|explain", re.I)  # fmt: skip
 FOLLOW_MAX_CHARS = 90  # longer than this, a question names its own topic
 # who answers: the console's assistant; the model and the gateway are not named (decision Q3, 28/11/2026)
-IDENTITY_RX = re.compile(r"bạn là ai|bạn là (model|mô hình|ai|gì|con)|(model|mô hình) (nào|gì)|phiên bản (claude|gpt|model|mô hình|nào|bao nhiêu)|"
-                         r"bạn (còn )?(có thể|làm được) (làm )?(gì|những gì)|who are you|what are you|which (model|version)|what (model|version)|"
+IDENTITY_RX = re.compile(r"bạn là (ai|model|mô hình|gì|con|phiên bản)|bạn (dùng|chạy) (model|mô hình) (nào|gì)|phiên bản (claude|gpt)|"
+                         r"bạn (còn )?(có thể|làm được) (làm )?(gì|những gì)|who are you|what are you|(which|what) (model|version) are you|"
                          r"are you (claude|gpt|an? (ai|llm|model))|what can you do", re.I)  # fmt: skip
 IDENTITY = (
     "**Tôi là Trợ lý phân tích của Flywheel Console.** Tôi đọc chỉ mục của Console qua các tra cứu và chỉ dùng số có trong đó.\n\n"
