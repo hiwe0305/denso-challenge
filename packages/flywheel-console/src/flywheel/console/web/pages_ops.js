@@ -31,7 +31,9 @@ import {
   renderFlywheelOrbitalCanvas,
   renderLoadingView,
   renderSourceCitation,
+  renderRoundLinks,
   renderStatStrip,
+  renderTimeline,
   renderStateChip,
   scopeStoryForTask,
   scrubPath,
@@ -1175,11 +1177,15 @@ export function renderHomePage() {
         roundEvalTile,
       ]),
 
+      renderRoundLinks(curRound),
+
       serverIncidentBanner,
 
       flywheelBoard,
 
       serverActivityDrawer,
+
+      renderTimeline(state.storyRawDoc),
 
       el("section", { className: cls("card", "table-wrap") }, [
         el("div", { className: "task-head", style: "margin-bottom:8px" }, [

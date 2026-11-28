@@ -663,13 +663,27 @@ function writeSession(key, value) {
   }
 }
 
-function rememberSelection() {
+// Only a round the viewer picked (menu, link card, `round=` link) is remembered, under its own
+// key, so a tab that stored the first round under the old rule opens on the new default.
+const ROUND_PICK_KEY = "fw_round_pick";
+
+function rememberSelection({ roundPicked = false } = {}) {
   writeSession("fw_task", state.taskId);
-  writeSession("fw_round", state.roundId);
+  if (roundPicked) writeSession(ROUND_PICK_KEY, state.roundId);
+}
+
+// The round a task opens on: tasks[].default_round when it names one of the task's rounds
+// (tray-jig-r1, the latest presented result; Hiếu 28/11/2026 evening), else its first round.
+export function defaultRoundId(taskId) {
+  const rounds = getRoundsForTask(taskId);
+  const task = getTasks().find((item) => item.id === taskId);
+  const want = task && typeof task.default_round === "string" ? task.default_round : null;
+  if (want && rounds.some((r) => r.id === want)) return want;
+  return rounds.length > 0 ? rounds[0].id : null;
 }
 
 // Picks the task and round after tasks.json loads: the ones remembered for this tab when
-// they still exist, else the first task and its first round (the seed order decides).
+// they still exist, else the first task and its default round.
 export function restoreSelection() {
   const tasks = getTasks();
   if (tasks.length === 0) return;
@@ -679,12 +693,10 @@ export function restoreSelection() {
   }
   const rounds = getRoundsForTask(state.taskId);
   if (!rounds.some((r) => r.id === state.roundId)) {
-    const savedRound = readSession("fw_round");
+    const savedRound = readSession(ROUND_PICK_KEY);
     state.roundId = rounds.some((r) => r.id === savedRound)
       ? savedRound
-      : rounds.length > 0
-        ? rounds[0].id
-        : null;
+      : defaultRoundId(state.taskId);
   }
   rememberSelection();
 }
@@ -697,7 +709,7 @@ export function applyRoundParam(roundId) {
   if (!rounds.some((r) => r.id === roundId)) return false;
   state.roundId = roundId;
   state.selection = null;
-  rememberSelection();
+  rememberSelection({ roundPicked: true });
   return true;
 }
 
@@ -710,8 +722,8 @@ export function selectTask(nextTaskId) {
     state.selection = null;
     state.taskCache = {};
     state.taskId = found.id;
-    const rounds = getRoundsForTask(found.id);
-    state.roundId = rounds.length > 0 ? rounds[0].id : null;
+    state.roundId = defaultRoundId(found.id);
+    writeSession(ROUND_PICK_KEY, null);
     rememberSelection();
   }
   notifyStateChange("task");
@@ -722,7 +734,7 @@ export function selectRound(nextRoundId) {
   const found = rounds.find((r) => r.id === nextRoundId);
   state.roundId = found ? found.id : null;
   state.selection = null;
-  rememberSelection();
+  rememberSelection({ roundPicked: true });
   notifyStateChange("round");
 }
 
@@ -766,6 +778,138 @@ export function renderRoundEmpty({ keys = [], text = null } = {}) {
           )
         )
       : null,
+  ]);
+}
+
+// "k/n" of a links count: {successes, n} or {k, n}; a preformatted string passes through.
+function linkCount(v) {
+  if (v == null) return null;
+  if (typeof v === "string") return v;
+  if (typeof v === "object") {
+    const k = v.successes ?? v.k;
+    if (k != null && v.n != null) return `${formatNumber(k)}/${formatNumber(v.n)}`;
+  }
+  return null;
+}
+
+// Short name of a round for the link cards ("vòng đồ gá"), else its title.
+function roundShortName(r, id) {
+  const key = "round.shortName." + id;
+  return hasI18nKey(key) ? t(key) : (r && pickLang(r.title)) || id;
+}
+
+// Cards that join the task's rounds both ways (tasks.json rounds[].links; Hiếu 28/11/2026
+// evening): what the previous round found and what the next round reached. They place the
+// numbers side by side only; never "better" or "+X points" (tray-jig.md §2, rule 4).
+export function renderRoundLinks(round = getCurrentRound()) {
+  const links = round && round.links && typeof round.links === "object" ? round.links : null;
+  if (!links) return null;
+  const rounds = getRoundsForTask(state.taskId);
+  const withheld = getAllWithheldRuns();
+  const card = (dir, L) => {
+    if (!L || typeof L !== "object" || !L.round) return null;
+    const target = rounds.find((r) => r.id === L.round);
+    if (!target) return null;
+    const result = withheld.has(L.run) ? null : linkCount(L);
+    const name = roundShortName(target, L.round);
+    let text;
+    if (dir === "prev") {
+      const carried = linkCount(L.carried);
+      const placed = linkCount(L.placed);
+      text =
+        carried && placed
+          ? t("round.linkPrevFound", { round: name, carried, placed })
+          : t("round.linkPrev", { round: name });
+    } else {
+      text = result
+        ? t("round.linkNext", { round: name, run: L.run || "—", result })
+        : t("round.linkNextNoResult", { round: name });
+    }
+    const differs = L.scene_differs || L.scorer_differs;
+    return el(
+      "button",
+      {
+        type: "button",
+        className: cls("round-link", "is-" + dir),
+        title: t("round.switchTo", { round: pickLang(target.title) || target.id }),
+        onClick: () => selectRound(L.round),
+      },
+      [
+        el("span", { className: "round-link-dir", "aria-hidden": "true", text: dir === "prev" ? "←" : "→" }),
+        el("b", { className: "round-link-text", text }),
+        differs ? el("span", { className: "tiny muted", text: t("round.linkDiffers") }) : null,
+      ]
+    );
+  };
+  const cards = [card("prev", links.prev), card("next", links.next)].filter(Boolean);
+  if (cards.length === 0) return null;
+  return el("section", { className: "round-links", "aria-label": t("round.linksAria") }, cards);
+}
+
+// "Diễn tiến": story.timeline newest first, at most `max` rows (index contract 28/11 evening).
+// The row of story.latest's round is marked; a row's round opens that round.
+export function renderTimeline(raw = state.storyRawDoc, { max = 6 } = {}) {
+  const rows = raw && Array.isArray(raw.timeline) ? raw.timeline.slice() : [];
+  if (rows.length === 0) return null;
+  const latest = raw.latest && typeof raw.latest === "object" ? raw.latest : null;
+  const rounds = getRoundsForTask(state.taskId);
+  rows.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+  const shown = rows.slice(0, max);
+  // one marked row: the latest round's row on latest.date, else that round's newest row
+  const latestRow = latest
+    ? shown.find((r) => r.round === latest.round && latest.date && r.date === latest.date) ||
+      shown.find((r) => r.round === latest.round) ||
+      null
+    : null;
+  return el("section", { className: "card" }, [
+    el("div", { className: "task-head" }, [
+      el("h2", { text: t("home.timelineTitle") }),
+      latest && latest.round
+        ? el("span", {
+            className: "chip",
+            text: t("home.timelineLatest", {
+              round: roundShortName(rounds.find((r) => r.id === latest.round), latest.round),
+              run: latest.run || "—",
+            }),
+          })
+        : null,
+    ]),
+    el(
+      "ol",
+      { className: "timeline-list" },
+      shown.map((row) => {
+        const isLatest = row === latestRow;
+        const target = row.round ? rounds.find((r) => r.id === row.round) : null;
+        const result = pickLang(row.result);
+        return el("li", { className: cls("timeline-row", isLatest && "is-latest") }, [
+          el("span", { className: "timeline-date mono", text: row.date || "—" }),
+          el("div", { className: "timeline-body" }, [
+            el("div", {}, [
+              row.story ? el("span", { className: "tax-badge", text: row.story }) : null,
+              el("b", { text: pickLang(row.title) || row.story || "—" }),
+              isLatest
+                ? el("span", { className: "chip", text: t("home.timelineLatestTag") })
+                : null,
+            ]),
+            result ? el("div", { className: "tiny", text: result }) : null,
+            el("div", { className: "timeline-meta tiny muted" }, [
+              row.doc ? el("span", { className: "mono", text: scrubPath(row.doc) }) : null,
+              target && target.id !== state.roundId
+                ? el(
+                    "button",
+                    {
+                      type: "button",
+                      className: "link timeline-round",
+                      onClick: () => selectRound(target.id),
+                    },
+                    [t("round.switchTo", { round: roundShortName(target, target.id) })]
+                  )
+                : null,
+            ]),
+          ]),
+        ]);
+      })
+    ),
   ]);
 }
 

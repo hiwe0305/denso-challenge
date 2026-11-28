@@ -4418,3 +4418,25 @@ a.lineage-box:hover {
   color: var(--ink);
   white-space: nowrap;
 }
+
+/* Links between rounds (Home, Report) and the "Diễn tiến" list (28/11/2026 evening) */
+.round-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.round-link {
+  display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; text-align: left;
+  padding: 12px 14px; border-radius: 12px; cursor: pointer; font: inherit; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border);
+}
+.round-link:hover, .round-link:focus-visible { border-color: var(--accent); }
+.round-link-dir { font-weight: 700; color: var(--accent); }
+.round-link-text { flex: 1 1 220px; font-weight: 600; line-height: 1.4; }
+.round-link .tiny { flex-basis: 100%; padding-left: 22px; }
+.timeline-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; }
+.timeline-row { display: grid; grid-template-columns: 96px 1fr; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); }
+.timeline-row:first-child { border-top: 0; }
+.timeline-row.is-latest .timeline-date { color: var(--accent); font-weight: 700; }
+.timeline-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.timeline-body .tax-badge { margin-right: 6px; }
+.timeline-body .chip { margin-left: 6px; }
+.timeline-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.timeline-round { padding: 0; border: 0; background: none; cursor: pointer; font: inherit; }
+@media (max-width: 560px) { .timeline-row { grid-template-columns: 1fr; gap: 2px; } }

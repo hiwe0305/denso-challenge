@@ -86,6 +86,26 @@ def test_place_rule_met_reading_uses_the_common_wording() -> None:
     )
 
 
+def test_default_round_and_round_links() -> None:
+    # Hiếu 28/11 evening: open on tasks[].default_round, link the rounds both ways
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    assert "task.default_round" in core
+    assert 'ROUND_PICK_KEY = "fw_round_pick"' in core
+    # only an explicit pick is remembered; the old auto-saved key is not read any more
+    assert 'readSession("fw_round")' not in core
+    assert core.count("rememberSelection({ roundPicked: true })") == 2
+    assert "export function renderRoundLinks" in core and "export function renderTimeline" in core
+    ops = (WEB / "pages_ops.js").read_text(encoding="utf-8")
+    assert "renderRoundLinks(curRound)" in ops and "renderTimeline(state.storyRawDoc)" in ops
+    for lang in ("vi", "en"):
+        text = (WEB / "i18n" / f"{lang}.js").read_text(encoding="utf-8")
+        lines = [ln for ln in text.splitlines() if '"round.link' in ln or '"home.timeline' in ln]
+        assert len(lines) >= 8, lang
+        # side by side only, never "better" or "+X points" (tray-jig.md §2, rule 4)
+        for ln in lines:
+            assert not re.search(r"tốt hơn|tăng|better|improv|\+\d", ln, re.I), ln
+
+
 def test_no_hex_in_pages() -> None:
     pages = sorted(WEB.glob("pages_*.js"))
     assert pages, "expected pages_*.js modules in web/"
