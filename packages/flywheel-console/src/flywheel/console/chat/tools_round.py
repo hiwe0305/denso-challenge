@@ -720,7 +720,7 @@ def _how(say: Say, focus: str) -> str:
     """How to shape the answer for this kind of question, in the user's language."""
     if focus in ("best", "cost", "steps", "compare", "data", "qa", "diag", "verdict"):
         return say("CÁCH TRẢ LỜI: câu trả lời thẳng, rồi một hoặc hai câu nhận xét lấy từ các ý trên, nêu tên vòng và run cho mọi số. Không chia phần, không thêm việc nên làm.",
-                   "HOW TO ANSWER: the direct answer, then one or two sentences of reading taken from the lines above, naming the round and the run of every number. No parts, no next steps.")  # fmt: skip
+                   "HOW TO ANSWER: the direct answer, then one or two sentences of reading taken from the lines above, naming the round once and the run next to each number. No parts, no next steps.")  # fmt: skip
     if focus == "next":
         return say("CÁCH TRẢ LỜI: một câu nêu tình hình, rồi từng phương án ở trên kèm lý do của nó (lấy từ số liệu liên quan). Mở đầu phần phương án bằng 'Việc nên làm:'.",
                    "HOW TO ANSWER: one sentence on where things stand, then each option above with its reason (from the related numbers). Open the options with 'Next steps:'.")  # fmt: skip

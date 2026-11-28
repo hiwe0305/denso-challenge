@@ -55,8 +55,8 @@ SYSTEM = (
     "For a lookup question (how many, which, list, show) about one dataset, run or job, answer in the user's language in at most 60 words, plain text, no tables. "
     "For a question about the results of a round, whether a mark is met, where the robot fails, the cost of the round, why, or what to do next, call round_report; "
     "for failure groups and system checks call round_diagnosis; for the confidence intervals of the paired comparisons call pair_comparisons; for egocentric or human-video clips as a whole call ego_summary. "
-    "Their result is already written in the user's language: open with its DIRECT ANSWER sentence, reuse its sentences word for word instead of rewording figures, and follow its HOW TO ANSWER line. At most 200 words, plain text. Never copy the upper-case headings of the tool result. "
-    "Name the round and the run for every number. Never give a number of one round for another round. "
+    "Their result is already written in the user's language: open with its DIRECT ANSWER sentence, reuse its sentences word for word instead of rewording figures, and follow its HOW TO ANSWER line. Keep it short, about 150 to 200 words, plain text; do not count words.  Never copy the upper-case headings of the tool result. "
+    "Name the round once at the start and the run next to each number; every number then belongs to that round unless you name another. Never give a number of one round for another round. "
     "Compare with a control only when the tool says the conditions are the same; otherwise put the numbers side by side and say why they cannot be compared. "
     "Say which interval is the bootstrap CI the rules read and which is descriptive only. Keep measured and estimated cost apart. Say what has not been checked. "
     "For a result that is not presented, write only the sentence the tool gives; never confirm or deny a figure the user offers for it. "
@@ -76,7 +76,7 @@ DEEP_PARTS = {"Vietnamese": "Số liệu / Đối chứng / Giới hạn / Việ
               "English": "Numbers / Controls / Limits / Next steps / Sources"}  # fmt: skip
 
 FORCE_ANSWER = (
-    "Stop looking things up. Write the answer now in {lang}, plain text, within the word limit of the instructions, "
+    "Stop looking things up. Write the answer now in {lang}, plain text, briefly, "
     "using only the tool results above. If they do not answer the question, say what is missing."
 )
 
@@ -724,8 +724,8 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
                 yield "token", {"text": fixed}
                 break
             msgs[-1]["content"] += (
-                f"\n[Answer the user now in {lang}, within the word limit of the instructions. Use only numbers shown above. "
-                "Name the round of every number. Do not call more tools unless a different lookup is clearly needed.]"
+                f"\n[Answer the user now in {lang}, briefly. Use only numbers shown above. "
+                "Name the round once and the run next to each number. Do not call more tools unless a different lookup is clearly needed.]"
             )
         if not answer_parts and tool_rounds:
             # the model spent every round on lookups, or asked for one more on the round that

@@ -329,7 +329,7 @@ def test_round_context_goes_into_the_system_prompt(idx: ConsolePaths) -> None:
     _two_rounds(idx)
     msgs, _ = llm.build_messages(_body("Nhận xét vòng này", "jig-r1"), _body("x", "jig-r1")["context"])
     sys = msgs[0]["content"]
-    assert "Selected round: jig-r1" in sys and "80%" in sys and "Name the round and the run for every number" in sys
+    assert "Selected round: jig-r1" in sys and "80%" in sys and "Name the round once at the start and the run next to each number" in sys
     msgs, _ = llm.build_messages(_body("x", "r1"), _body("x", "r1")["context"])
     assert "C70_R1" not in msgs[0]["content"] and "not presented" in msgs[0]["content"]
 
