@@ -39,8 +39,16 @@ import {
   state,
   t,
   tryGetJSON,
+  hasI18nKey,
 } from "./core.js";
 import { icon } from "./icons.js";
+
+// The assistant's name "Trợ lý phân tích" (Q3) once the chat PR adds its key; "chat.title"
+// until then, so either PR can merge first.
+const ASSISTANT_TITLE_KEY = "chat.titleAnalysis";
+function assistantTitleKey() {
+  return hasI18nKey(ASSISTANT_TITLE_KEY) ? ASSISTANT_TITLE_KEY : "chat.title";
+}
 
 const MODES = [
   { id: "ask", labelKey: "studio.modeAsk", subKey: "studio.modeAskSub" },
@@ -494,7 +502,7 @@ export function renderChatStudioPage() {
       el("div", { className: "turn-header" }, [
         el("span", { className: "turn-header-brand" }, [
           icon(tr.kind === "slash" ? "jobs" : "chat"),
-          tr.kind === "slash" ? tr.question.split(/\s+/)[0] : t("chat.title"),
+          tr.kind === "slash" ? tr.question.split(/\s+/)[0] : t(assistantTitleKey()),
         ]),
         isRunning
           ? el("span", { className: "turn-badge-live" }, [
