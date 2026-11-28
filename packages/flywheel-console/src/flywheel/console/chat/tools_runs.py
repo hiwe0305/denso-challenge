@@ -514,6 +514,11 @@ OTHER_VI = "Thí nghiệm khác (không trình bày)"
 OTHER_EN = "Other experiments (not presented)"
 
 
+def _ledger_merger() -> Any:
+    """``hidden.ledger`` of PR #258 (merges hidden stories into one "other" row), else None."""
+    return getattr(hidden, "ledger", None)
+
+
 def _story_ledger() -> list[dict[str, Any]] | None:
     """``story.ledger`` as ``{story, label, est_cu, mea_cu, est_usd, mea_usd}`` rows (PR #258), the
     rows of hidden stories (DA-50) merged into one ``story: "other"`` row by ``hidden.ledger``.
@@ -524,7 +529,7 @@ def _story_ledger() -> list[dict[str, Any]] | None:
     st = story().get("ledger") or []
     if not isinstance(st, list):
         return []
-    merge = getattr(hidden, "ledger", None)
+    merge = _ledger_merger()
     if merge is not None:
         st = merge(st, hidden_runs())
     out: list[dict[str, Any]] = []
