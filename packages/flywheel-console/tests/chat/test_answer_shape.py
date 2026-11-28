@@ -267,7 +267,8 @@ def test_the_prompt_keeps_an_unasked_re_test_out_of_the_answer() -> None:
 # W1 (docs/he/tray-jig.md §2): "đạt" reads a CI lower bound against a mark, never a count.
 # Live panel 28/11/2026: "chỉ run M được trình bày, đạt 136/180 (75,6 %)".
 _MET_COUNT = re.compile(r"(?i)\b(đạt|met)\s*(\d|\{)")
-_RULE_EXAMPLE = "never 'đạt 10/60' / 'met 10/60'"  # the prompt's own counter-example
+_RULE_EXAMPLE = "never 'đạt 10/60' / 'met 10/60'"  # the prompt's own counter-examples
+_SHARE_EXAMPLE = "never 'đạt 16,7 %'"
 
 
 def _literals(path: Path) -> list[str]:
@@ -279,7 +280,9 @@ def _literals(path: Path) -> list[str]:
 
 def test_no_canned_text_writes_dat_before_a_count() -> None:
     chat = Path(llm.__file__).parent
-    hits = [(p.name, s) for p in sorted(chat.glob("*.py")) for s in _literals(p) if _MET_COUNT.search(s.replace(_RULE_EXAMPLE, ""))]
+    # wording.py is the rewrite itself and names the wrong form on purpose
+    mods = [p for p in sorted(chat.glob("*.py")) if p.name != "wording.py"]
+    hits = [(p.name, s) for p in mods for s in _literals(p) if _MET_COUNT.search(s.replace(_RULE_EXAMPLE, "").replace(_SHARE_EXAMPLE, ""))]
     web = chat.parent / "web"
     for p in [web / "chat.js", *sorted((web / "i18n").glob("*.js"))]:
         hits += [(p.name, m.group(0)) for m in _MET_COUNT.finditer(p.read_text(encoding="utf-8"))]
@@ -292,7 +295,7 @@ def test_no_canned_text_writes_dat_before_a_count() -> None:
 
 def test_the_prompt_writes_a_count_as_a_count() -> None:
     assert _RULE_EXAMPLE in llm.SYSTEM and "'136/180" not in llm.SYSTEM  # an earlier answer's figure never reaches the prompt
-    assert "'C_70: 10/60 lượt thành công (16,7 %)'" in llm.SYSTEM and "'đạt' / 'met' is only the verdict of a mark" in llm.SYSTEM
+    assert "'C_70: 10/60 lượt thành công (16,7 %)'" in llm.SYSTEM and "'tỉ lệ 16,7 %', " + _SHARE_EXAMPLE in llm.SYSTEM and "'đạt' / 'met' is only the verdict of a mark" in llm.SYSTEM
     bench = {json.loads(ln)["id"]: json.loads(ln) for ln in (Path(llm.__file__).parent / "bench.jsonl").read_text(encoding="utf-8").splitlines()}
     for bid in ("a01", "a09", "a19"):
         forbid = [re.compile(p, re.I) for p in bench[bid]["forbid"]]
@@ -321,3 +324,45 @@ def test_the_round_report_table_names_its_columns_in_the_user_language(idx: Cons
     assert rows["whole task"] == "not met the 80% mark", rows
     vi = registry.call("round_report", {}, {"task": "tray", "round": "jig-r1", "lang": "vi", "question": "Run nào tốt nhất, vì sao?"})
     assert [r["reading"] for r in vi["ui"]["rows"]] == ["chưa đạt mốc 80 %", "đạt mốc 70 %", "chưa đạt mốc 70 %"]
+
+
+@pytest.mark.parametrize(
+    ("said", "shown"),
+    [
+        ("M đạt **136/180 lượt thành công (75,6 %)** ở cả task", "M: **136/180 lượt thành công (75,6 %)** ở cả task"),
+        ("chỉ run M được trình bày, đạt 136/180 (75,6 %)", "chỉ run M được trình bày, 136/180 (75,6 %)"),
+        ("M đạt được 136/180 lượt", "M: 136/180 lượt"),
+        ("M met 47/60 rollouts", "M: 47/60 rollouts"),
+        # a verdict on a mark, a negated count and a table cell stay as written
+        ("mức 1 đạt mốc 70 %, chưa đạt mốc 80 %", "mức 1 đạt mốc 70 %, chưa đạt mốc 80 %"),
+        ("chưa đạt 136/180", "chưa đạt 136/180"),
+        ("| Bước đặt | 161/180 (89,4 %), đạt mốc 50 % |", "| Bước đặt | 161/180 (89,4 %), đạt mốc 50 % |"),
+        ("đặt đúng 10/60 và đạt 80 % mốc", "đặt đúng 10/60 và đạt 80 % mốc"),
+    ],
+)
+def test_the_stream_writes_a_count_as_a_count(said: str, shown: str) -> None:
+    from flywheel.console.chat import wording
+
+    assert wording.fix(said) == shown
+    # every split of the text into tokens gives the same text
+    for size in range(1, 8):
+        s = wording.Stream()
+        out = "".join(s.feed(said[i : i + size]) for i in range(0, len(said), size)) + s.flush()
+        assert out == shown, size
+
+
+def test_a_turn_shows_and_keeps_the_count_wording(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
+    _two_rounds(idx)
+    _hosted(monkeypatch)
+    answer = "Vòng jig-r1 chỉ có run M; M đạt **136/180 lượt thành công (75,6 %)**, chưa đạt mốc 80 %."
+
+    def gen(msgs: Any, schemas: Any, deadline: float, *a: Any) -> Any:
+        for i in range(0, len(answer), 3):
+            yield "tok", answer[i : i + 3]
+        yield "end", (answer, [], 1, 1)
+
+    monkeypatch.setattr(llm, "generate", gen)
+    evs = list(llm.events(_body("Run nào tốt nhất, vì sao?", "jig-r1")))
+    streamed = "".join(d["text"] for e, d in evs if e == "token")
+    assert "M: **136/180 lượt thành công (75,6 %)**, chưa đạt mốc 80 %." in streamed and "đạt **136" not in streamed
+    assert evs[-1][0] == "done" and evs[-1][1]["unverified"] == []
