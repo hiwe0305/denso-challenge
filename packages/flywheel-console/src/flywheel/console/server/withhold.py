@@ -36,6 +36,11 @@ def story(doc: dict[str, Any], ids: set[str]) -> dict[str, Any]:
             "rollouts": [r for r in jig.get("rollouts") or [] if r.get("run") not in ids],
             "conditions": [c for c in jig.get("conditions") or [] if c.get("run") not in ids],
         }
+        c60 = jig.get("compare60")
+        if isinstance(c60, dict):  # the 60-rollout table (DA-53 AC 11) of a stale index
+            out["jig"]["compare60"] = {
+                **c60, "earlier": [e for e in c60.get("earlier") or [] if e.get("run") not in ids]
+            }
     follow = out.get("follow")
     if isinstance(follow, dict):
         out["follow"] = {k: v for k, v in follow.items() if k != "r3"} | {

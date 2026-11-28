@@ -8,10 +8,12 @@ N with ``--bootstrap-seed 20261126 --baseline`` M's eval), public sim data.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import json
 from pathlib import Path
 from typing import Any
 
+import yaml
 from flywheel.console.index import jig, story, tasks
 from flywheel.console.paths import ConsolePaths
 
@@ -271,3 +273,115 @@ def test_story_carries_the_jig_round(fw: ConsolePaths, tmp_path: Path) -> None:
 
 def test_no_jig_round_gives_an_empty_block(fw: ConsolePaths) -> None:
     assert jig.build(fw.fw_root, None, [], [], {}, STEPS, []) == {}
+
+
+# ------------------------------------------------------------------ AC 11: the 60-rollout table
+# 2 levels x 3 conditions x 3 repeats (n = 6 per repeat); repeat 0 is deliberately not the best
+_C60_OK = {0: {1000100, 1000200}, 1: {1000100, 1000101, 1000200, 1000201}, 2: {1000100}}
+
+
+def _c60_outcome(fw: ConsolePaths, run: str = "M", outcomes: bool = True) -> None:
+    folder = fw.fw_root / f"tray/outcomes/jig-{run.lower()}-100000-r3"
+    folder.mkdir(parents=True, exist_ok=True)
+    scores, outs = [], []
+    for rep in (0, 1, 2):
+        for lv in (1, 2):
+            for seed in range(1000000 + lv * 100, 1000000 + lv * 100 + 3):
+                ep = f"{run}/l{lv}-s{seed}-r{rep}"
+                ok = seed in _C60_OK[rep]
+                scores.append({"episode_id": ep, "success": ok, "level": lv,
+                               "step_status": ["pass"] * 7, "scorer_version": "simple-tray@2"})
+                outs.append({"episode_id": ep, "seed": seed, "level": lv, "repeat": rep})
+    outs.reverse()  # joined by episode_id, not by line
+    (folder / "scores.jsonl").write_text("\n".join(json.dumps(r) for r in scores))
+    if outcomes:
+        (folder / "outcomes.jsonl").write_text("\n".join(json.dumps(r) for r in outs))
+
+
+def _c60_pair(fw: ConsolePaths, n: int = 6) -> dict[str, Any]:
+    folder = fw.fw_root / "tray/pair60k/stage1-60k"
+    folder.mkdir(parents=True, exist_ok=True)
+    for stem, succ in (("stage1-C_ALL-table", 1), ("stage1-g-C_70-vs-C_ALL", 2),
+                       ("stage1-h-B_ALL-vs-C_ALL", 1), ("stage1-a-B_70-vs-C_70", 1),
+                       ("stage1-r-C70_R1-vs-C_70", 3)):  # fmt: skip
+        h = {"n": n, "successes": succ, "p": succ / n}
+        (folder / f"{stem}.json").write_text(json.dumps({"headline": h, "levels": {}}))
+    prnd = tasks.load(fw).story_round()
+    assert prnd is not None and prnd.eval_dir
+    return story._pair(fw.fw_root, prnd.eval_dir, prnd.run_ids)
+
+
+def test_outcome_rows_count_each_repeat_by_episode_id(fw: ConsolePaths) -> None:
+    _c60_outcome(fw)
+    row = _block(fw)["outcomes"][0]
+    assert [(r["repeat"], r["n"], r["successes"]) for r in row["repeats"]] == [
+        (0, 6, 2), (1, 6, 4), (2, 6, 1)
+    ]  # fmt: skip
+    two = {"n": 3, "successes": 2}
+    assert row["repeats"][1]["levels"] == {"1": two, "2": two}
+
+
+def test_outcome_rows_leave_repeats_out_rather_than_guess(fw: ConsolePaths) -> None:
+    _c60_outcome(fw, outcomes=False)
+    assert "repeats" not in _block(fw)["outcomes"][0]
+    folder = fw.fw_root / "tray/outcomes/jig-m-100000-r3"
+    rows = [json.loads(x) for x in (folder / "scores.jsonl").read_text().splitlines()]
+    outs = [{"episode_id": r["episode_id"], "repeat": 0} for r in rows[:-1]]  # one id short
+    (folder / "outcomes.jsonl").write_text("\n".join(json.dumps(r) for r in outs))
+    assert "repeats" not in _block(fw)["outcomes"][0]
+
+
+def test_compare60_takes_repeat_0_beside_the_earlier_runs(fw: ConsolePaths) -> None:
+    _c60_outcome(fw)
+    pair = _c60_pair(fw)
+    prnd = tasks.load(fw).story_round()
+    c = jig.compare60(_block(fw), _round(fw), pair, prnd)
+    assert c is not None
+    # repeat 0 (2/6), not the best repeat (4/6); every repeat listed
+    assert (c["run"], c["repeat"], c["n"], c["successes"], c["p"]) == ("M", 0, 6, 2, 0.3333)
+    assert c["levels"] == {"1": {"n": 3, "successes": 1}, "2": {"n": 3, "successes": 1}}
+    assert [(r["repeat"], r["successes"]) for r in c["repeats"]] == [(0, 2), (1, 4), (2, 1)]
+    # the earlier round's baseline and controls in display order; C70_R1 is withheld (16/11)
+    assert [(e["run"], e["successes"], e["n"]) for e in c["earlier"]] == [
+        ("C_ALL", 1, 6), ("C_70", 2, 6), ("B_ALL", 1, 6), ("B_70", 1, 6)
+    ]  # fmt: skip
+    assert c["scorer_version"] == "simple-tray@2" and c["earlier_scorer"] is None
+    assert c["source"]["outcomes"] == "fwdata/tray/outcomes/jig-m-100000-r3/outcomes.jsonl"
+    assert c["earlier_source"] == "fwdata/tray/pair60k/stage1-60k"
+    assert c["earlier_doc"] == prnd.raw["doc"] if prnd else False
+    text = json.dumps(c, ensure_ascii=False)
+    assert "diff" not in text and "ci" not in c and "verdict" not in text
+
+
+def test_compare60_is_none_when_sizes_differ_or_repeat_0_is_missing(fw: ConsolePaths) -> None:
+    _c60_outcome(fw)
+    prnd = tasks.load(fw).story_round()
+    assert jig.compare60(_block(fw), _round(fw), _c60_pair(fw, n=60), prnd) is None
+    block = _block(fw)
+    block["outcomes"][0]["repeats"] = block["outcomes"][0]["repeats"][1:]
+    assert jig.compare60(block, _round(fw), _c60_pair(fw), prnd) is None
+    assert jig.compare60(_block(fw), _round(fw), {}, prnd) is None
+
+
+def test_compare60_never_lists_a_hidden_run(fw: ConsolePaths) -> None:
+    _c60_outcome(fw)
+    pair = _c60_pair(fw)
+    data = yaml.safe_load((fw.seed / tasks.FILE).read_text(encoding="utf-8"))
+    pr = next(r for r in data["rounds"] if r["id"] == "tray-r1")
+    pr["withhold_runs"] = [{"id": "C70_R1"}]
+    pr["withhold_eval"] = []
+    prnd = tasks.parse(data).round("tray-r1")
+    c = jig.compare60(_block(fw), _round(fw), pair, prnd)
+    assert c is not None and "C70_R1" not in [e["run"] for e in c["earlier"]]
+    # the jig run itself hidden (the manifest refuses a hidden baseline; the guard stays): no table
+    hid = dataclasses.replace(_round(fw), withhold_runs=("M", "N"))
+    assert jig.compare60(_block(fw), hid, pair, prnd) is None
+
+
+def test_story_carries_compare60(fw: ConsolePaths, tmp_path: Path) -> None:
+    _c60_outcome(fw)
+    _c60_pair(fw)
+    out = tmp_path / "out"
+    story.build(fw, out)
+    c = json.loads((out / "story.json").read_text())["jig"]["compare60"]
+    assert c["successes"] == 2 and [e["run"] for e in c["earlier"]][0] == "C_ALL"

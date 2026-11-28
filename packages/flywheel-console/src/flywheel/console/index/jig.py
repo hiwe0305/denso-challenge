@@ -42,10 +42,13 @@ Shape::
       "featured": after_round's run id if shown and its eval is ready, else the baseline's if
                   ready, else None,
       # descriptive, from the runs' outcome folders (scores.jsonl, outcomes.jsonl): no interval
-      "steps", "outcomes": [per run: counts, step pass, repeat spread, relaxed placement],
+      "steps", "outcomes": [per run: counts, step pass, repeat spread, relaxed placement,
+                  "repeats": [{"repeat", "n", "successes", "levels": {"1": {n, successes}}}]
+                  (absent unless outcomes.jsonl matches scores.jsonl one to one by episode_id)],
       "rollouts", "conditions", "live_evals", "agentqa", "cuts", "m_cut",
       "next_cut", "n_ckpt_done",          # of the after-round run; None when it is hidden
       "active_sessions",
+      "compare60": the 60-rollout table (``compare60``; set by ``story.build``), or None,
     }
 
 Runs in the round's ``withhold_runs`` (Hiếu, 28/11/2026: run N) are never written: no eval, train
@@ -434,7 +437,92 @@ def _outcome(
         "relaxed": relaxed,
         "failures": dict(fails.most_common()),
     }
+    reps = _repeats(srows, orows)
+    if reps is not None:
+        row["repeats"] = reps
     return row, rollouts, conditions
+
+
+def _repeats(
+    srows: list[dict[str, Any]], orows: list[dict[str, Any]]
+) -> list[dict[str, Any]] | None:
+    """Counts per repeat, the repeat read from the ``outcomes.jsonl`` row with the same
+    ``episode_id`` as the ``scores.jsonl`` row. None (no guess) unless both files list the same
+    ids once each and every outcome row has an integer ``repeat``."""
+    sid = [r.get("episode_id") for r in srows]
+    oid: dict[Any, Any] = {r.get("episode_id"): r.get("repeat") for r in orows}
+    if (
+        not orows
+        or len(orows) != len(srows)
+        or len(oid) != len(orows)
+        or len(set(sid)) != len(sid)
+        or set(sid) != set(oid)
+        or not all(isinstance(v, int) and not isinstance(v, bool) for v in oid.values())
+    ):
+        return None
+    reps: dict[int, dict[str, Any]] = {}
+    for sr in srows:
+        slot = reps.setdefault(oid[sr.get("episode_id")], {"n": 0, "successes": 0, "levels": {}})
+        lv = slot["levels"].setdefault(str(sr.get("level") or "?"), {"n": 0, "successes": 0})
+        ok = sr.get("success") is True
+        for d in (slot, lv):
+            d["n"] += 1
+            d["successes"] += int(ok)
+    return [
+        {"repeat": k, "n": v["n"], "successes": v["successes"],
+         "levels": dict(sorted(v["levels"].items()))}
+        for k, v in sorted(reps.items())
+    ]  # fmt: skip
+
+
+def compare60(
+    block: dict[str, Any], rnd: Round | None, pair: dict[str, Any], pair_rnd: Round | None
+) -> dict[str, Any] | None:
+    """Repeat 0 of the jig round's baseline beside the earlier round's runs, same size.
+
+    Decision of Hiếu, 28/11/2026, point 3 (story DA-53, AC 11). Repeat 0 is fixed by its ordinal
+    before reading, never the best repeat; every repeat is listed. The earlier rows are
+    ``pair["runs"]`` of the round listing ``story.pair`` (``tray-r1``), restricted to its baseline
+    and controls in display order, never a run of its ``withhold_eval`` nor a hidden run.
+    Descriptive only (rule 4 of ``jig-m-rules``): no difference, interval or verdict. None unless
+    repeat 0 exists and every earlier row has repeat 0's ``n``.
+    """
+    if not block or rnd is None or pair_rnd is None or not pair:
+        return None
+    run = rnd.baseline
+    if run in rnd.withhold_runs:
+        return None
+    row = next((o for o in block.get("outcomes") or [] if o.get("run") == run), None)
+    reps = (row or {}).get("repeats") or []
+    r0 = next((r for r in reps if r["repeat"] == 0), None)
+    if row is None or r0 is None:
+        return None
+    keep = {pair_rnd.baseline, *pair_rnd.controls}
+    banned = set(pair_rnd.withhold_eval) | set(pair_rnd.withhold_runs) | set(rnd.withhold_runs)
+    by = {r.get("run"): r for r in pair.get("runs") or [] if isinstance(r, dict)}
+    earlier = [
+        {"run": i, "n": by[i].get("n"), "successes": by[i].get("successes"), "p": by[i].get("p")}
+        for i in (x.id for x in pair_rnd.runs)
+        if i in keep and i not in banned and i in by
+    ]
+    if not earlier or any(e["n"] != r0["n"] for e in earlier):
+        return None
+    folder = (row.get("source") or "").removesuffix("/scores.jsonl")
+    return {
+        "run": run,
+        "repeat": 0,
+        "n": r0["n"],
+        "successes": r0["successes"],
+        "p": round(r0["successes"] / r0["n"], 4) if r0["n"] else None,
+        "levels": r0["levels"],
+        "repeats": [{k: r[k] for k in ("repeat", "n", "successes")} for r in reps],
+        "scorer_version": row.get("scorer_version"),
+        "source": {"scores": f"{folder}/scores.jsonl", "outcomes": f"{folder}/outcomes.jsonl"},
+        "earlier": earlier,
+        "earlier_scorer": pair.get("scorer_version"),
+        "earlier_source": pair.get("source"),
+        "earlier_doc": pair_rnd.raw.get("doc"),
+    }
 
 
 def live_eval_watchers(fw: Path) -> list[dict[str, Any]]:
@@ -599,4 +687,5 @@ def build(
         "next_cut": cuts.get(after_id) if after_id is not None else None,
         "n_ckpt_done": after.get("ckpt_step"),
         "active_sessions": hidden.off_sessions(running, hide, "session"),
+        "compare60": None,  # story.build sets it (needs the story.pair round's block)
     }

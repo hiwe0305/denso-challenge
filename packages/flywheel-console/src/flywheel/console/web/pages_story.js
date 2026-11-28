@@ -996,6 +996,90 @@ export function renderEvalPage() {
             ])
           : null;
 
+      // Hiếu, 28/11/2026 (story DA-53, AC 11): repeat 0 of the jig round's run beside the earlier
+      // runs at the same size. Descriptive only: no difference, interval or verdict is shown.
+      const c60 = story.jig && story.jig.compare60 ? story.jig.compare60 : null;
+      const compare60Card = c60
+        ? (() => {
+            const earlierScorer = c60.earlier_scorer || t("exp.c60ScorerV1");
+            const rows = [
+              ...(Array.isArray(c60.earlier) ? c60.earlier : []).map((e) => ({
+                run: e.run,
+                scene: t("exp.c60SceneEarlier"),
+                scorer: earlierScorer,
+                successes: e.successes,
+                n: e.n,
+              })),
+              {
+                run: t("exp.c60RunRepeat", { run: c60.run, repeat: c60.repeat }),
+                scene: t("exp.c60SceneJig"),
+                scorer: c60.scorer_version || "-",
+                successes: c60.successes,
+                n: c60.n,
+              },
+            ];
+            const reps = Array.isArray(c60.repeats) ? c60.repeats : [];
+            const repList = reps.map((r) => formatNumber(r.successes)).join(", ");
+            const sources = [c60.source && c60.source.scores, c60.earlier_source, c60.earlier_doc]
+              .filter(Boolean)
+              .join(" · ");
+            return el("section", { className: cls("card", "table-wrap") }, [
+              el("div", { className: "task-head" }, [
+                el("h2", { text: t("exp.c60Title", { run: c60.run, n: formatNumber(c60.n) }) }),
+              ]),
+              el("table", { className: "table" }, [
+                el("thead", {}, [
+                  el("tr", {}, [
+                    el("th", { text: t("exp.c60ColRun") }),
+                    el("th", { text: t("exp.c60ColScene") }),
+                    el("th", { text: t("exp.c60ColScorer") }),
+                    el("th", { className: "num", text: t("eval.colSuccN") }),
+                    el("th", { className: "num", text: t("eval.colRate") }),
+                  ]),
+                ]),
+                el(
+                  "tbody",
+                  {},
+                  rows.map((r) =>
+                    el("tr", {}, [
+                      el("td", { className: "mono", text: r.run }),
+                      el("td", { text: r.scene }),
+                      el("td", { className: "mono", text: r.scorer }),
+                      el("td", {
+                        className: "num",
+                        text: `${formatNumber(r.successes)} / ${formatNumber(r.n)}`,
+                      }),
+                      el("td", {
+                        className: "num",
+                        text: formatPercent(r.n ? r.successes / r.n : null),
+                      }),
+                    ])
+                  )
+                ),
+              ]),
+              reps.length > 0
+                ? el("p", {
+                    className: "tiny",
+                    text: t(reps.length === 3 ? "exp.c60RepeatsThree" : "exp.c60Repeats", {
+                      run: c60.run,
+                      list: repList,
+                      n: formatNumber(c60.n),
+                    }),
+                  })
+                : null,
+              el("p", {
+                className: "tiny muted",
+                text: t("exp.c60Caveat", {
+                  scorer: c60.scorer_version || "-",
+                  run: c60.run,
+                  repeat: c60.repeat,
+                }),
+              }),
+              sources ? el("p", { className: cls("tiny", "muted", "mono"), text: sources }) : null,
+            ]);
+          })()
+        : null;
+
       setChildren(
         wrap,
         ...renderCrumbHeading({
@@ -1003,6 +1087,8 @@ export function renderEvalPage() {
           title: t("eval.title"),
         }),
         renderReportSubnav("eval"),
+
+        compare60Card,
 
         jigLiveEvals.length > 0
           ? el("div", { className: cls("attention-banner", "is-warn") }, [
