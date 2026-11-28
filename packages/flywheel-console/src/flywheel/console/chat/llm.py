@@ -43,6 +43,10 @@ DEEP_ROUNDS = 5
 DEEP_PREDICT = 2000  # about 400 words in five parts; 1,280 until 28/11/2026
 DEEP_CAP_S = 85.0  # a model on this machine or the tunnel
 DEEP_CAP_HOSTED_S = 150.0  # a hosted model: Opus 5.5 needed 96 s for one deep turn (audit 28/11/2026)
+# A generation must START before the turn cap; once started it may stream until the cap plus
+# this grace, so an answer already on screen is not cut into an error (Website, 28/11/2026: a
+# two-round answer of a hosted model finished just past 45 s)
+STREAM_GRACE_S = 60.0
 HTTP_TIMEOUT_S = 30.0
 TUNNEL_WAIT_S = 8.0
 MAX_CALLS_PER_ROUND = 3
@@ -628,12 +632,15 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
     tool_ctx = {**context, "lang": "vi" if lang == "Vietnamese" else "en", "question": question, "deep": mode == "investigate"}
 
     def _call_gen(m_list: list[dict[str, Any]], sch: list[dict[str, Any]] | None) -> Iterator[tuple[str, Any]]:
+        if time.time() > deadline:
+            raise TimeoutError("turn cap reached")  # no new generation starts after the cap
+        stream_until = deadline + STREAM_GRACE_S  # one that started in time is not cut at the cap
         if max_predict == NUM_PREDICT:
-            return generate(m_list, sch, deadline)
+            return generate(m_list, sch, stream_until)
         try:
-            return generate(m_list, sch, deadline, max_predict)
+            return generate(m_list, sch, stream_until, max_predict)
         except TypeError:  # test doubles with 3-arg signature (msgs, schemas, deadline)
-            return generate(m_list, sch, deadline)
+            return generate(m_list, sch, stream_until)
 
     def _gen(m_list: list[dict[str, Any]], sch: list[dict[str, Any]] | None, md: bool) -> Iterator[tuple[str, dict[str, Any]]]:
         """Stream one generation; leaves (content, calls, tin, tout) in ``out``."""
