@@ -283,3 +283,155 @@ def test_fetch_reads_m_from_the_drive_folder_its_expected_file_names(
     expected.write_text(json.dumps(old))
     with pytest.raises(SystemExit, match="differs from the laptop's"):
         fetch(expected, tmp_path / "vm2")
+
+
+MIX_N = REPO / "configs/runplans/tray/he-tray-jig-n.yaml"
+N_RUN = "fw-da50-ft-n-s0.simple.flow1000.cosine.lr1.0e-04.b16.gpus1.da50-ft-n-s0"
+
+
+def _mix_n(tmp_path: Path, stats: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A copy of the N plan pinned to the fake stats, frozen, its id approved as MIX_N_FROZEN."""
+    from flywheel_psi0.tray.mixplan import TrayMixPlan
+    from flywheel_psi0.tray.runplan import lock_path, run_plan_id
+
+    raw = yaml.safe_load(MIX_N.read_text())
+    raw["cut"]["stats_sha256"] = sha256(stats)
+    out = tmp_path / "mix-n.yaml"
+    out.write_text(yaml.safe_dump(raw, allow_unicode=True))
+    rp = run_plan_id(TrayMixPlan.load(out))
+    lock_path(out).write_text(json.dumps({"run_plan_id": rp}))
+    monkeypatch.setattr(colab_serve.colab_train, "MIX_N_FROZEN", rp)
+    return out
+
+
+def _n_run(runs: Path, steps: tuple[int, ...] = (100000,), weights: bool = True) -> Path:
+    src = runs / "da50-ft-n-s0" / "psi0" / "finetune" / N_RUN
+    for step in steps:
+        (src / f"checkpoints/ckpt_{step}").mkdir(parents=True)
+        if weights:
+            (src / f"checkpoints/ckpt_{step}/model.safetensors").write_bytes(b"weights")
+    (src / "argv.txt").write_text("train ...")
+    (src / "run_config.json").write_text(json.dumps(_config(STATS)))
+    return src
+
+
+def _n_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path, Path]:
+    stats = tmp_path / "stats_psi0.json"
+    stats.write_text(json.dumps(STATS))
+    return stats, _mix_n(tmp_path, stats, monkeypatch), _plan(tmp_path, stats)
+
+
+def test_expect_serves_run_n_only_from_the_frozen_n_plan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stats, mix, pair = _n_setup(tmp_path, monkeypatch)
+    runs = tmp_path / "jig-n"
+    _n_run(runs, (60000, 100000))
+    want = expect(runs, "N", 100000, stats, pair, mix_path=mix)
+    assert (want["job"], want["run"], want["ckpt_step"]) == ("da50-ft-n-s0", N_RUN, 100000)
+    assert want["run_plan_id"] == colab_serve.colab_train.MIX_N_FROZEN
+    assert want["drive_runs"] == "denso/da50/runs"
+    assert "checkpoint_sha256_from" not in want
+    assert json.loads((runs / want["job"] / "expected-100000.json").read_text()) == want
+    assert expect(runs, "N", 60000, stats, pair, mix_path=mix)["ckpt_step"] == 60000
+    with pytest.raises(SystemExit, match="the rules read"):
+        expect(runs, "N", 90000, stats, pair, mix_path=mix)
+    monkeypatch.setattr(colab_serve.colab_train, "MIX_N_FROZEN", "rp_000000000000")
+    with pytest.raises(SystemExit, match="(?s)N plan does not hold.*only rp_000000000000"):
+        expect(runs, "N", 100000, stats, pair, mix_path=mix)
+    monkeypatch.setattr(colab_serve.colab_train, "MIX_N_FROZEN", None)
+    with pytest.raises(SystemExit, match="MIX_N_FROZEN is unset"):
+        expect(runs, "N", 100000, stats, pair, mix_path=mix)
+
+
+def test_n_is_not_approved_by_ms_constant(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    stats, mix, pair = _n_setup(tmp_path, monkeypatch)
+    _n_run(tmp_path / "jig-n")
+    monkeypatch.setattr(colab_serve.colab_train, "MIX_FROZEN", colab_serve.colab_train.MIX_N_FROZEN)
+    monkeypatch.setattr(colab_serve.colab_train, "MIX_N_FROZEN", None)
+    with pytest.raises(SystemExit, match="MIX_N_FROZEN is unset"):
+        expect(tmp_path / "jig-n", "N", 100000, stats, pair, mix_path=mix)
+
+
+def test_real_n_plan_is_the_frozen_one() -> None:
+    spec = colab_serve._mix(MIX_N, "N")
+    assert spec.job == "da50-ft-n-s0" and spec.steps == (100000, 60000, 80000)
+    assert spec.drive_runs == "denso/da50/runs"
+    assert spec.run_plan_id == colab_serve.colab_train.MIX_N_FROZEN
+    # the plan of each branch is its own by default
+    assert colab_serve._job("N", PAIR, PAIR, None).job == "da50-ft-n-s0"
+    assert colab_serve._job("M", PAIR, PAIR, None).job == "da48-ft-m-s0"
+
+
+def test_checkpoint_sha256_stands_for_weights_not_on_the_laptop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stats, mix, pair = _n_setup(tmp_path, monkeypatch)
+    runs = tmp_path / "jig-n"
+    src = _n_run(runs, weights=False)
+    rel = "checkpoints/ckpt_100000/model.safetensors"
+    digest = "ab" * 32
+    with pytest.raises(SystemExit, match="model.safetensors missing"):
+        expect(runs, "N", 100000, stats, pair, mix_path=mix)
+    want = expect(runs, "N", 100000, stats, pair, mix_path=mix, checkpoint_sha256=digest)
+    assert want["files"][rel] == digest
+    assert want["files"]["argv.txt"] == sha256(src / "argv.txt")
+    assert want["checkpoint_sha256_from"] == "recorded"
+    written = json.loads((runs / "da50-ft-n-s0" / "expected-100000.json").read_text())
+    assert written == want
+    # another served file still has to be there
+    (src / "argv.txt").unlink()
+    with pytest.raises(SystemExit, match="argv.txt missing"):
+        expect(runs, "N", 100000, stats, pair, mix_path=mix, checkpoint_sha256=digest)
+    (src / "argv.txt").write_text("train ...")
+    # bad hex
+    for bad in ("abc", "AB" * 32, "zz" * 32, "ab" * 33):
+        with pytest.raises(SystemExit, match="not 64 lowercase hex"):
+            expect(runs, "N", 100000, stats, pair, mix_path=mix, checkpoint_sha256=bad)
+    # weights present locally: they must hash to the given value
+    (src / rel).write_bytes(b"weights")
+    with pytest.raises(SystemExit, match=f"sha256 {sha256(src / rel)}.*is {digest}"):
+        expect(runs, "N", 100000, stats, pair, mix_path=mix, checkpoint_sha256=digest)
+    ok = expect(runs, "N", 100000, stats, pair, mix_path=mix, checkpoint_sha256=sha256(src / rel))
+    assert ok["files"][rel] == sha256(src / rel)
+
+
+def test_fetch_checks_recorded_weights_against_the_drive_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import hashlib
+
+    stats, mix, pair = _n_setup(tmp_path, monkeypatch)
+    runs = tmp_path / "laptop"
+    _n_run(runs, weights=False)
+    mydrive = tmp_path / "MyDrive"
+    drive_src = _n_run(mydrive / "denso/da50/runs")  # Drive has the weights
+    digest = hashlib.sha256(b"weights").hexdigest()
+    want = expect(runs, "N", 100000, stats, pair, mix_path=mix, checkpoint_sha256=digest)
+    expected = runs / want["job"] / "expected-100000.json"
+    monkeypatch.setattr(colab_serve, "MYDRIVE", mydrive)
+    assert sorted(fetch(expected, tmp_path / "vm")) == sorted(want["files"])
+    # a Drive copy that is not the recorded weights is refused
+    (drive_src / "checkpoints/ckpt_100000/model.safetensors").write_bytes(b"other")
+    with pytest.raises(SystemExit, match="differs from the laptop's"):
+        fetch(expected, tmp_path / "vm2")
+
+
+def test_cli_parses_branch_n_and_checkpoint_sha256(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seen: dict[str, Any] = {}
+
+    def fake(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        seen["args"], seen["kwargs"] = args, kwargs
+        return {"job": "j", "files": {}}
+
+    monkeypatch.setattr(colab_serve, "expect", fake)
+    digest = "cd" * 32
+    code = colab_serve.main(
+        ["expect", "--runs", str(tmp_path), "--branch", "N", "--step", "100000"]
+        + ["--stats", str(tmp_path / "s.json"), "--checkpoint-sha256", digest]
+    )
+    assert code == 0
+    assert seen["args"][1:3] == ("N", 100000)
+    assert seen["kwargs"] == {"checkpoint_sha256": digest}

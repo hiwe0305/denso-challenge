@@ -41,6 +41,14 @@ that folder into the expected file (`drive_runs`) and `fetch` reads from it, so 
 
     python -m flywheel_psi0.tray.colab_serve expect --runs fwdata/tray/jig-m --branch M \
         --step 100000 --stats <M>/meta/stats_psi0.json
+
+Run N of DA-50 (`--branch N`) is served the same way from its own plan
+(`he-tray-jig-n.yaml`, approved id `colab_train.MIX_N_FROZEN`, job `da50-ft-n-s0`).
+Its 6 GB weights need not be on the laptop: `--checkpoint-sha256 <hex>`, the sha256
+recorded when training ended (read on Drive), stands for the weights file's, which then is
+not read locally (and, if it is there, must hash to it). Every other served file is hashed
+from the laptop's copy as before, and `fetch` and `serve` check the Drive and VM copies
+against the expected file as always; the file records `"checkpoint_sha256_from": "recorded"`.
 """
 
 from __future__ import annotations
@@ -49,6 +57,7 @@ import argparse
 import hashlib
 import json
 import math
+import re
 import shutil
 import subprocess
 import sys
@@ -62,7 +71,7 @@ from flywheel_psi0.trainer.colab import Report
 from flywheel_psi0.tray import colab_train
 from flywheel_psi0.tray.colab_train import (
     MIX,
-    MIX_PLAN,
+    MIX_N,
     ROUND_C70,
     ROUND_C70_PLAN,
     mix_job_id,
@@ -132,28 +141,30 @@ class Job(NamedTuple):
     stats_name: str = "ALL's"
 
 
-def _mix(plan_path: Path) -> Job:
-    """Run M: refused unless its plan is frozen and its id is colab_train.MIX_FROZEN."""
+def _mix(plan_path: Path, branch: str = MIX) -> Job:
+    """Run M or N: refused unless its plan is frozen and its id is the approved one."""
+    _, frozen, constant, task = colab_train._mix_approval(branch)  # read at call time (monkeypatch)
     plan = TrayMixPlan.load(plan_path)
     problems = launch_problems(plan, plan_path)
-    frozen = colab_train.MIX_FROZEN
     if frozen is None:
-        problems.append("no M plan is approved: MIX_FROZEN is unset")
+        problems.append(f"no {branch} plan is approved: {constant} is unset ({task})")
     elif run_plan_id(plan) != frozen:
         problems.append(f"{plan_path.name} is {run_plan_id(plan)}; only {frozen} is approved")
-    if list(plan.branches) != [MIX]:
-        problems.append(f"the M plan's branches are {list(plan.branches)}, not [{MIX}]")
+    if list(plan.branches) != [branch]:
+        problems.append(f"the {branch} plan's branches are {list(plan.branches)}, not [{branch}]")
     if problems:
-        raise SystemExit("M plan does not hold, nothing served:\n  " + "\n  ".join(problems))
+        raise SystemExit(
+            f"{branch} plan does not hold, nothing served:\n  " + "\n  ".join(problems)
+        )
     steps = (plan.checkpoints.primary, *plan.checkpoints.reads)
-    job = mix_job_id(MIX, plan.train_seeds[0])
+    job = mix_job_id(branch, plan.train_seeds[0], plan.story)
     return Job(job, steps, plan.cut.stats_sha256, plan.drive.runs, frozen, "the joined set's")
 
 
-def _job(branch: str, plan_path: Path, round_path: Path, mix_path: Path) -> Job:
+def _job(branch: str, plan_path: Path, round_path: Path, mix_path: Path | None) -> Job:
     """The job, the steps the rules read, the stats sha256 and Drive folder of a branch."""
-    if branch == MIX:
-        return _mix(mix_path)
+    if branch in (MIX, MIX_N):
+        return _mix(mix_path or REPO / colab_train._mix_approval(branch)[0], branch)
     plan = TrayPairPlan.load(plan_path)
     if branch in plan.branches:
         both = (plan.checkpoints.primary, plan.checkpoints.early)
@@ -166,7 +177,7 @@ def _job(branch: str, plan_path: Path, round_path: Path, mix_path: Path) -> Job:
             job = round_job_id(branch, rnd.train.train_seed)
             return Job(job, (rnd.eval.checkpoint,), rnd.train.stats_sha256, PAIR_DRIVE)
     raise SystemExit(
-        f"{branch} is not a branch of {plan_path.name}, its round {ROUND_C70} nor {MIX}"
+        f"{branch} is not a branch of {plan_path.name}, its round {ROUND_C70}, {MIX} nor {MIX_N}"
     )
 
 
@@ -177,9 +188,17 @@ def expect(
     stats: Path,
     plan_path: Path = REPO / PAIR_PLAN,
     round_path: Path = REPO / ROUND_C70_PLAN,
-    mix_path: Path = REPO / MIX_PLAN,
+    mix_path: Path | None = None,
+    checkpoint_sha256: str | None = None,
 ) -> dict[str, Any]:
-    """Laptop: the sha256 a serve VM must find, after the bounds check; written beside the job."""
+    """Laptop: the sha256 a serve VM must find, after the bounds check; written beside the job.
+
+    `mix_path` defaults to the plan of the branch (M or N). `checkpoint_sha256`, the weights'
+    sha256 recorded when training ended, replaces hashing the weights file, which then need
+    not be on the laptop (and, if it is, must hash to it).
+    """
+    if checkpoint_sha256 is not None and not re.fullmatch(r"[0-9a-f]{64}", checkpoint_sha256):
+        raise SystemExit(f"--checkpoint-sha256 {checkpoint_sha256!r}: not 64 lowercase hex chars")
     spec = _job(branch, plan_path, round_path, mix_path)
     job, stats_sha256 = spec.job, spec.stats_sha256
     if step not in spec.steps:
@@ -189,8 +208,19 @@ def expect(
     src = run_dir(runs / job)
     config = json.loads((src / "run_config.json").read_text(encoding="utf-8"))
     problems = bound_problems(config, json.loads(stats.read_text(encoding="utf-8")))
-    missing = [rel for rel in served(step) if not (src / rel).is_file()]
+    weights = served(step)[-1]  # checkpoints/ckpt_<step>/model.safetensors
+    recorded = checkpoint_sha256 is not None
+    missing = [
+        rel
+        for rel in served(step)
+        if not (src / rel).is_file() and not (recorded and rel == weights)
+    ]
     problems += [f"{src / rel} missing" for rel in missing]
+    if recorded and (src / weights).is_file() and sha256(src / weights) != checkpoint_sha256:
+        problems.append(
+            f"{src / weights}: sha256 {sha256(src / weights)}, "
+            f"--checkpoint-sha256 is {checkpoint_sha256}"
+        )
     if problems:
         raise SystemExit(f"{job} is not served:\n  " + "\n  ".join(problems))
     want = {
@@ -201,8 +231,13 @@ def expect(
         "stats_sha256": stats_sha256,
         "run_plan_id": spec.run_plan_id,
         "drive_runs": spec.drive_runs,
-        "files": {rel: sha256(src / rel) for rel in served(step)},
+        "files": {
+            rel: checkpoint_sha256 if recorded and rel == weights else sha256(src / rel)
+            for rel in served(step)
+        },
     }
+    if recorded:
+        want["checkpoint_sha256_from"] = "recorded"
     out = runs / job / f"expected-{step}.json"
     out.write_text(json.dumps(want, indent=1) + "\n")
     return want
@@ -325,7 +360,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("phase", choices=["expect", "fetch", "serve"])
     parser.add_argument("--runs", type=Path, help="expect: the laptop's fwdata/tray/runs")
-    parser.add_argument("--branch", help="expect: B_ALL, C_ALL, B_70, C_70, C70_R1 or M")
+    parser.add_argument("--branch", help="expect: B_ALL, C_ALL, B_70, C_70, C70_R1, M or N")
     parser.add_argument("--step", type=int, help="expect: the checkpoint to serve")
     parser.add_argument(
         "--stats", type=Path, help="expect: ALL's (M: the joined set's) meta/stats_psi0.json"
@@ -336,11 +371,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--drive", type=Path, help="fetch: the runs folder; default MyDrive/<drive_runs>"
     )
     parser.add_argument("--port", type=int, default=PORT)
+    parser.add_argument(
+        "--checkpoint-sha256",
+        help="expect: the weights' recorded sha256 (64 hex); the file need not be local",
+    )
     args = parser.parse_args(argv)
     if args.phase == "expect":
         if None in (args.runs, args.branch, args.step, args.stats):
             parser.error("expect needs --runs, --branch, --step and --stats")
-        want = expect(args.runs, args.branch, args.step, args.stats)
+        want = expect(
+            args.runs, args.branch, args.step, args.stats, checkpoint_sha256=args.checkpoint_sha256
+        )
         print(json.dumps({k: v for k, v in want.items() if k != "files"}))
         return 0
     if args.expected is None:

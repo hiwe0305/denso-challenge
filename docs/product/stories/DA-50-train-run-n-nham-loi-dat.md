@@ -97,6 +97,7 @@ Luật đọc: khối `jig-n-rules` ở [tray-jig.md](../../he/tray-jig.md) mụ
 - [ ] 6. Eval và đọc
   - [x] 6.1 Hiệu ghép cặp trên nhiều lượt mỗi điều kiện trong `eval_results` (`paired_diff_repeats`, khối `paired.repeats`), có test CPU. Lệnh đọc N so với M: `eval_results configs/runplans/tray/he-tray-v2.yaml --set <tập> --out <lô N> --baseline <lô M> --repeats 3 --no-yaw --bootstrap-seed 20261126`
   - [x] 6.4 Sửa theo review sau merge của PR 228 (phiên điều phối, 27/11/2026): `eval_set` từ chối cảnh lệch với `task.env_id` của plan; `eval_results` và `place_error` cảnh báo và ghi `plan_mismatch` khi tập điều kiện được dựng cho plan khác plan đang đọc
+  - [x] 6.5 `colab_serve --branch N` và `expect --checkpoint-sha256` (laptop không có checkpoint của N; sha256 lấy từ bản ghi lúc train xong, VM vẫn kiểm file trên Drive)
   - [ ] 6.2 Eval 180 rollout theo runbook của DA-47
   - [ ] 6.3 Đọc theo `jig-n-rules`, ghi kết quả và dòng ledger thực đo
 - [ ] 7. Kiểm tra cuối và PR
@@ -156,3 +157,4 @@ Hiếu (làm cùng Claude), duyệt cuối: Hiếu.
 | 27/11/2026 | Thêm và làm xong 6.4 (hai điểm review sau merge của PR 228); chờ Hiếu xác nhận việc này thuộc DA-50 | Hiếu (soạn với Claude) |
 | 27/11/2026 | 3.1, 3.2, 4.1, 4.2 xong: lô lệch góc (554 đoạn đặt giữ lại), tập N và plan `rp_23b25206d96e`; Phạm vi file ghi từng đường dẫn để `pr_guard` đọc được | Hiếu (soạn với Claude) |
 | 28/11/2026 | Nhiệm vụ 5 xong: train run N (Hiếu cho chạy 27/11/2026, "Chạy train N"), số thực đo ở tray-jig.md mục 8 và dòng sổ thực đo | Hiếu (soạn với Claude) |
+| 28/11/2026 | 6.5 thêm và xong: serve run N từ `colab_serve` để eval | Hiếu (soạn với Claude) |
