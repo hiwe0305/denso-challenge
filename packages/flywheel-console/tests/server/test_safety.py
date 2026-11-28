@@ -15,10 +15,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from conftest import make_lerobot
 from flywheel.console.chat import providers
 from flywheel.console.paths import ConsolePaths
-from flywheel.console.server import app, runner, withhold
+from flywheel.console.server import app, kinds, runner, withhold
 from test_app import Srv
+from test_lane_kinds import STORE_CARD
 
 SEED = ConsolePaths(repo=Path(), fw_root=Path()).seed / "tasks.yaml"
 SECRET = "SENTINEL-HELD"  # stands for a held result figure
@@ -141,7 +143,9 @@ def test_unreadable_seed_refuses_instead_of_serving(
     job = fw.fw_root / "tray/jig-n/da50-ft-n-s0"
     job.mkdir(parents=True)
     (job / "metrics.jsonl").write_text(json.dumps({"step": 9, "loss": 0.1}) + "\n")
-    for path in ("/data/story.json", "/data/story.json/", "/data/tasks.json"):
+    (fw.index / "catalog.json").write_text(json.dumps(_stale_catalog()))
+    for path in ("/data/story.json", "/data/story.json/", "/data/tasks.json",
+                 "/data/catalog.json", f"/data/ds/{HID_STORY}/episodes.json"):  # fmt: skip
         st, body = open_srv.get(path)
         assert st == 500 and SECRET.encode() not in body, path
     for path in ("/api/chat/traces", "/api/chat/traces/t1"):
@@ -377,12 +381,221 @@ def test_a_client_that_left_prints_nothing(
 def test_missing_qa_json_is_not_a_404(open_srv: Srv) -> None:
     ds = open_srv.paths.index / "ds" / "S70"
     ds.mkdir(parents=True)
+    (open_srv.paths.index / "catalog.json").write_text('{"rows": []}')
     assert open_srv.get("/data/ds/S70/qa.json")[0] == 404  # no data at all
     (ds / "quality.json").write_text("{}")
     assert open_srv.get("/data/ds/S70/qa.json") == (204, b"")
     assert open_srv.get("/data/ds/NOPE/qa.json")[0] == 404
     (ds / "qa.json").write_text('{"a": 1}')
     assert open_srv.get("/data/ds/S70/qa.json")[0] == 200
+
+
+# ---------------------------------------------------------------- hidden run's datasets
+HID_STORY = "tray_s1_02d895d28050"  # hidden by its story, DA-50
+HID_NOTES = "tray_s1place_6a7b780fb66b"  # hidden by its notes only
+SHOWN = "S70"
+
+
+def _row(i: str, story: str, episodes: int, **kw: Any) -> dict[str, Any]:
+    return {"id": i, "title": i, "story": story, "task": "tray_transfer", "group": "s1",
+            "kind": "sim", "status": "ok", "episodes": episodes, "hours": 1.0,
+            "unique": True, "notes": "", "parents": [], "children": [], **kw}  # fmt: skip
+
+
+def _stale_catalog() -> dict[str, Any]:
+    """A catalog written before the rows of the hidden run's story were dropped."""
+    rows = [
+        _row(SHOWN, "DA-33", 70, children=[HID_STORY]),
+        _row(HID_STORY, "DA-50", 480, parents=[SHOWN]),
+        _row(HID_NOTES, "DA-33", 480, notes="see analysis/da50-clean"),
+    ]
+    total = {"sets": 3, "episodes": 1030, "hours": 3.0}
+    return {"rows": rows, "edges": [[SHOWN, HID_STORY]], "runs": [],
+            "totals": {"s1": total, "all": total}}  # fmt: skip
+
+
+def _stale_data_index(ix: Path) -> None:
+    ix.mkdir(parents=True, exist_ok=True)
+    cat = _stale_catalog()
+    (ix / "catalog.json").write_text(json.dumps(cat))
+    (ix / "story.json").write_text(json.dumps({"ds": cat}))
+    trimmed = [{"id": r["id"], "title": r["title"], "episodes": r["episodes"]} for r in cat["rows"]]
+    task = {"catalog_task": "tray_transfer", "catalog_rows": trimmed,
+            "catalog_totals": cat["totals"]}  # fmt: skip
+    (ix / "tasks.json").write_text(json.dumps({"tasks": [task], "rounds": []}))
+    for ds in (SHOWN, HID_STORY, HID_NOTES):
+        (ix / "ds" / ds / "posters").mkdir(parents=True)
+        (ix / "ds" / ds / "episodes.json").write_text("[]")
+        (ix / "ds" / ds / "quality.json").write_text("{}")
+        (ix / "ds" / ds / "posters" / "0.jpg").write_bytes(b"jpg")
+
+
+def _no_trace(body: bytes) -> bool:
+    return not any(x.encode() in body for x in ("DA-50", "da50", HID_STORY, HID_NOTES))
+
+
+@pytest.fixture(params=["srv", "open_srv"])
+def either(request: pytest.FixtureRequest) -> Srv:
+    s: Srv = request.getfixturevalue(str(request.param))
+    _stale_data_index(s.paths.index)
+    return s
+
+
+@pytest.mark.parametrize("name", ["catalog.json", "story.json", "tasks.json"])
+@pytest.mark.parametrize(
+    "form",
+    [
+        "/data/{}",
+        "/data/{}/",
+        "/data/{}%2f",
+        "/data/{}/.",
+        "/data/./{}",
+        "/data/ds/../{}",
+        "/data/%2e/{}",
+        "/data/ds/%2e%2e/{}",
+        "/data//{}",
+        "//data/{}",
+    ],
+)
+def test_hidden_datasets_leave_every_index_file(either: Srv, name: str, form: str) -> None:
+    st, body = either.get(form.format(name))
+    assert st in (200, 404) and _no_trace(body), (st, body[:300])
+
+
+def test_filtered_catalog_keeps_the_other_rows_and_totals_them(either: Srv) -> None:
+    kept = {"sets": 1, "episodes": 70, "hours": 1.0}
+    for name, pick in (("catalog.json", None), ("story.json", "ds")):
+        st, body = either.get(f"/data/{name}")
+        doc = json.loads(body)[pick] if pick else json.loads(body)
+        assert st == 200 and [r["id"] for r in doc["rows"]] == [SHOWN], name
+        assert doc["edges"] == [] and doc["rows"][0]["children"] == []
+        assert doc["totals"]["all"] == kept
+    task = json.loads(either.get("/data/tasks.json")[1])["tasks"][0]
+    assert [r["id"] for r in task["catalog_rows"]] == [SHOWN]
+    assert task["catalog_totals"]["all"] == kept
+
+
+def test_tasks_rows_of_an_older_build_do_not_outlive_the_catalog(either: Srv) -> None:
+    cat = _stale_catalog()  # catalog.json built again without them, tasks.json not
+    cat["rows"] = cat["rows"][:1]
+    (either.paths.index / "catalog.json").write_text(json.dumps(cat))
+    st, body = either.get("/data/tasks.json")
+    assert st == 200 and _no_trace(body)
+
+
+@pytest.mark.parametrize("ds", [HID_STORY, HID_NOTES])
+@pytest.mark.parametrize(
+    "form",
+    [
+        "/data/ds/{}/episodes.json",
+        "/data/ds/{}/posters/0.jpg",
+        "/data/ds/{}/qa.json",  # missing: the 204 path
+        "/data/ds/{}/",
+        "/data/ds/{}",
+        "/data/ds/./{}/episodes.json",
+        "/data/ds/S70/../{}/episodes.json",
+        "/data/ds/{}%2fepisodes.json",
+        "/data//ds/{}/episodes.json",
+        "/data/%2e/ds/{}/episodes.json",
+        "//data/ds/{}/episodes.json",
+    ],
+)
+def test_hidden_dataset_files_are_not_found(either: Srv, ds: str, form: str) -> None:
+    assert either.get(form.format(ds))[0] == 404
+
+
+def test_shown_dataset_is_still_served(either: Srv) -> None:
+    assert either.get("/data/ds/S70/episodes.json") == (200, b"[]")
+    assert either.get("/data/ds/S70/posters/0.jpg") == (200, b"jpg")
+    assert either.get("/data/ds/S70/qa.json") == (204, b"")
+
+
+def _release(fw_root: Path, store: str, rid: str, story: str) -> None:
+    """A dataset on disk with its card, as a data round leaves it."""
+    d = fw_root / "datasets" / store
+    (d / "cards").mkdir(parents=True, exist_ok=True)
+    text = STORE_CARD.replace("tray_s1_aaaaaaaaaaaa", rid).replace("tray-s1-test", store)
+    text = text.replace("tray.s1.jig2.l1.p8.20261122", rid)
+    (d / "cards" / f"{rid}.yaml").write_text(f"{text}lineage: {{parents: [], story: {story}}}\n")
+    make_lerobot(d / "releases" / rid)
+
+
+def test_folders_of_a_hidden_runs_data_are_not_offered(
+    open_srv: Srv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    root = open_srv.paths.fw_root
+    other = "tray_s1_bbbbbbbbbbbb"
+    _release(root, "round-hidden", HID_STORY, "DA-50")  # every card of the round is hidden
+    _release(root, "round-mixed", HID_NOTES, "DA-50")
+    _release(root, "round-mixed", other, "DA-41")
+    runner.init(open_srv.paths)
+    kinds.clear_cache()
+
+    st, body = open_srv.get("/api/kinds")
+    assert st == 200 and other.encode() in body
+    assert not any(x.encode() in body for x in (HID_STORY, HID_NOTES, "round-hidden"))
+
+    ds = root / "datasets"
+    for rel, shown in (("", "round-mixed"), ("round-mixed/releases", other)):
+        st, body = open_srv.get(f"/api/fs?path={ds / rel}")
+        assert st == 200 and shown.encode() in body, rel
+        assert not any(x.encode() in body for x in (HID_STORY, HID_NOTES, "round-hidden")), rel
+    for rel in ("round-hidden", "round-hidden/releases", f"round-mixed/releases/{HID_NOTES}"):
+        for api in ("fs", "dir_check"):
+            assert open_srv.get(f"/api/{api}?path={ds / rel}")[0] == 400, (api, rel)
+
+
+def test_a_card_added_later_is_hidden_without_a_restart(open_srv: Srv) -> None:
+    runner.init(open_srv.paths)
+    hide = runner.hidden_runs()
+    assert HID_STORY not in runner.hidden_data_names(hide)
+    _release(open_srv.paths.fw_root, "round-hidden", HID_STORY, "DA-50")
+    assert HID_STORY in runner.hidden_data_names(hide)
+
+
+def test_a_folder_left_by_an_older_build_stays_hidden(open_srv: Srv) -> None:
+    ix = open_srv.paths.index
+    _stale_data_index(ix)
+    (ix / "catalog.json").write_text('{"rows": []}')  # built again: no row says whose it was
+    _release(open_srv.paths.fw_root, "round-hidden", HID_STORY, "DA-50")
+    runner.init(open_srv.paths)
+    assert open_srv.get(f"/data/ds/{HID_STORY}/episodes.json")[0] == 404
+    assert open_srv.get("/data/ds/S70/episodes.json")[0] == 200
+
+
+@pytest.mark.parametrize("state", ["missing", "truncated", "list", "no-rows"])
+def test_unreadable_catalog_closes_what_it_would_filter(either: Srv, state: str) -> None:
+    f = either.paths.index / "catalog.json"
+    if state == "missing":
+        f.unlink()
+    else:
+        bad = {"truncated": f.read_text()[:40], "list": f"[{f.read_text()}]", "no-rows": "{}"}
+        f.write_text(bad[state])
+    st, body = either.get("/data/catalog.json")
+    assert st == (404 if state == "missing" else 500) and _no_trace(body)
+    for path in (f"/data/ds/{HID_STORY}/episodes.json", "/data/tasks.json"):
+        st, body = either.get(path)
+        assert st == 500 and _no_trace(body), path
+
+
+def test_any_failure_to_name_the_datasets_is_a_500(
+    open_srv: Srv, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stale_data_index(open_srv.paths.index)
+
+    def broken(hide: Any) -> frozenset[str]:
+        raise KeyError("rows")
+
+    monkeypatch.setattr(runner, "hidden_data_names", broken)
+    assert open_srv.get("/data/ds/S70/episodes.json")[0] == 500
+
+
+@pytest.mark.parametrize("ds", [[1], "x", {"rows": "x"}])
+def test_story_ds_of_an_unknown_shape_is_refused(open_srv: Srv, ds: Any) -> None:
+    open_srv.paths.index.mkdir(parents=True, exist_ok=True)
+    (open_srv.paths.index / "story.json").write_text(json.dumps({"ds": ds}))
+    assert open_srv.get("/data/story.json")[0] == 500
 
 
 # ---------------------------------------------------------------- readiness asks the model

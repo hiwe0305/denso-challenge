@@ -57,6 +57,14 @@ def get(path):
 
 
 bad = []
+# no served index file may name the story or the sessions of the run that is not presented
+for path in ("/data/catalog.json", "/data/story.json", "/data/tasks.json"):
+    try:
+        body = call(path)
+    except urllib.error.HTTPError as e:
+        sys.exit("FAIL: %s answers %s: %s" % (path, e.code, e.read()[:200].decode(errors="replace")))
+    bad += ["%s mentions %s" % (path, w) for w in ("DA-50", "da50") if w.encode() in body]
+
 status, tasks = get("/api/status"), get("/data/tasks.json")
 if not status["locked"]:
     bad.append("server is NOT locked")

@@ -423,7 +423,7 @@ def test_locked_server_with_chat_takes_only_the_chat_posts(
 
 def test_locked_server_still_serves_pages_and_reports_lock(locked_srv: Srv) -> None:
     (locked_srv.paths.index).mkdir(parents=True, exist_ok=True)
-    (locked_srv.paths.index / "catalog.json").write_text("{}")
+    (locked_srv.paths.index / "catalog.json").write_text('{"rows": []}')
     assert locked_srv.get("/data/catalog.json")[0] == 200
     st, body = locked_srv.get("/api/status")
     assert st == 200 and json.loads(body)["locked"] is True
