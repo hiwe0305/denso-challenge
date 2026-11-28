@@ -521,22 +521,22 @@ def test_locked_chat_stream_hides_machine_paths(
         httpd.server_close()
 
 
-def test_held_results_never_leave_the_server(locked_srv: Srv) -> None:
+def test_held_results_never_leave_the_server(
+    locked_srv: Srv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """``withhold_eval``: /data/story.json loses the held run's result blocks before it is sent."""
     ix = locked_srv.paths.index
     ix.mkdir(parents=True, exist_ok=True)
-    held = {"rounds": [{"id": "r1", "withhold_eval": ["HELD"]}]}
-    (ix / "tasks.json").write_text(json.dumps(held))
     story = {
-        "runs": [{"branch": "HELD", "loss": 0.1}],
-        "pair": {"runs": [{"run": "HELD", "f": "4/60"}, {"run": "A", "f": "10/60"}],
-                 "comparisons": [{"variant": "HELD", "baseline": "A"},
+        "runs": [{"branch": "C70_R1", "loss": 0.1}],
+        "pair": {"runs": [{"run": "C70_R1", "f": "4/60"}, {"run": "A", "f": "10/60"}],
+                 "comparisons": [{"variant": "C70_R1", "baseline": "A"},
                                  {"variant": "B", "baseline": "A"}]},
-        "follow": {"runs": {"HELD": 1, "A": 2}, "r3": {"HELD": 3}},
-        "demo": {"round1_reading": {"x": "4/60"}, "models": {"runs": {"HELD": {"episodes": 606}}},
-                 "ladder": {"runs": {"HELD": 4, "A": 10},
-                            "on_table_b": {"value": {"HELD": 51},
-                                           "check_from_rollouts": {"HELD": 51},
+        "follow": {"runs": {"C70_R1": 1, "A": 2}, "r3": {"C70_R1": 3}},
+        "demo": {"round1_reading": {"x": "4/60"}, "models": {"runs": {"C70_R1": {"episodes": 606}}},
+                 "ladder": {"runs": {"C70_R1": 4, "A": 10},
+                            "on_table_b": {"value": {"C70_R1": 51},
+                                           "check_from_rollouts": {"C70_R1": 51},
                                            "quote": "| 43/60 | 51/60 |"}}},
     }  # fmt: skip
     (ix / "story.json").write_text(json.dumps(story))
@@ -548,8 +548,13 @@ def test_held_results_never_leave_the_server(locked_srv: Srv) -> None:
     assert out["follow"] == {"runs": {"A": 2}} and "round1_reading" not in out["demo"]
     # training and data facts of the run are not results: they stay
     assert out["runs"] == story["runs"] and out["demo"]["models"] == story["demo"]["models"]
-    (ix / "tasks.json").write_text(json.dumps({"rounds": [{"id": "r1"}]}))
-    assert json.loads(locked_srv.get("/data/story.json")[1]) == story  # nothing held: file as it is
+    seed = tmp_path / "seed"  # a manifest that holds nothing: the file as it is
+    seed.mkdir()
+    lines = (ConsolePaths.seed.fget(locked_srv.paths) / "tasks.yaml").read_text().splitlines()  # type: ignore[attr-defined]
+    kept = [ln for ln in lines if not ln.strip().startswith("withhold_eval:")]
+    (seed / "tasks.yaml").write_text("\n".join(kept))
+    monkeypatch.setattr(ConsolePaths, "seed", property(lambda self: seed))
+    assert json.loads(locked_srv.get("/data/story.json")[1]) == story
 
 
 def _stale_n_index(ix: Path) -> dict[str, Any]:

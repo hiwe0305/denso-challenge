@@ -26,6 +26,7 @@ from typing import Any
 
 from flywheel.console.index import cards, hidden
 from flywheel.console.paths import ConsolePaths, active, guard
+from flywheel.console.server import withhold
 
 VIDEO_EXT = (".mp4", ".mov", ".mkv", ".avi", ".webm")
 TUNNEL_PORT = 11435
@@ -62,6 +63,44 @@ def _fw() -> Path:
 
 def _repo() -> Path:
     return _p().repo
+
+
+class ManifestUnreadable(RuntimeError):
+    """``seed/tasks.yaml`` cannot be read, so which runs are held or hidden is unknown."""
+
+
+_manifest_cache: tuple[tuple[Path, int, int], Any] | None = None
+
+
+def _manifest() -> Any:
+    """The seed task manifest, read again when the file changes.
+
+    Unlike ``hidden.load``, a manifest that cannot be read raises: an empty list of held or hidden
+    runs must mean "nothing is held", never "unknown"."""
+    global _manifest_cache
+    from flywheel.console.index import tasks as task_idx
+
+    try:
+        f = _p().seed / task_idx.FILE
+        st = f.stat()
+        key = (f, st.st_mtime_ns, st.st_size)
+        hit = _manifest_cache
+        if hit is None or hit[0] != key:
+            hit = _manifest_cache = (key, task_idx.load(_p()))
+    except Exception as e:  # missing, unreadable or invalid in any way
+        raise ManifestUnreadable("seed/tasks.yaml cannot be read: results are not served") from e
+    return hit[1]
+
+
+def hidden_runs() -> hidden.Hidden:
+    """The runs of ``withhold_runs``; raises ``ManifestUnreadable``."""
+    return hidden.from_manifest(_manifest())
+
+
+def _withheld_runs() -> set[str]:
+    """Run ids under ``withhold_eval`` of any round in the **seed** manifest, never the index: a
+    missing or broken index must not switch the filter off. Raises ``ManifestUnreadable``."""
+    return {str(x) for r in _manifest().rounds for x in r.withhold_eval}
 
 
 def jobs_dir() -> Path:
@@ -165,7 +204,8 @@ class Tunnel:
 
     CMD = [
         "ssh", "-N", "-o", "BatchMode=yes", "-o", "ExitOnForwardFailure=yes",
-        "-o", "ConnectTimeout=10", "-L", f"127.0.0.1:{TUNNEL_PORT}:127.0.0.1:11434", "rtx3060",
+        "-o", "ConnectTimeout=10", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3",
+        "-L", f"127.0.0.1:{TUNNEL_PORT}:127.0.0.1:11434", "rtx3060",
     ]  # fmt: skip
 
     def __init__(self) -> None:
@@ -1651,8 +1691,12 @@ def max_steps(job_dir: Path) -> int | None:
 
 
 def train_runs() -> list[dict[str, Any]]:
-    """Training runs with a ``metrics.jsonl``; a run in ``withhold_runs`` is left out."""
-    hide = hidden.load(_p())
+    """Training runs with a ``metrics.jsonl``; a run in ``withhold_runs`` is left out, and no
+    run is listed when the manifest cannot say which those are."""
+    try:
+        hide = hidden_runs()
+    except ManifestUnreadable:
+        return []
     runs: list[dict[str, Any]] = []
     seen: set[Path] = set()
     candidates: list[tuple[str, str, Path]] = []
@@ -1703,15 +1747,19 @@ def _hidden_endpoints(hide: hidden.Hidden) -> set[str]:
 
 def colab_state() -> dict[str, Any]:
     """Balance and listed VMs of the newest guard log. A guard of a hidden run's session folder
-    is skipped, and VMs of hidden runs' sessions are left out of ``sessions``."""
-    hide = hidden.load(_p())
+    is skipped, and VMs of hidden runs' sessions are left out of ``sessions``. Empty when the
+    manifest cannot say which sessions those are."""
+    out: dict[str, Any] = {"balance": None, "sessions": [], "time": None}
+    try:
+        hide = hidden_runs()
+    except ManifestUnreadable:
+        return out
     best: Path | None = None
     for f in _fw().glob("colab/*/guard.jsonl"):
         if hide.session(f.parent.name):
             continue
         if best is None or f.stat().st_mtime > best.stat().st_mtime:
             best = f
-    out: dict[str, Any] = {"balance": None, "sessions": [], "time": None}
     if best is None:
         return out
     for ln in reversed(tail_text(best, 12000).splitlines()):
@@ -1751,28 +1799,21 @@ def _new_stage(sid: str, label: str, link: str, tm: str) -> dict[str, Any]:
             "how": None, "jobs": [], "link": link, "updated": tm}  # fmt: skip
 
 
-def _withheld_runs() -> set[str]:
-    """Run ids listed under ``withhold_eval`` of any round in the indexed manifest."""
-    try:
-        doc = json.loads((_p().index / "tasks.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return set()
-    rounds = doc.get("rounds") if isinstance(doc, dict) else None
-    rs = [r for r in rounds or [] if isinstance(r, dict)]
-    return {str(x) for r in rs for x in r.get("withhold_eval") or []}
-
-
 def _eval_loop_text() -> tuple[str, str]:
-    """Eval and loop lines from the indexed pair60k reads; the best run's fraction comes first."""
+    """Eval and loop lines from the indexed pair60k reads; the best run's fraction comes first.
+
+    Raises when the manifest or the shape of ``story.json`` does not let the held runs be
+    filtered out."""
+    hide = hidden_runs()
+    held = _withheld_runs()  # a run whose test result is not presented stays out of the status
     try:
         doc = json.loads((_p().index / "story.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return "", ""
     if not isinstance(doc, dict):
         return "", ""
-    doc = hidden.story(doc, hidden.load(_p()))  # an index built before withhold_runs
+    doc = withhold.story(hidden.story(doc, hide), held)  # also cleans an index built earlier
     pair = doc.get("pair") or {}
-    held = _withheld_runs()  # a run whose test result is not presented stays out of the status
     runs = {r.get("run"): r for r in pair.get("runs") or []
             if isinstance(r, dict) and r.get("run") not in held}  # fmt: skip
     best = runs.get(pair.get("best"))
@@ -1901,7 +1942,16 @@ def status() -> dict[str, Any]:
         s.update(state="idle", now="Chưa thấy metrics.jsonl của lần train nào")
     s["runs"] = runs
     # eval and loop have no live source on the laptop: read the index, else show waiting
-    ev, lp = _eval_loop_text()
+    refused: tuple[str, str] | None = None
+    ev, lp = "", ""
+    try:
+        ev, lp = _eval_loop_text()
+    except ManifestUnreadable:
+        refused = ("Không đọc được seed/tasks.yaml nên không hiện kết quả",
+                   "Sửa seed/tasks.yaml rồi tải lại trang")  # fmt: skip
+    except Exception:  # story.json of an unexpected shape: show nothing rather than unfiltered
+        refused = ("Không đọc được story.json nên không hiện kết quả",
+                   "Chạy lại fw console index")  # fmt: skip
     if ev:
         stages["eval"].update(state="done", now=ev, static=True, how="Xem trang Eval")
     else:
@@ -1912,6 +1962,10 @@ def status() -> dict[str, Any]:
     else:
         stages["loop"].update(state="waiting", now="Vòng lặp chờ kết quả eval", static=True,
                               how="Xem trang Vòng lặp")  # fmt: skip
+    if refused:
+        for sid in ("eval", "loop"):
+            stages[sid].update(state="blocked", now=refused[0], issue=refused[0], how=refused[1],
+                               static=True)  # fmt: skip
     jobs = list_jobs(10)
     mi = models_info()
     # an ego.pipeline parent holds no slot; only its child jobs do
@@ -1953,15 +2007,37 @@ def _hidden(name: str) -> bool:
     return name.startswith(".") or name == "vault" or "holdout" in name.lower()
 
 
+def _run_folder(name: str, hide: hidden.Hidden) -> bool:
+    """``name`` is a job, outcome or session folder (or file) of a run in ``withhold_runs``."""
+    return name in hide.names or hide.session(name)
+
+
+def _browsable(p: Path, hide: hidden.Hidden) -> Path:
+    """Refuse the folder of a hidden run, or a dot folder, anywhere on the way to ``p``.
+
+    Dot folders are counted below ``fw_root`` when ``p`` is inside it (a git worktree keeps its
+    data under ``.claude/``), else below the home folder. The message is the one of a folder that
+    does not exist."""
+    below = p
+    for base in (_fw().resolve(), Path.home().resolve()):
+        if p.is_relative_to(base):
+            below = p.relative_to(base)
+            break
+    if any(_run_folder(x, hide) for x in p.parts) or any(x.startswith(".") for x in below.parts):
+        raise ValueError("not a folder")
+    return p
+
+
 def fs_list(path: str) -> dict[str, Any]:
     home = Path.home()
-    p = under(path or str(home), home)
+    hide = hidden_runs()
+    p = _browsable(under(path or str(home), home), hide)
     if not p.is_dir():
         raise ValueError("not a folder")
     dirs: list[dict[str, Any]] = []
     vids: list[dict[str, Any]] = []
     for e in sorted(p.iterdir(), key=lambda x: x.name.lower()):
-        if _hidden(e.name):
+        if _hidden(e.name) or _run_folder(e.name, hide):
             continue
         try:
             if e.is_dir():
@@ -1976,10 +2052,15 @@ def fs_list(path: str) -> dict[str, Any]:
 
 
 def dir_check(path: str) -> dict[str, Any]:
-    p = under_import(path)
+    hide = hidden_runs()
+    p = _browsable(under_import(path), hide)
     return {
         "has_device": (p / "device.json").is_file(),
-        "tasks": sorted(x.name for x in p.iterdir() if x.is_dir() and any(x.glob("*.mp4"))),
+        "tasks": sorted(
+            x.name
+            for x in p.iterdir()
+            if x.is_dir() and not _run_folder(x.name, hide) and any(x.glob("*.mp4"))
+        ),
     }
 
 

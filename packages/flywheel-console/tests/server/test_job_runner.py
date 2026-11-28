@@ -289,16 +289,16 @@ def test_status_eval_and_loop_wait_without_index(rn: ConsolePaths) -> None:
     assert st["eval"]["state"] == "waiting" and st["loop"]["state"] == "waiting"
 
 
-def test_status_reads_pair_round_from_index(rn: ConsolePaths) -> None:
+def _pair_index(rn: ConsolePaths, retest: str) -> dict[str, Any]:
     pair = {
         "best": "C_70",
         "runs": [
             {"run": "C_70", "successes": 10, "n": 60},
-            {"run": "C70_R1", "successes": 4, "n": 60},
+            {"run": retest, "successes": 4, "n": 60},
         ],
         "comparisons": [
-            {"variant": "C70_R1", "baseline": "C_70", "outcome": "F"},
-            {"variant": "C70_R1", "baseline": "C_ALL", "outcome": "F"},
+            {"variant": retest, "baseline": "C_70", "outcome": "F"},
+            {"variant": retest, "baseline": "C_ALL", "outcome": "F"},
             {"variant": "C_70", "baseline": "C_ALL", "outcome": "continue"},
         ],
     }  # fmt: skip
@@ -306,12 +306,22 @@ def test_status_reads_pair_round_from_index(rn: ConsolePaths) -> None:
     (rn.index / "story.json").write_text(
         json.dumps({"pair": pair, "round": {"chain": {"selected": 181}}}), encoding="utf-8"
     )
-    st = {s["id"]: s for s in runner.status()["stages"]}
+    return {s["id"]: s for s in runner.status()["stages"]}
+
+
+def test_status_reads_pair_round_from_index(rn: ConsolePaths) -> None:
+    st = _pair_index(rn, "X_R2")  # a retest run no round holds
     # the home page reads the first fraction of eval.now as the success rate: the best run's
     assert st["eval"]["state"] == "done"
-    assert st["eval"]["now"] == "Tốt nhất C_70 10/60 · vòng C70_R1 4/60"
+    assert st["eval"]["now"] == "Tốt nhất C_70 10/60 · vòng X_R2 4/60"
     assert st["loop"]["state"] == "done"
-    assert st["loop"]["now"] == "Vòng C70_R1: chọn 181 tập → 4/60 → dừng (F)"
+    assert st["loop"]["now"] == "Vòng X_R2: chọn 181 tập → 4/60 → dừng (F)"
+
+
+def test_status_does_not_present_the_held_retest(rn: ConsolePaths) -> None:
+    st = _pair_index(rn, "C70_R1")  # withhold_eval of the seed; the index lists nothing
+    assert st["eval"]["now"] == "Tốt nhất C_70 10/60"
+    assert st["loop"]["now"] == "Đã chọn 181 tập nhắm lỗi · kết quả thi lại không trình bày"
 
 
 def _jig_index(rn: ConsolePaths, status: str) -> None:

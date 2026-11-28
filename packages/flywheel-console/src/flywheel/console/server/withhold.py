@@ -3,7 +3,8 @@
 The pages already hide them (``web/core.js``, ``unhide``), but ``/data/story.json`` used to
 carry the figures to the browser, where devtools showed them. The server now removes the same
 result blocks before the file leaves; training, data cut and cost of the run stay, as on the
-pages. Keep this in step with ``unhide`` in ``web/core.js``.
+pages. Keep this in step with ``filterWithheldStory`` in ``web/core.js``. The ids come from the
+seed manifest (``runner._withheld_runs``), never from the index on disk.
 """
 
 from __future__ import annotations
@@ -13,6 +14,40 @@ from typing import Any
 
 def _omit(d: Any, ids: set[str]) -> dict[str, Any]:
     return {k: v for k, v in (d or {}).items() if k not in ids} if isinstance(d, dict) else {}
+
+
+def _off(rows: Any, ids: set[str]) -> Any:
+    """``rows`` without those of a held run; anything but a list is left as it is."""
+    if not isinstance(rows, list):
+        return rows
+    return [r for r in rows if not (isinstance(r, dict) and r.get("run") in ids)]
+
+
+def _jig(jig: dict[str, Any], ids: set[str]) -> dict[str, Any]:
+    """The ``jig`` block: the train entries in ``jig.runs`` stay (keyed ``branch``; rows keyed
+    ``run`` are eval rows of an older index and go), the result blocks of a held run go."""
+    out = dict(jig)
+    for key in ("runs", "outcomes", "rollouts", "conditions"):
+        if key in out:
+            out[key] = _off(out[key], ids)
+    if isinstance(out.get("evals"), list):
+        out["evals"] = [
+            {"run": e.get("run"), "role": e.get("role"), "status": "withheld"}
+            if isinstance(e, dict) and e.get("run") in ids
+            else e
+            for e in out["evals"]
+        ]
+    for key in ("featured", "best"):
+        if out.get(key) in ids:
+            out[key] = None
+    paired = out.get("paired")
+    if isinstance(paired, dict) and (paired.get("variant") in ids or paired.get("baseline") in ids):
+        out["paired"] = None
+    c60 = out.get("compare60")  # the 60-rollout table (DA-53 AC 11)
+    if isinstance(c60, dict):
+        held = c60.get("run") in ids
+        out["compare60"] = None if held else {**c60, "earlier": _off(c60.get("earlier"), ids)}
+    return out
 
 
 def story(doc: dict[str, Any], ids: set[str]) -> dict[str, Any]:
@@ -30,17 +65,7 @@ def story(doc: dict[str, Any], ids: set[str]) -> dict[str, Any]:
         }  # fmt: skip
     jig = out.get("jig")
     if isinstance(jig, dict):
-        out["jig"] = {
-            **jig,
-            "runs": [r for r in jig.get("runs") or [] if r.get("run") not in ids],
-            "rollouts": [r for r in jig.get("rollouts") or [] if r.get("run") not in ids],
-            "conditions": [c for c in jig.get("conditions") or [] if c.get("run") not in ids],
-        }
-        c60 = jig.get("compare60")
-        if isinstance(c60, dict):  # the 60-rollout table (DA-53 AC 11) of a stale index
-            out["jig"]["compare60"] = {
-                **c60, "earlier": [e for e in c60.get("earlier") or [] if e.get("run") not in ids]
-            }
+        out["jig"] = _jig(jig, ids)
     follow = out.get("follow")
     if isinstance(follow, dict):
         out["follow"] = {k: v for k, v in follow.items() if k != "r3"} | {

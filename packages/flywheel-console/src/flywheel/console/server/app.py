@@ -11,7 +11,10 @@ import json
 import mimetypes
 import os
 import re
+import signal
+import sys
 import threading
+import time
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -20,10 +23,14 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from flywheel.console.index import hidden
 from flywheel.console.paths import ConsolePaths, PathDenied, active, guard, set_active
-from flywheel.console.server import kinds, media, runner, withhold
+from flywheel.console.server import kinds, media, probe, runner, withhold
 
 MAX_JSON = 1 << 20
 MAX_UPLOAD = 8 << 30
+BODY_TIMEOUT_S = 60.0  # a request body that stops arriving; not applied to responses (video)
+CACHE_TTL_S = 3.0  # /api/status and /api/kinds: every page polls them, and each takes 40-80 ms
+# the client closed or stopped reading: nothing to answer and nothing to log
+GONE = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)
 # GETs that expose machine internals; refused with every POST when the server runs with --lock
 # the only POSTs a locked server takes, and only when it was started with ``chat``
 CHAT_POST = ("/api/chat", "/api/models/prewarm", "/api/models/connect")
@@ -43,8 +50,28 @@ def _chat(mod: str) -> Any:
     return importlib.import_module(f"flywheel.console.chat.{mod}")
 
 
+class _Cache:
+    """Values kept for a few seconds; requests that arrive together wait for one computation."""
+
+    def __init__(self) -> None:
+        self._items: dict[str, tuple[float, Any]] = {}
+        self._locks: dict[str, threading.Lock] = {}
+
+    def get(self, key: str, make: Callable[[], Any]) -> Any:
+        with self._locks.setdefault(key, threading.Lock()):
+            hit = self._items.get(key)
+            if hit is None or time.monotonic() - hit[0] >= CACHE_TTL_S:
+                hit = self._items[key] = (time.monotonic(), make())
+            return hit[1]
+
+    def clear(self) -> None:
+        self._items.clear()
+
+
 class ConsoleServer(ThreadingHTTPServer):
     daemon_threads = True
+    # the default of 5 drops connections when a page opens many at once (HTTP/1.0: one each)
+    request_queue_size = 128
 
     def __init__(
         self, paths: ConsolePaths, port: int, lock: bool = False, chat: bool = False
@@ -54,7 +81,13 @@ class ConsoleServer(ThreadingHTTPServer):
         # the chat is on unless the server is locked; ``chat`` keeps it on while locked: it reads
         # the index and starts nothing, so a recording can use one read-only server
         self.chat_on = (not lock) or chat
+        self.cache = _Cache()
         super().__init__(("127.0.0.1", port), Handler)
+
+    def handle_error(self, request: Any, client_address: Any) -> None:
+        if isinstance(sys.exc_info()[1], (*GONE, TimeoutError)):
+            return
+        super().handle_error(request, client_address)
 
     def unredact(self, value: str) -> str:
         """Inverse of ``redact`` for a path a page sends back (e.g. ``out=fwdata/console/...``)."""
@@ -133,13 +166,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.jerr(403, "forbidden origin")
         if self.server.locked and not (self.server.chat_on and u.path in CHAT_POST):
             return self.jerr(403, "locked")
+        self.server.cache.clear()  # a POST can start or cancel work: show it at once
         try:
             if u.path == "/api/upload":
                 return self.upload(u)
-            n = int(self.headers.get("Content-Length") or 0)
+            n = self.content_length()
             if n > MAX_JSON:
                 return self.jerr(413, "body too large")
-            body = json.loads(self.rfile.read(n) or b"{}") if n else {}
+            body = self.read_json(n)
             parts = u.path.strip("/").split("/")
             if u.path == "/api/chat":
                 return self.chat_sse(body)
@@ -153,9 +187,12 @@ class Handler(BaseHTTPRequestHandler):
                         os.environ["FW_CHAT_API_KEY"] = str(body["api_key"]).strip()
                 return self.jok(_chat("providers").set_runtime_config(body))
             if u.path == "/api/models/prewarm":
-                return self.jok(_chat("llm").prewarm())
+                return self.jok(probe.prewarm(_chat("llm"), _chat("providers")))
             if u.path == "/api/jobs":
-                job = runner.submit(str(body.get("kind")), body.get("params") or {})
+                params = body.get("params") or {}
+                if not isinstance(params, dict):
+                    return self.jerr(400, "params must be a JSON object")
+                job = runner.submit(str(body.get("kind")), params)
                 return self.jok(runner.pub(job), 201)
             if len(parts) == 4 and parts[1] == "jobs" and parts[3] == "cancel":
                 return self.jok(runner.cancel(parts[2]))
@@ -171,8 +208,36 @@ class Handler(BaseHTTPRequestHandler):
             return self.jerr(404, "not found")
         except ValueError as e:
             return self.jerr(400, str(e))
+        except GONE:
+            raise
         except Exception as e:
             return self.jerr(500, str(e))
+
+    def content_length(self, missing: int = 0) -> int:
+        raw = (self.headers.get("Content-Length") or "").strip()
+        if not raw:
+            return missing
+        if not re.fullmatch(r"[0-9]{1,18}", raw):
+            raise ValueError("Content-Length must be a non-negative integer")
+        return int(raw)
+
+    def read_json(self, n: int) -> dict[str, Any]:
+        """The JSON object of a POST (``{}`` without a body)."""
+        if not n:
+            return {}
+        self.connection.settimeout(BODY_TIMEOUT_S)
+        try:
+            raw = self.rfile.read(n)
+        except TimeoutError:
+            raw = b""
+        finally:
+            self.connection.settimeout(None)
+        if len(raw) < n:
+            raise ValueError("body shorter than Content-Length")
+        body = json.loads(raw)
+        if not isinstance(body, dict):
+            raise ValueError("body must be a JSON object")
+        return body
 
     def chat_sse(self, body: dict[str, Any]) -> None:
         """text/event-stream; the client closing the socket stops the turn."""
@@ -216,7 +281,7 @@ class Handler(BaseHTTPRequestHandler):
         ext = os.path.splitext(name)[1].lower()
         if ext not in runner.VIDEO_EXT:
             return self.jerr(400, "chỉ nhận " + " ".join(runner.VIDEO_EXT))
-        n = int(self.headers.get("Content-Length") or -1)
+        n = self.content_length(missing=-1)
         if n < 0:
             return self.jerr(411, "Content-Length required")
         if n > MAX_UPLOAD:
@@ -231,13 +296,18 @@ class Handler(BaseHTTPRequestHandler):
         tmp = Path(str(dest) + ".part")
         left = n
         try:
+            self.connection.settimeout(BODY_TIMEOUT_S)
             with open(tmp, "wb") as f:
                 while left > 0:
-                    b = self.rfile.read(min(1 << 20, left))
+                    try:
+                        b = self.rfile.read(min(1 << 20, left))
+                    except TimeoutError:
+                        b = b""
                     if not b:
                         break
                     f.write(b)
                     left -= len(b)
+            self.connection.settimeout(None)
             if left:
                 tmp.unlink()
                 dest.unlink(missing_ok=True)
@@ -291,35 +361,61 @@ class Handler(BaseHTTPRequestHandler):
             return self.jerr(403, "forbidden host")
         if u.path.startswith("/api/"):
             return self.api(u)
-        fp = self.resolve(u.path)
-        # a mounted folder asked for by its own URL (/ego/, the viewer's home) serves its index.html
-        if fp is not None and fp.is_dir() and u.path.endswith("/"):
-            fp = fp / "index.html"
-        if fp is None or not fp.is_file():
+        try:
+            fp = self.resolve(u.path)
+            # a mounted folder asked for by its own URL (/ego/, the viewer's home) serves its
+            # index.html
+            if fp is not None and fp.is_dir() and u.path.endswith("/"):
+                fp = fp / "index.html"
+            found = fp is not None and fp.is_file()
+        except (OSError, ValueError):  # a name the file system refuses (too long)
+            fp, found = None, False
+        if fp is None or not found:
+            if fp is not None and self.no_qa(fp):
+                self.send_response(204)  # the pages ask for every dataset; this one has no checks
+                return self.end_headers()
             return self.jerr(404, "not found")
-        if unquote(u.path) in ("/data/story.json", "/data/tasks.json"):
-            return self.send_index(fp, unquote(u.path) == "/data/story.json")
+        # filtered by the file that would be sent, not by the URL: /data/./story.json,
+        # /data/story.json/ and the like name the same file
+        index = self.paths.index.resolve()
+        if fp in (index / "story.json", index / "tasks.json"):
+            return self.send_index(fp, fp.name == "story.json")
         self.send_file(fp)
+
+    def no_qa(self, fp: Path) -> bool:
+        """``fp`` is the missing ``qa.json`` of an indexed dataset."""
+        return (
+            fp.name == "qa.json"
+            and fp.parent.parent == self.paths.index.resolve() / "ds"
+            and (fp.parent / "quality.json").is_file()
+        )
 
     def send_index(self, fp: Path, is_story: bool) -> None:
         """``story.json`` / ``tasks.json`` without the runs a round does not present.
 
-        ``withhold_runs`` (hidden.py, read from the seed): nothing of the run, even from an index
-        built before the switch. ``withhold_eval`` (withhold.py, read from the index tasks.json):
-        the result blocks of a held run never reach the browser.
+        ``withhold_runs`` (hidden.py): nothing of the run, even from an index built before the
+        switch. ``withhold_eval`` (withhold.py): the result blocks of a held run never reach the
+        browser. Both lists come from the seed; the file is never sent as it is, and a list or a
+        file that cannot be read refuses the request.
         """
-        hide = hidden.load(self.paths)
-        held = runner._withheld_runs() if is_story else set()
-        if not hide and not held:
-            return self.send_file(fp)
+        try:
+            hide = runner.hidden_runs()
+            held = runner._withheld_runs() if is_story else set()
+        except runner.ManifestUnreadable as e:
+            return self.jerr(500, str(e))
         try:
             doc = json.loads(fp.read_text(encoding="utf-8"))
         except ValueError:
             return self.jerr(500, "index file is not valid JSON")
-        if is_story:
-            doc = withhold.story(hidden.story(doc, hide), held)
-        else:
-            doc = hidden.tasks_doc(doc, hide)
+        try:
+            if is_story:
+                if not isinstance(doc, dict):
+                    raise TypeError("story.json is not an object")
+                doc = withhold.story(hidden.story(doc, hide), held)
+            else:
+                doc = hidden.tasks_doc(doc, hide)
+        except Exception:  # unfiltered is worse than unavailable
+            return self.jerr(500, "index file has an unexpected shape")
         self.send_bytes(json.dumps(doc, ensure_ascii=False).encode())
 
     def send_file(self, fp: Path) -> None:
@@ -366,7 +462,7 @@ class Handler(BaseHTTPRequestHandler):
                         break
                     self.wfile.write(b)
                     left -= len(b)
-        except (BrokenPipeError, ConnectionResetError):
+        except (*GONE, TimeoutError):
             pass
 
     # ------------------------------------------------------------ API
@@ -392,6 +488,10 @@ class Handler(BaseHTTPRequestHandler):
             if _chat_missing(e):
                 return self.jerr(503, "chat module not available")
             return self.jerr(500, str(e))
+        except GONE:
+            raise
+        except runner.ManifestUnreadable as e:
+            return self.jerr(500, str(e))
         except FileNotFoundError:
             return self.jerr(404, "episode not on disk")
         except runner.NotFound:
@@ -413,14 +513,16 @@ class Handler(BaseHTTPRequestHandler):
             return q.get(k, [d])[0]
 
         simple: dict[str, Callable[[], Any]] = {
-            "/api/status": lambda: runner.status()
+            "/api/status": lambda: self.server.cache.get("status", lambda: runner.status())
             | {"locked": self.server.locked, "chat_on": self.server.chat_on},
             "/api/artifacts": runner.list_artifacts,
             "/api/works": runner.list_works,
             "/api/estimates": runner.list_estimates,
             "/api/exports": runner.list_exports,
             "/api/agent_stats": runner.agent_stats,
-            "/api/kinds": lambda: kinds.catalog(self.server.locked),
+            "/api/kinds": lambda: self.server.cache.get(
+                "kinds", lambda: kinds.catalog(self.server.locked)
+            ),
         }
         if path in simple:
             self.jok(simple[path]())
@@ -443,14 +545,19 @@ class Handler(BaseHTTPRequestHandler):
                 d["nemotron"] = llm.nemotron_status()
                 if hasattr(llm, "provider"):
                     p = llm.provider()
-                    prov_mod = _chat("providers")
-                    prob = prov_mod.problem(p) if hasattr(prov_mod, "problem") else None
+                    prob = (  # asks the model itself, unless the chat is off
+                        probe.check(llm, _chat("providers"), p)
+                        if self.server.chat_on
+                        else "chat is off"
+                    )
+                    if prob and p.kind != "ollama":
+                        d["nemotron"] = "down"
                     d["chat"] = {
                         "provider": p.name,
                         "kind": p.kind,
                         "model": p.model,
                         "hosted": p.hosted,
-                        "ready": p.kind != "ollama" and prob is None,
+                        "ready": prob is None,
                         "problem": prob,
                     }
             except ModuleNotFoundError as e:
@@ -463,27 +570,12 @@ class Handler(BaseHTTPRequestHandler):
             prov_mod = _chat("providers")
             self.jok(prov_mod.get_runtime_config(llm.ENDPOINT, llm.MODEL))
         elif path == "/api/chat/remote_models":
-            import urllib.request
-
-            llm = _chat("llm")
-            p = llm.provider()
-            if p.kind == "ollama" or not p.key:
+            p = _chat("llm").provider()
+            if not self.server.chat_on or p.kind == "ollama" or not p.key:
                 self.jok({"models": []})
                 return True
-            m_url = p.base_url.rstrip("/") + "/models"
-            req = urllib.request.Request(
-                m_url,
-                headers={"Authorization": f"Bearer {p.key}", "User-Agent": "curl/8.0"},
-            )
             try:
-                with urllib.request.urlopen(req, timeout=6.0) as resp:
-                    raw_m = json.load(resp)
-                    m_ids = [
-                        str(it["id"])
-                        for it in (raw_m.get("data") or [])
-                        if isinstance(it, dict) and it.get("id")
-                    ]
-                    self.jok({"models": m_ids[:40]})
+                self.jok({"models": probe.model_ids(p, arg("q"))})
             except Exception:
                 self.jok({"models": [p.model] if p.model else []})
         elif path == "/api/work_episodes":
@@ -560,7 +652,7 @@ def make_server(
 def _warm_chat() -> None:
     """Open the tunnel and load the chat model once, so the first question does not wait for it."""
     try:
-        _chat("llm").prewarm()
+        probe.prewarm(_chat("llm"), _chat("providers"))
     except Exception:  # the chat is optional: a model that is down must not stop the server
         pass
 
@@ -569,6 +661,12 @@ def serve(
     paths: ConsolePaths | None = None, port: int = 4178, lock: bool = False, chat: bool = False
 ) -> None:
     srv = make_server(paths, port, lock, chat)
+
+    def stop(signum: int, frame: Any) -> None:  # `kill`: close the ssh tunnel like Ctrl+C does
+        raise KeyboardInterrupt
+
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGTERM, stop)
     mode = " (locked, chat on)" if lock and chat else " (locked)" if lock else ""
     print(f"console on http://127.0.0.1:{srv.port}" + mode, flush=True)
     if srv.chat_on:
@@ -579,3 +677,4 @@ def serve(
         pass
     finally:
         srv.server_close()
+        runner.TUNNEL.close()
