@@ -22,8 +22,12 @@ from .tools_round import (
     asks_held,
     ego_summary,
     pair_comparisons,
+    pair_runs_named,
     round_diagnosis,
     round_report,
+    rounds_named,
+    rounds_side_by_side,
+    runs_named,
     strip_round_refs,
 )
 from .tools_runs import (
@@ -70,6 +74,8 @@ TOOLS: dict[str, tuple[ToolFn, str, str, dict[str, Any]]] = {
                      P()),
     "round_diagnosis": (round_diagnosis, "/diagnosis", "Diagnosis of the selected round: each failure group (c1-c8) with its diagnosis and whether it got data, the step-4 system checks (H1-H3) with their verdict and ticket, and the cost of generating and checking the data. Call this for 'why were these groups chosen', 'which system issues were ruled out', 'what did step 4 find', tickets (vì sao chọn cụm, lỗi hệ thống nào đã loại trừ, bước 4, phiếu).",
                         P()),
+    "rounds_side_by_side": (rounds_side_by_side, "/round", "Two or more rounds the question names, each with its own facts under its own title, placed side by side (different scene, eval set and scorer: never compared as a result). Call this when the question names two rounds (vòng 1 và vòng đồ gá, both rounds).",
+                            P(rounds=("array", "round ids, e.g. tray-r1, tray-jig-r1"))),
     "pair_comparisons": (pair_comparisons, "/comparisons", "The paired comparisons fixed in advance between the models of the DA-34 round, each with its difference, confidence interval and McNemar p, read descriptively. Call this for confidence intervals, significance, 'is the difference real' (khoảng tin cậy, phép so sánh, có khác biệt thật không).",
                          P()),
     "catalog_search": (catalog_search, "/catalog", "List datasets in the catalog. Use for 'what datasets', 'which sets are teleop/egocentric/synthetic', find a dataset by text.",
@@ -256,6 +262,44 @@ _DIAG_RX = re.compile(r"\bc[1-8]\b|\bH[1-3]\b|bước 4|step 4|loại trừ|rule
 _PAIR_RX = re.compile(r"phép so sánh|\bcomparisons?\b|mcnemar|khoảng tin cậy|\bCI\b|confidence interval|ý nghĩa thống kê|significan", re.I)
 
 
+# a cost question about the whole project, not one round: the ledger of every story
+_PROJECT_RX = re.compile(r"cả dự án|toàn (bộ )?dự án|toàn bộ|mọi story|các story|tất cả|whole project|entire project|all stories|"
+                         r"project[- ]wide|\bproject\b|\boverall\b|\bin total\b", re.I)  # fmt: skip
+# a run named with a question about its test result or why it fails, not its training
+_RESULT_RX = re.compile(r"vì sao|tại sao|\bwhy\b|hỏng|thất bại|\bfail|thành công|\bsuccess|đạt|kết quả|\bresult|"
+                        r"bước đặt|\bplac(e|ing)\b|chỗ nào|ở đâu|\bwhere\b|điểm yếu|phân tích|nhận xét|\banaly", re.I)  # fmt: skip
+_TRAINING_RX = re.compile(r"\b(train|training|trained|checkpoint|lr|batch)\b|huấn luyện|dạy|bao lâu|mất bao", re.I)
+# the earlier eval of policy C is asked for by name: its own lookup (eval_summary)
+_EARLIER_RX = re.compile(r"\bpolicy C\b|\beval C\b|40k|lần thi trước", re.I)
+_WHY_RX = re.compile(r"vì sao|tại sao|\bwhy\b|hỏng|thất bại|\bfail|lỗi|điểm yếu|\bweak", re.I)
+
+
+def forced_tools(question: Any) -> list[str]:
+    """Every tool the code runs itself, in order, before the model writes anything (see
+    ``forced_tool``). Three questions need more than one lookup or a lookup ``forced_tool`` does
+    not give:
+
+    - a run of a round named with a question about its result or why it fails ("Vì sao C_70 hỏng
+      nhiều ở bước đặt?"): the round's report for that run and the round's diagnosis, never the
+      earlier eval of policy C, whose numbers are not the run's own;
+    - two rounds named ("vòng 1 so với vòng đồ gá"): both side by side;
+    - the cost of the whole project: the ledger of every story.
+    """
+    q = str(question or "")
+    if asks_held(q) and not _LOOKUP_RX.search(q):
+        return ["round_report"]
+    if _COST_RX.search(q) and _PROJECT_RX.search(q) and not rounds_named(q) and not runs_named(q):
+        return ["ledger_query"]
+    if len(rounds_named(q)) >= 2 and not runs_named(q) and not _LOOKUP_RX.search(q):
+        # rounds as wholes; a run named ("run M ... so với vòng 1") is read by its round's report
+        return ["rounds_side_by_side"]
+    if (pair_runs_named(q) and _RESULT_RX.search(q) and not _LOOKUP_RX.search(q) and not _TRAINING_RX.search(q)
+            and not _EARLIER_RX.search(q) and not _dataset_in(strip_round_refs(q))):  # fmt: skip
+        return ["round_report", "round_diagnosis"] if _WHY_RX.search(q) else ["round_report"]
+    one = forced_tool(q)
+    return [one] if one else []
+
+
 def forced_tool(question: Any) -> str | None:
     """The tool the code runs itself, before the model writes anything.
 
@@ -283,7 +327,7 @@ def forced_tool(question: Any) -> str | None:
 def analysis_question(question: Any) -> bool:
     """A question about the round as a whole (no single dataset, run or job named)."""
     q = str(question or "")
-    return forced_tool(q) in ANALYSIS_TOOLS or bool(_PAIR_RX.search(q))
+    return any(t in ANALYSIS_TOOLS or t == "rounds_side_by_side" for t in forced_tools(q)) or bool(_PAIR_RX.search(q))
 
 
 def offered_names(route: Any, question: Any) -> list[str]:

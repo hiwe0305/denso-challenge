@@ -342,8 +342,11 @@ def log_tail(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
 # said first in every answer built on story.json["eval"], so its numbers are not read as the round's
 EARLIER = (
     "NOTE: this is the EARLIER evaluation of policy C (40k steps, per level), run before the "
-    "Failure -> Data round. Say so. The current round's results (60 runs per model) are in "
-    "round_report."
+    "Failure -> Data round and before the data for C_70 was generated. Its numbers are NOT the "
+    "result of C_70 or of any run of the round: never give them under a run's name. Cite them "
+    "only as 'lần thi trước vòng của policy C (40k bước), trước khi sinh dữ liệu cho C_70' / "
+    "'the pre-round test of policy C (40k steps), before the data for C_70 was generated'. The "
+    "round's results (60 runs per model) and its diagnosis are in round_report and round_diagnosis."
 )
 LEDGER_SCOPE = (
     "NOTE: this is the ledger of every story of the project. The cost of the current round alone "
@@ -430,6 +433,7 @@ def eval_failures(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     rows.sort(key=lambda r: -r["total"])
     specs = [table("Failures by label", cols("label", "L0", "L1", "L2", "total"), rows[:limit])]
     lines = [
+        EARLIER,
         "failures (all levels): "
         + "; ".join(
             "%s=%d (L0 %d, L1 %d, L2 %d)" % (r["label"], r["total"], r["L0"], r["L1"], r["L2"])  # noqa: UP031
@@ -546,6 +550,26 @@ def _story_ledger() -> list[dict[str, Any]] | None:
     return out
 
 
+def _host_split() -> str:
+    """Where the round's work ran (``story.diag.gen_qa_cost``, tray.md §20.16, §20.18): data
+    generation and QA on the lab GPU at 0 CU beside the round's train and serve CU. '' when the
+    index has no such block."""
+    c = (story().get("diag") or {}).get("gen_qa_cost") or {}
+    if not isinstance(c, dict) or c.get("cu") is None or c.get("train_serve_cu") is None:
+        return ""
+    parts = c.get("train_serve_parts") or {}
+    rnd = (story().get("diag") or {}).get("round") or "the round"
+    gen, qa = (c.get("generation") or {}).get("hours"), (c.get("qa") or {}).get("hours")
+    src = ", ".join(str(x) for x in c.get("source") or [])
+    return (
+        f" Where the cost falls (round {rnd}, {src}): data generation, QA and diagnosis ran on "
+        f"{c.get('host')} at {c.get('cu')} CU (generation {gen} h, QA {qa} h); "
+        f"train and serve = {c.get('train_serve_cu')} CU measured ("
+        + ", ".join(f"{k} {v}" for k, v in parts.items())
+        + "). Give this split with the totals."
+    )
+
+
 def ledger_query(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     g = str(args.get("group_by") or "story").lower()
     mk = str(args.get("measure_kind") or "").lower()
@@ -597,7 +621,7 @@ def ledger_query(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         )  # fmt: skip
         return result(
             ui,
-            LEDGER_SCOPE + head + other + totals_txt + "\n"
+            LEDGER_SCOPE + head + other + totals_txt + _host_split() + "\n"
             + rows_text(rows, ["story", "measure_kind", "cu", "usd"], 40),
         )
     led = _ledger_rows()

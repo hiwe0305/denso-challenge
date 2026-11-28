@@ -528,28 +528,30 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
     mode = str(body.get("mode") or "ask").strip().lower()
     deep = mode == "investigate"
     names = registry.offered_names(context.get("route"), question) if seed_ok else []
-    forced = registry.forced_tool(question) if seed_ok else None
+    forced_all = registry.forced_tools(question) if seed_ok else []
+    forced = forced_all[0] if forced_all else None
     if deep and seed_ok:
         # deep analysis always starts from the round's facts; the model may then look further,
         # but opens no page (A4, A14)
         extra = [n for n in names if n not in registry.ANALYSIS_TOOLS and n != "open_page"]
         names = [n for n in registry.ANALYSIS_TOOLS if registry.usable(n)] + extra
         names = names[: registry.MAX_OFFERED]
-        prefetch = ["round_report"] + ([forced] if forced and forced != "round_report" else [])
+        prefetch = list(dict.fromkeys(["round_report", *forced_all]))
     else:
-        prefetch = [forced] if forced else []
-        if forced and forced not in names:
-            names = [forced] + names
+        prefetch = list(forced_all)
+        names = [n for n in forced_all if n not in names] + names
     answer_only = bool(forced) and not deep  # the code makes the lookup; the model only writes
     tr: dict[str, Any] = {
         "turn_id": turn, "conversation_id": conv, "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
         "model": prov.model, "provider": prov.name, "hosted": prov.hosted, "question": question,
-        "context": context, "round": turn_round or None, "mode": mode, "tools_offered": names, "nodes": [],
+        "context": context, "round": turn_round or None, "mode": mode, "tools_offered": names,
+        "tools_forced": list(prefetch), "nodes": [],
         "answer": "", "tokens_in": 0, "tokens_out": 0,
     }  # fmt: skip
     yield (
         "trace_start",
-        {"conversation_id": conv, "turn_id": turn, "model": prov.model, "tools_offered": names, "round": turn_round or None},
+        {"conversation_id": conv, "turn_id": turn, "model": prov.model, "tools_offered": names,
+         "tools_forced": list(prefetch), "round": turn_round or None},
     )
 
     def finish(event: str, data: dict[str, Any]) -> tuple[str, dict[str, Any]]:
@@ -582,6 +584,16 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
         yield "token", {"text": msg}
         yield finish("done", {"turn_id": turn, "ms_total": int((time.time() - t0) * 1000), "tokens_in": 0, "tokens_out": 0,
                               "numbers": [], "unverified": [], "guard": "manifest", "round": turn_round or None})  # fmt: skip
+        return
+    # 1c. a run or story that is not presented (run N, DA-50): a scoped, true sentence that neither
+    # confirms nor denies it; no model, no tool (same rule as W5)
+    if tools_round.asks_hidden(question):
+        msg = tools_round.NOT_PRESENTED[0 if lang_of(question) == "Vietnamese" else 1]
+        tr["guard"] = "hidden"
+        tr["answer"] = msg
+        yield "token", {"text": msg}
+        yield finish("done", {"turn_id": turn, "ms_total": int((time.time() - t0) * 1000), "tokens_in": 0, "tokens_out": 0,
+                              "numbers": [], "unverified": [], "guard": "hidden", "round": turn_round or None})  # fmt: skip
         return
     # 2. GPU busy / tunnel down -> slash fallback (only when the model sits behind the tunnel)
     why_not = providers.problem(prov)
