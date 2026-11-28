@@ -6,8 +6,14 @@
    "release": "tray_s1_41899efb4b27+tray_s1_4a8f4a8c6a8d#S70:8ab4e33b657f",
    "run_plan_id": "rp_e2fb9f62c223",
    "step": 59999,
+   "ckpt_step": 60000,
    "max_steps": 60000,
+   "episodes": null,
+   "frames": null,
    "loss_last": 0.247,
+   "val_last": 0.2372,
+   "thr_med": 41.5,
+   "vram_max": 16.12,
    "loss": [
     [
      0,
@@ -76,6 +82,15 @@
     "turn": 1.9762,
     "target_yaw": 2.1319
    },
+   "vm_phases": {
+    "setup_tray_b_70": 1036.3,
+    "train": 38542.7,
+    "persist": 347.2
+   },
+   "log_tail": [
+    "wandb:      eval/unknown/err_l1_height 0",
+    "wandb:  eval/unknown/err_l1_target_yaw 0.0607"
+   ],
    "argv": [
     "finetune_simple_psi0_config",
     "--exp=fw-da34-t6-ft-b-70-s0"
@@ -87,8 +102,14 @@
    "release": "tray_s1_41899efb4b27+tray_s1_4a8f4a8c6a8d#ALL:113520c517a0",
    "run_plan_id": "rp_e2fb9f62c223",
    "step": 59999,
+   "ckpt_step": 60000,
    "max_steps": 60000,
+   "episodes": null,
+   "frames": null,
    "loss_last": 0.264,
+   "val_last": 0.1347,
+   "thr_med": 40.5,
+   "vram_max": 16.12,
    "loss": [
     [
      0,
@@ -157,6 +178,14 @@
     "turn": 2.1937,
     "target_yaw": 1.4191
    },
+   "vm_phases": {
+    "setup_tray_b_all": 260.0,
+    "train": 39483.1
+   },
+   "log_tail": [
+    "wandb:      eval/unknown/err_l1_height 0",
+    "wandb:  eval/unknown/err_l1_target_yaw 0.06622"
+   ],
    "argv": [
     "finetune_simple_psi0_config",
     "--exp=fw-da34-t6-ft-b-all-s0"
@@ -170,7 +199,7 @@
  "vm_phases": {
   "setup_tray_c_70": 119.3,
   "train": 38049.2,
-  "persist": 38262.6
+  "persist": 213.4
  },
  "sources": [
   {
@@ -216,7 +245,7 @@
    299
   ]
  ],
- "qa_sample": "{\"report_id\": \"qa_99115c19694e4bd2\", \"episode_id\": \"ep_bd159d0c5259d7d5\", \"threshold_version\": \"ego-1@2b0b593722be\", \"decision\": \"pass\", \"reasons\": [], \"chec…",
+ "qa_sample": "{\"report_id\": \"qa_99115c19694e4bd2\", \"episode_id\": \"ep_bd159d0c5259d7d5\", \"threshold_version\": \"ego-1@2b0b593722be\", \"decision\": \"pass\", \"reasons\": [], \"checks\": [{\"name\": \"deid_gate\", \"value\": 0.0, \"threshold\": 0.0, \"passed\": true}, {\"name\": \"min_frames\", \"v…",
  "h1m": {
   "clips": 379,
   "hours": 0.9653796296296296,
@@ -273,22 +302,10 @@
    38.42
   ]
  ],
- "colab_sessions": [
-  {
-   "session": "da34-b-70",
-   "gpu": "A100",
-   "state": "stopped",
-   "cap": 82.0
-  },
-  {
-   "session": "da34-b-all",
-   "gpu": "A100",
-   "state": "running",
-   "cap": 82.0
-  }
- ],
+ "colab_sessions": [],
  "ds": {
   "generated": "2026-11-11",
+  "cards": 24,
   "rows": [
    {
     "id": "egodex-test",
@@ -329,6 +346,11 @@
     "aliases": [],
     "lerobot": null,
     "ego_viewer": null,
+    "scene": null,
+    "superseded_by": [],
+    "story": null,
+    "replay_qa": null,
+    "card": null,
     "unique": false
    },
    {
@@ -351,7 +373,7 @@
       "where": "laptop",
       "path": "fwdata/egodex-da30",
       "raw": "laptop:fwdata/egodex-da30",
-      "exists": true
+      "exists": false
      },
      {
       "where": "rtx3060",
@@ -365,8 +387,8 @@
     "notes": "frames from src_158e report; manifest pins D2 deid waiver",
     "qa": "-",
     "qa_counts": null,
-    "view": "meta",
-    "laptop_dir": "fwdata/egodex-da30",
+    "view": "remote",
+    "laptop_dir": null,
     "parents": [
      "egodex-test"
     ],
@@ -378,7 +400,14 @@
     "aliases": [],
     "lerobot": null,
     "ego_viewer": null,
-    "unique": true
+    "scene": null,
+    "superseded_by": [],
+    "story": null,
+    "replay_qa": null,
+    "card": null,
+    "unique": true,
+    "rsync": "rsync -a rtx3060:~/denso-da30/data/egodex/meta ./fwdata/remote/egodex-da30/",
+    "rsync_full": "rsync -a rtx3060:~/denso-da30/data/egodex/ ./fwdata/remote/egodex-da30/   # kích thước: 2.1 GB"
    }
   ],
   "edges": [
@@ -412,24 +441,24 @@
     "hours": 0.966
    },
    "all": {
-    "sets": 10,
-    "episodes": 2572,
-    "hours": 16.869
+    "sets": 13,
+    "episodes": 3436,
+    "hours": 26.328
    },
    "teleop": {
     "sets": 2,
     "episodes": 193,
-    "hours": 0.586
-   },
-   "s1": {
-    "sets": 3,
-    "episodes": 1032,
-    "hours": 6.095
+    "hours": 0.59
    },
    "s2": {
     "sets": 2,
     "episodes": 968,
     "hours": 9.222
+   },
+   "s1": {
+    "sets": 6,
+    "episodes": 1896,
+    "hours": 15.55
    }
   }
  },
@@ -959,7 +988,7 @@
      "kind": "description",
      "value": "seven steps, success when the tray is within 5 cm and 10 degrees of the target",
      "source": "docs/superpowers/specs/2026-11-15-console-one-site-design.md §6",
-     "quote": "Bảy bước bằng lời thường: tới bàn A, cầm khay, nhấc lên, mang sang, tới bàn B, đặt xuống, buông tay và đứng. Lượt đạt khi khay nằm trong ô đích: lệch ≤ 5 cm …"
+     "quote": "Bảy bước bằng lời thường: tới bàn A, cầm khay, nhấc lên, mang sang, tới bàn B, đặt xuống, buông tay và đứng. Lượt đạt khi khay nằm trong ô đích: lệch ≤ 5 cm và xoay ≤ 10°."
     },
     {
      "id": "station",
@@ -1112,23 +1141,7 @@
    },
    "total_usd": 10.91
   },
-  "success_clip": {
-   "model": "C_70",
-   "level": null,
-   "seed": null,
-   "success": true,
-   "provenance": "deck",
-   "deck_file": "DENSO-ilovephysicalintelligence-7.pptx",
-   "deck_member": "ppt/media/media2.mp4",
-   "deck_slide": 11,
-   "deck_caption": "Robot G1, model dạy bằng 425 bài mẫu (bản tốt nhất)",
-   "sha256": "e470196bcbfd804e73cd8b4152cc9b340a22f7fafb5a8e415621fd194e87618b",
-   "note": "No original rollout video of the pair60k eval exists under fwdata; level and seed of this clip are not recorded anywhere found",
-   "route": null,
-   "path": "console/media/demo/success-C_70.mp4",
-   "bytes": 7507527,
-   "source": "console/media/demo/success-C_70.json"
-  },
+  "success_clip": {},
   "models": {
    "source": "docs/he/tray.md §19.1, §20.6, §20.16; round1 = variant of the 'r' comparisons",
    "runs": {
@@ -1221,6 +1234,684 @@
      "quote": "VLM của C (cha `psi0-baseline-egodex-he`), dữ liệu S70 + tập nhắm lỗi, 60 000 bước"
     }
    }
+  }
+ },
+ "jig": {
+  "round": "tray-jig-r1",
+  "scene": "jig2",
+  "doc": "docs/he/tray-jig.md §2, §5",
+  "source": "seed/tasks.yaml round tray-jig-r1; fwdata/<outcome>/results.json",
+  "rules": {
+   "whole_task": 0.8,
+   "per_level": 0.7,
+   "place": 0.5,
+   "read_at": "lower_bound",
+   "source": {
+    "vi": "docs/he/tray-jig.md mục 2 (khối jig-m-rules)",
+    "en": "docs/he/tray-jig.md §2 (block jig-m-rules)"
+   }
+  },
+  "eval_set": {
+   "path": "fwdata/tray/eval-sets/jig-m-rp_a410d01efa62",
+   "conditions_sha256": "bbec07e31ee022ac46d59e5322628c226519abe76363160ccbdb78b68725d348",
+   "sha_ok": true
+  },
+  "rollouts_expected": 180,
+  "scorer_version": 2,
+  "runs": [
+   {
+    "job": "da48-ft-m-s0",
+    "branch": "M",
+    "release": "tray_s1_bfbdcbcf719e+tray_s1_8631ace9b1b3+tray_s1place_a1797e480160+tray_s1place_56e6d006d8d1#M:351de072bd94",
+    "run_plan_id": "rp_a410d01efa62",
+    "step": 99999,
+    "ckpt_step": 100000,
+    "max_steps": 100000,
+    "episodes": 1037,
+    "frames": 948639,
+    "loss_last": 0.27,
+    "val_last": 0.1737,
+    "thr_med": 23.05,
+    "vram_max": 16.12,
+    "loss": [
+     [
+      0,
+      44.9186
+     ],
+     [
+      254,
+      12.9723
+     ]
+    ],
+    "val": [
+     [
+      0,
+      45.1462
+     ],
+     [
+      2000,
+      2.6294
+     ]
+    ],
+    "thr": [
+     [
+      0,
+      null
+     ],
+     [
+      254,
+      23.238590307494658
+     ]
+    ],
+    "vram": [
+     [
+      0,
+      16.118330368
+     ],
+     [
+      254,
+      16.122143744
+     ]
+    ],
+    "gn": [
+     [
+      0,
+      170.4398193359375
+     ],
+     [
+      254,
+      49.587364196777344
+     ]
+    ],
+    "groups_last": {
+     "hand": 0.0078,
+     "arm": 0.0107,
+     "torso_rpy": 0.0061,
+     "height": 0.007,
+     "base_velocity": 0.023,
+     "turn": 0.0182,
+     "target_yaw": 0.0283
+    },
+    "groups_first": {
+     "hand": 1.928,
+     "arm": 1.665,
+     "torso_rpy": 1.3151,
+     "height": 1.7233,
+     "base_velocity": 1.4014,
+     "turn": 2.1456,
+     "target_yaw": 1.7041
+    },
+    "vm_phases": {
+     "setup_tray_m": 118.9,
+     "train": 30416.8,
+     "persist": 549.0
+    },
+    "log_tail": [
+     "wandb:  eval/unknown/err_l1_target_yaw 0.05543",
+     "wandb:   eval/unknown/err_l1_torso_rpy 0"
+    ],
+    "argv": [
+     "finetune_simple_psi0_config",
+     "--exp=fw-da48-ft-m-s0"
+    ],
+    "scene": "jig2",
+    "fetched_final": false,
+    "fetched_train": "done",
+    "fetched_step": 99999
+   }
+  ],
+  "log_run": "M",
+  "train_log_tail": [
+   "wandb:  eval/unknown/err_l1_target_yaw 0.05543",
+   "wandb:   eval/unknown/err_l1_torso_rpy 0"
+  ],
+  "vm_phases": {
+   "setup_tray_m": 118.9,
+   "train": 30416.8,
+   "persist": 549.0
+  },
+  "evals": [
+   {
+    "run": "M",
+    "role": "baseline",
+    "results_source": "fwdata/tray/outcomes/jig-m-100000-r3/results.json",
+    "status": "ready",
+    "problems": [],
+    "headline": {
+     "n": 180,
+     "conditions": 60,
+     "successes": 136,
+     "p": 0.7555555555555555,
+     "ci": [
+      0.7,
+      0.8111111111111112
+     ],
+     "wilson": [
+      0.6336434231297559,
+      0.846713185775398
+     ],
+     "wilson_method": "clustered: n_eff = conditions, descriptive (CI: bootstrap)",
+     "failures": {
+      "L-PLACE-POSE": 28,
+      "L-TRAY-TILT": 13,
+      "L-TIMEOUT": 1,
+      "L-PART-DROP": 1,
+      "L-ONE-HAND": 1
+     },
+     "step_pass": {
+      "approach_a": 0.9888888888888889,
+      "grasp": 0.9888888888888889,
+      "lift": 0.9888888888888889,
+      "carry": 0.9888888888888889,
+      "reach_b": 0.9888888888888889,
+      "place": 0.8944444444444445,
+      "release_stand": 0.7555555555555555
+     }
+    },
+    "levels": {
+     "1": {
+      "n": 90,
+      "conditions": 30,
+      "successes": 77,
+      "p": 0.8555555555555555,
+      "ci": [
+       0.788888888888889,
+       0.9222222222222223
+      ],
+      "wilson": [
+       0.6900674297582453,
+       0.9403230462069324
+      ],
+      "wilson_method": "clustered: n_eff = conditions, descriptive (CI: bootstrap)",
+      "failures": {
+       "L-PLACE-POSE": 8,
+       "L-TRAY-TILT": 5
+      },
+      "step_pass": {
+       "approach_a": 1.0,
+       "grasp": 1.0,
+       "lift": 1.0,
+       "carry": 1.0,
+       "reach_b": 1.0,
+       "place": 0.9111111111111111,
+       "release_stand": 0.8555555555555555
+      }
+     },
+     "2": {
+      "n": 90,
+      "conditions": 30,
+      "successes": 59,
+      "p": 0.6555555555555556,
+      "ci": [
+       0.5555555555555556,
+       0.7555555555555556
+      ],
+      "wilson": [
+       0.4768283767548246,
+       0.7989674564799406
+      ],
+      "wilson_method": "clustered: n_eff = conditions, descriptive (CI: bootstrap)",
+      "failures": {
+       "L-PLACE-POSE": 20,
+       "L-TIMEOUT": 1,
+       "L-TRAY-TILT": 8,
+       "L-PART-DROP": 1,
+       "L-ONE-HAND": 1
+      },
+      "step_pass": {
+       "approach_a": 0.9777777777777777,
+       "grasp": 0.9777777777777777,
+       "lift": 0.9777777777777777,
+       "carry": 0.9777777777777777,
+       "reach_b": 0.9777777777777777,
+       "place": 0.8777777777777778,
+       "release_stand": 0.6555555555555556
+      }
+     }
+    },
+    "place": {
+     "p": 0.8944444444444445,
+     "successes": 161,
+     "n": 180,
+     "ci": null
+    },
+    "bootstrap_seed": 20261125,
+    "scorer_version": 2,
+    "plan_mismatch": {
+     "set_run_plan_id": "rp_a410d01efa62",
+     "plan_run_plan_id": "rp_a04c14e79dfd",
+     "plan": "he-tray-v2.yaml",
+     "bootstrap_seed_from": "--bootstrap-seed"
+    },
+    "readings": [
+     {
+      "rule": "1",
+      "scope": "whole_task",
+      "threshold": 0.8,
+      "lower": 0.7,
+      "verdict": "not_met"
+     },
+     {
+      "rule": "2",
+      "scope": "level",
+      "level": "1",
+      "threshold": 0.7,
+      "lower": 0.788888888888889,
+      "verdict": "met"
+     },
+     {
+      "rule": "2",
+      "scope": "level",
+      "level": "2",
+      "threshold": 0.7,
+      "lower": 0.5555555555555556,
+      "verdict": "not_met"
+     },
+     {
+      "rule": "3",
+      "scope": "place",
+      "threshold": 0.5,
+      "lower": null,
+      "verdict": null,
+      "why": "no_ci"
+     }
+    ]
+   }
+  ],
+  "paired": null,
+  "featured": "M",
+  "steps": [
+   "approach_a",
+   "grasp"
+  ],
+  "outcomes": [
+   {
+    "run": "M",
+    "eval_id": "jig-m-100000-r3",
+    "source": "fwdata/tray/outcomes/jig-m-100000-r3/scores.jsonl",
+    "scorer_version": "simple-tray-predicates@2",
+    "n": 180,
+    "successes": 136,
+    "p": 0.7556,
+    "levels": {
+     "1": {
+      "n": 90,
+      "successes": 77,
+      "p": 0.8556,
+      "failures": {
+       "L-PLACE-POSE": 8,
+       "L-TRAY-TILT": 5
+      }
+     },
+     "2": {
+      "n": 90,
+      "successes": 59,
+      "p": 0.6556,
+      "failures": {
+       "L-PLACE-POSE": 20,
+       "L-TRAY-TILT": 8,
+       "L-TIMEOUT": 1,
+       "L-PART-DROP": 1,
+       "L-ONE-HAND": 1
+      }
+     }
+    },
+    "step_pass": {
+     "approach_a": 0.9889,
+     "grasp": 0.9889,
+     "lift": 0.9889,
+     "carry": 0.9889,
+     "reach_b": 0.9889,
+     "place": 0.8944,
+     "release_stand": 0.7556
+    },
+    "levels_step_pass": {
+     "1": {
+      "approach_a": 1.0,
+      "grasp": 1.0,
+      "lift": 1.0,
+      "carry": 1.0,
+      "reach_b": 1.0,
+      "place": 0.9111,
+      "release_stand": 0.8556
+     },
+     "2": {
+      "approach_a": 0.9778,
+      "grasp": 0.9778,
+      "lift": 0.9778,
+      "carry": 0.9778,
+      "reach_b": 0.9778,
+      "place": 0.8778,
+      "release_stand": 0.6556
+     }
+    },
+    "repeat_dist": {
+     "1": [
+      18,
+      11
+     ],
+     "2": [
+      10,
+      9
+     ]
+    },
+    "reach_b": 178,
+    "relaxed": {
+     "5.0": 136,
+     "7.5": 145,
+     "10.0": 150,
+     "15.0": 153,
+     "20.0": 154
+    },
+    "failures": {
+     "L-PLACE-POSE": 28,
+     "L-TRAY-TILT": 13,
+     "L-TIMEOUT": 1,
+     "L-PART-DROP": 1,
+     "L-ONE-HAND": 1
+    },
+    "repeats": [
+     {
+      "repeat": 0,
+      "n": 60,
+      "successes": 47,
+      "levels": {
+       "1": {
+        "n": 30,
+        "successes": 26
+       },
+       "2": {
+        "n": 30,
+        "successes": 21
+       }
+      }
+     },
+     {
+      "repeat": 1,
+      "n": 60,
+      "successes": 47,
+      "levels": {
+       "1": {
+        "n": 30,
+        "successes": 28
+       },
+       "2": {
+        "n": 30,
+        "successes": 19
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "rollouts": [
+   {
+    "i": 0,
+    "ep": "M/l1-s1000100",
+    "run": "M",
+    "level": 1,
+    "seed": 1000100,
+    "repeat": 0,
+    "success": true,
+    "failure": null,
+    "sim_s": 35.76,
+    "dist_cm": 3.48,
+    "yaw_deg": 6.52,
+    "tray_z": 0.852,
+    "steps": [
+     true,
+     true
+    ],
+    "latch_t": [
+     8.12,
+     8.24
+    ]
+   },
+   {
+    "i": 1,
+    "ep": "M/l1-s1000101",
+    "run": "M",
+    "level": 1,
+    "seed": 1000101,
+    "repeat": 0,
+    "success": false,
+    "failure": "L-PLACE-POSE",
+    "sim_s": 93.28,
+    "dist_cm": 8.31,
+    "yaw_deg": 14.25,
+    "tray_z": 0.8662,
+    "steps": [
+     true,
+     true
+    ],
+    "latch_t": [
+     8.12,
+     8.3
+    ]
+   }
+  ],
+  "conditions": [
+   {
+    "run": "M",
+    "level": 1,
+    "seed": 1000100,
+    "pass_k": 1,
+    "n_rep": 3,
+    "dist_cm_mean": 6.79,
+    "yaw_deg_mean": 4.59,
+    "top_failure": "L-PLACE-POSE",
+    "trials": [
+     {
+      "repeat": 0,
+      "success": true,
+      "dist_cm": 3.48,
+      "yaw_deg": 6.52,
+      "sim_s": 35.76,
+      "failure": null
+     },
+     {
+      "repeat": 1,
+      "success": false,
+      "dist_cm": 6.93,
+      "yaw_deg": 3.27,
+      "sim_s": 93.28,
+      "failure": "L-PLACE-POSE"
+     }
+    ]
+   },
+   {
+    "run": "M",
+    "level": 1,
+    "seed": 1000101,
+    "pass_k": 2,
+    "n_rep": 3,
+    "dist_cm_mean": 5.18,
+    "yaw_deg_mean": 6.79,
+    "top_failure": "L-PLACE-POSE",
+    "trials": [
+     {
+      "repeat": 0,
+      "success": false,
+      "dist_cm": 8.31,
+      "yaw_deg": 14.25,
+      "sim_s": 93.28,
+      "failure": "L-PLACE-POSE"
+     },
+     {
+      "repeat": 1,
+      "success": true,
+      "dist_cm": 4.97,
+      "yaw_deg": 5.98,
+      "sim_s": 28.12,
+      "failure": null
+     }
+    ]
+   }
+  ],
+  "live_evals": [],
+  "agentqa": [
+   {
+    "case_id": "jig-m-100k-opus",
+    "run_id": "run_0700ae96ff7a125a",
+    "status": "degraded",
+    "started_at": "2026-11-26T15:26:06.666835Z",
+    "source": "fwdata/agentqa/cases/jig-m-100k-opus/assembly.json",
+    "clusters": [
+     {
+      "cluster_id": "M/release_stand/L-PLACE-POSE/l2",
+      "run": "M",
+      "step": "release_stand",
+      "label": "L-PLACE-POSE",
+      "level": 2,
+      "size": 11,
+      "hypothesis_id": "H1",
+      "rule_id": "near_miss_placement",
+      "title": "Most failed placements of this cluster land near the target: the skill lacks precision rather than aiming at a wrong destination",
+      "diagnosis": "weak_skill",
+      "group": "data",
+      "support_count": 6
+     },
+     {
+      "cluster_id": "M/place/L-PLACE-POSE/l2",
+      "run": "M",
+      "step": "place",
+      "label": "L-PLACE-POSE",
+      "level": 2,
+      "size": 8,
+      "hypothesis_id": "H2",
+      "rule_id": "none",
+      "title": "No rule of the agent explains this cluster",
+      "diagnosis": "unknown",
+      "group": "data",
+      "support_count": 0
+     }
+    ],
+    "not_judged": [
+     {
+      "what": "paired_compare_not_judged",
+      "reason": "fewer than two runs, so no pair"
+     },
+     {
+      "what": "trace_stats_not_judged",
+      "reason": "no entry of kind trace in the pack"
+     }
+    ]
+   },
+   {
+    "case_id": "jig-m-100k-chat1",
+    "run_id": "run_801b164fcb5f44b3",
+    "status": "degraded",
+    "started_at": "2026-11-26T16:39:11.692703Z",
+    "source": "fwdata/agentqa/cases/jig-m-100k-chat1/assembly.json",
+    "clusters": [
+     {
+      "cluster_id": "M/release_stand/L-PLACE-POSE/l2",
+      "run": "M",
+      "step": "release_stand",
+      "label": "L-PLACE-POSE",
+      "level": 2,
+      "size": 11,
+      "hypothesis_id": "H1",
+      "rule_id": "place_rests_raised",
+      "title": "Most failed placements of this cluster end with the tray resting above the placing surface: it sits on an obstacle at the target instead of lying in it",
+      "diagnosis": "weak_skill",
+      "group": "data",
+      "support_count": 9
+     },
+     {
+      "cluster_id": "M/place/L-PLACE-POSE/l2",
+      "run": "M",
+      "step": "place",
+      "label": "L-PLACE-POSE",
+      "level": 2,
+      "size": 8,
+      "hypothesis_id": "H3",
+      "rule_id": "place_rests_raised",
+      "title": "Most failed placements of this cluster end with the tray resting above the placing surface: it sits on an obstacle at the target instead of lying in it",
+      "diagnosis": "weak_skill",
+      "group": "data",
+      "support_count": 9
+     }
+    ],
+    "not_judged": [
+     {
+      "what": "paired_compare_not_judged",
+      "reason": "fewer than two runs, so no pair"
+     },
+     {
+      "what": "trace_stats_not_judged",
+      "reason": "no entry of kind trace in the pack"
+     }
+    ]
+   }
+  ],
+  "cuts": {
+   "M": {
+    "name": "M",
+    "files": 2088,
+    "bytes": 5530101760,
+    "source": "fwdata/da48/cuts/M.tar.json"
+   }
+  },
+  "m_cut": {
+   "name": "M",
+   "files": 2088,
+   "bytes": 5530101760,
+   "source": "fwdata/da48/cuts/M.tar.json"
+  },
+  "next_cut": null,
+  "n_ckpt_done": null,
+  "active_sessions": [],
+  "compare60": {
+   "run": "M",
+   "repeat": 0,
+   "n": 60,
+   "successes": 47,
+   "p": 0.7833,
+   "levels": {
+    "1": {
+     "n": 30,
+     "successes": 26
+    },
+    "2": {
+     "n": 30,
+     "successes": 21
+    }
+   },
+   "repeats": [
+    {
+     "repeat": 0,
+     "n": 60,
+     "successes": 47
+    },
+    {
+     "repeat": 1,
+     "n": 60,
+     "successes": 47
+    }
+   ],
+   "scorer_version": "simple-tray-predicates@2",
+   "source": {
+    "scores": "fwdata/tray/outcomes/jig-m-100000-r3/scores.jsonl",
+    "outcomes": "fwdata/tray/outcomes/jig-m-100000-r3/outcomes.jsonl"
+   },
+   "earlier": [
+    {
+     "run": "C_ALL",
+     "n": 60,
+     "successes": 5,
+     "p": 0.08333333333333333
+    },
+    {
+     "run": "C_70",
+     "n": 60,
+     "successes": 10,
+     "p": 0.16666666666666666
+    }
+   ],
+   "earlier_scorer": null,
+   "earlier_source": "fwdata/tray/pair60k/stage1-60k",
+   "earlier_doc": "docs/he/tray.md §19, §20"
   }
  }
 }

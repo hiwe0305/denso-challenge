@@ -41,11 +41,22 @@
     "source": "configs/eval/scorer/tray.yaml thresholds (giả định, chưa hiệu chỉnh)"
    },
    "rounds": [
+    "tray-jig-r1",
     "tray-r1"
    ],
    "index": [
-    "story.runs",
-    "story.train_log_tail"
+    "story.sources",
+    "story.heat",
+    "story.reasons",
+    "story.qa_sample",
+    "story.h1m",
+    "story.ledger",
+    "story.colab_balance",
+    "story.colab_sessions",
+    "story.ds",
+    "story.eval",
+    "story.loop_chain",
+    "story.loop_detail"
    ],
    "evals": [],
    "clusters": {},
@@ -236,19 +247,19 @@
      "hours": 0.124
     },
     "all": {
-     "sets": 7,
-     "episodes": 2161,
-     "hours": 15.441
-    },
-    "s1": {
-     "sets": 3,
-     "episodes": 1032,
-     "hours": 6.095
+     "sets": 10,
+     "episodes": 3025,
+     "hours": 24.896
     },
     "s2": {
      "sets": 2,
      "episodes": 968,
      "hours": 9.222
+    },
+    "s1": {
+     "sets": 6,
+     "episodes": 1896,
+     "hours": 15.55
     }
    },
    "catalog_rows": [
@@ -513,12 +524,12 @@
     "teleop": {
      "sets": 1,
      "episodes": 99,
-     "hours": 0.349
+     "hours": 0.35
     },
     "all": {
      "sets": 1,
      "episodes": 99,
-     "hours": 0.349
+     "hours": 0.35
     }
    },
    "catalog_rows": [
@@ -528,7 +539,7 @@
      "group": "teleop",
      "kind": "raw source",
      "episodes": 99,
-     "status": "current"
+     "status": "reference"
     },
     {
      "id": "psi-eval-e78fb93",
@@ -595,7 +606,68 @@
    "deck_corrections": true,
    "index": [
     "story.pair",
-    "story.round"
+    "story.round",
+    "story.follow",
+    "story.demo",
+    "sim",
+    "story.runs",
+    "story.train_log_tail",
+    "story.vm_phases"
+   ]
+  },
+  {
+   "id": "tray-jig-r1",
+   "task": "tray",
+   "number": 2,
+   "title": {
+    "vi": "Vòng trên cảnh đồ gá: run M",
+    "en": "Jig-scene round: run M"
+   },
+   "doc": "docs/he/tray-jig.md §2, §5",
+   "eval": {
+    "levels": [
+     1,
+     2
+    ],
+    "level_key": "levels 1-2"
+   },
+   "max_steps": 100000,
+   "log_run": "M",
+   "scene": "jig2",
+   "eval_set": "tray/eval-sets/jig-m-rp_a410d01efa62",
+   "conditions_sha256": "bbec07e31ee022ac46d59e5322628c226519abe76363160ccbdb78b68725d348",
+   "rollouts_expected": 180,
+   "scorer_version": 2,
+   "rules": {
+    "whole_task": 0.8,
+    "per_level": 0.7,
+    "place": 0.5,
+    "read_at": "lower_bound",
+    "source": {
+     "vi": "docs/he/tray-jig.md mục 2 (khối jig-m-rules)",
+     "en": "docs/he/tray-jig.md §2 (block jig-m-rules)"
+    }
+   },
+   "runs": [
+    {
+     "id": "M",
+     "train_set": "M",
+     "session": "da48-m",
+     "train": "tray/jig-m/da48-ft-m-s0",
+     "stats": "tray/jig-m/M-stats_psi0.json",
+     "cut": "da48/cuts/M.tar.json",
+     "outcome": "tray/outcomes/jig-m-100000-r3",
+     "bootstrap_seed": 20261125,
+     "rules_block": "jig-m-rules",
+     "results_cmd": "uv run python -m flywheel_psi0.tray.eval_results configs/runplans/tray/he-tray-v2.yaml --set $FW/eval-sets/jig-m-rp_a410d01efa62 --out $FW/eval/jig-m-100000-r3 --repeats 3 --bootstrap-seed 20261125 --json $FW/outcomes/jig-m-100000-r3/results.json",
+     "role": "baseline"
+    }
+   ],
+   "baseline": "M",
+   "after_round": null,
+   "controls": [],
+   "index": [
+    "story.jig"
    ]
   }
  ]
