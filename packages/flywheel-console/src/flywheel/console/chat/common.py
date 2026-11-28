@@ -228,8 +228,8 @@ def cols(*names: str) -> list[dict[str, str]]:
     return [{"key": n, "label": n.replace("_", " ")} for n in names]
 
 
-def cap(text: str) -> str:
-    return text if len(text) <= MODEL_CHARS else text[:MODEL_CHARS] + "\n[truncated]"
+def cap(text: str, limit: int = MODEL_CHARS) -> str:
+    return text if len(text) <= limit else text[:limit] + "\n[truncated]"
 
 
 def result(ui: dict[str, Any], model: str, ok: bool = True) -> Result:
