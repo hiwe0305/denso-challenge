@@ -173,7 +173,7 @@ Theo 07 mục 3.1. File story luôn được sửa.
 - `packages/flywheel-console/src/flywheel/console/server/runner.py`: chỉ `_train_dirs` (vòng không có `train_dir`) và dòng trạng thái đọc khối `story.jig`. Thêm ngày 28/11/2026 khi viết 2.1
 - `packages/flywheel-console/src/flywheel/console/server/` và `packages/flywheel-console/src/flywheel/console/chat/` (chỉ cho nhiệm vụ 2.5: lọc run trong `withhold_runs`)
 - `docs/console/ui-spec.md` (chỉ mục lọc dữ liệu bị giữ)
-- `packages/flywheel-console/src/flywheel/console/web/` (chỉ trang Train, Đánh giá, Vòng và i18n)
+- `packages/flywheel-console/src/flywheel/console/web/`: trang Train, Đánh giá, Vòng và i18n; thêm ngày 28/11/2026 khi làm 2.4: thẻ tổng quan trong `pages_ops.js`, số mô phỏng trong `pages_data.js` và bộ lọc withhold trong `core.js`, vì các chỗ này đọc khối `story.jig` cũ
 - `packages/flywheel-console/tests/`
 - `docs/console/api-contract.md`, `docs/console/api-samples/`
 
