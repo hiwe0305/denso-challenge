@@ -40,6 +40,7 @@ import {
   setChildren,
   shortHashId,
   state,
+  subscribe,
   t,
   tryGetJSON,
   hasI18nKey,
@@ -65,6 +66,24 @@ function toolLabel(step) {
   const key = "tool.label." + name;
   if (name && hasI18nKey(key)) return t(key);
   return (step && step.ui && step.ui.title) || name;
+}
+
+// Rows a finished tool step returned, read from its ui (the SSE tool_result carries no count):
+// a table's total (else its rows), a bar chart's categories, a line chart's points, a stat or
+// thumbs list's items; a group adds its parts. null when the ui holds no rows (text, log, confirm).
+function stepRows(ui) {
+  if (!ui || typeof ui !== "object") return null;
+  if (ui.type === "group" && Array.isArray(ui.items)) {
+    const parts = ui.items.map(stepRows).filter((n) => n !== null);
+    return parts.length ? parts.reduce((a, b) => a + b, 0) : null;
+  }
+  if (ui.type === "table" && Array.isArray(ui.rows)) return Number.isFinite(ui.total) ? ui.total : ui.rows.length;
+  if (ui.type === "bar" && Array.isArray(ui.categories)) return ui.categories.length;
+  if (ui.type === "line" && Array.isArray(ui.series)) {
+    return ui.series.reduce((a, sr) => a + (Array.isArray(sr && sr.points) ? sr.points.length : 0), 0);
+  }
+  if ((ui.type === "stat" || ui.type === "thumbs") && Array.isArray(ui.items)) return ui.items.length;
+  return null;
 }
 
 // Source chips under a finished answer (done.sources), when chat.js provides them.
@@ -474,6 +493,38 @@ export function renderChatStudioPage() {
     return [panel];
   };
 
+  // "Quá trình suy luận": the ordered tool steps of one answer (readable label, rows, ms), built
+  // from the saved turn so a locked server shows it too (traces are refused there). Never the
+  // system prompt, the tool instructions or the model's thinking. Open while the answer streams,
+  // closed once done, unless the reader opened or closed it (reasoningOpen keeps that choice).
+  const renderReasoning = (tr, isRunning, tokMeta) => {
+    const choice = reasoningOpen.get(tr.id);
+    const box = el("details", { className: cls("analysis-activity", "reasoning-block") });
+    box.open = choice === undefined ? isRunning : choice;
+    const summary = el("summary", { text: t("analysis.reasoning", { count: formatNumber(tr.steps.length) }) });
+    summary.addEventListener("click", () => reasoningOpen.set(tr.id, !box.open));
+    const artifacts = getActiveSession().artifacts || [];
+    box.append(summary, el("ol", { className: "reasoning-steps" }, tr.steps.map((st) => {
+      const rows = st.ms === null || st.ok === false ? null : stepRows(st.ui);
+      return el("li", { className: "reasoning-step" }, [
+        el("span", { className: cls("step-status-icon", st.ms === null && "running", st.ms !== null && !st.ok && "err"), "aria-hidden": "true" },
+          [st.ms === null ? icon("dot") : st.ok ? "✓" : "!"]),
+        el("b", { className: "reasoning-label", text: toolLabel(st), title: st.name || "" }),
+        st.ok === false && st.ms !== null
+          ? el("span", { className: "reasoning-rows", text: t("analysis.stepFailed") })
+          : rows !== null
+            ? el("span", { className: "reasoning-rows", text: t(rows === 1 ? "analysis.stepRow" : "analysis.stepRows", { n: formatNumber(rows) }) })
+            : el("span", { className: "reasoning-rows" }),
+        el("span", { className: cls("step-ms", "mono"), text: st.ms === null ? "…" : `${formatNumber(st.ms)} ms` }),
+        artifacts.some((item) => item.id === st.artifactId)
+          ? el("button", { type: "button", className: "turn-action-btn",
+              onClick: () => openArtifactInWorkbench(st.artifactId) }, [t("studio.openInWorkbench")])
+          : null,
+      ]);
+    })), tokMeta ? el("small", { className: cls("muted", "reasoning-total"), text: tokMeta }) : null);
+    return box;
+  };
+
   const renderStudioTurn = (tr) => {
     const wrap = el("div", { className: "studio-turn-pair" });
     wrap.appendChild(el("div", { className: "user-turn", text: tr.question }));
@@ -542,41 +593,7 @@ export function renderChatStudioPage() {
       tr.error ? el("div", { className: "missing-item", text: tr.error }) : null,
 
       ...renderResults(tr),
-      (tr.steps || []).length > 0
-        ? el("details", { className: "analysis-activity" }, [
-            el("summary", { text: t("analysis.activity", { count: tr.steps.length }) }),
-            tokMeta ? el("small", { className: "muted", text: tokMeta }) : null,
-            el("div", { className: "agent-steps" },
-            tr.steps.map((st) =>
-              el("div", { className: "studio-tool-pill" }, [
-                el("span", {
-                  className: cls(
-                    "step-status-icon",
-                    st.ms === null && "running",
-                    st.ms !== null && !st.ok && "err"
-                  ),
-                }, [st.ms === null ? icon("dot") : st.ok ? "✓" : "!"]),
-                el("b", { text: toolLabel(st), title: st.name || "" }),
-                st.ui?.type === "text" && st.ui.text ? el("small", { text: st.ui.text }) : null,
-                el("span", {
-                  className: cls("step-ms", "mono"),
-                  text: st.ms === null ? "…" : `${st.ms} ms`,
-                }),
-                getActiveSession().artifacts?.some((item) => item.id === st.artifactId)
-                  ? el(
-                      "button",
-                      {
-                        type: "button",
-                        className: "turn-action-btn",
-                        onClick: () => openArtifactInWorkbench(st.artifactId),
-                      },
-                      [t("studio.openInWorkbench")]
-                    )
-                  : null,
-              ])
-            )
-          )])
-        : null,
+      (tr.steps || []).length > 0 ? renderReasoning(tr, isRunning, tokMeta) : null,
 
       tr.navigate
         ? el(
@@ -674,6 +691,7 @@ export function renderChatStudioPage() {
   };
 
   const rendered = new Map();
+  const reasoningOpen = new Map(); // turn id -> open or closed by the reader
   const jumpLatest = el("button", { type: "button", className: "analysis-latest topbtn", hidden: true,
     text: t("analysis.latest"), onClick: () => { streamBox.scrollTop = streamBox.scrollHeight; jumpLatest.hidden = true; } });
 
@@ -720,8 +738,6 @@ export function renderChatStudioPage() {
       }
       const node = renderStudioTurn(turn);
       if (previous) {
-        const activity = node.querySelector(".analysis-activity");
-        if (activity && previous.node.querySelector(".analysis-activity")?.open) activity.open = true;
         previous.node.replaceWith(node);
         requestAnimationFrame(resizeChatCharts);
       } else streamBox.appendChild(node);
@@ -1258,8 +1274,31 @@ export function renderChatStudioPage() {
     syncStudioLayout();
   });
 
+  // Charts in an answer (```chart blocks drawn by chat.js) take the message width: resize them
+  // with the window and with the stream column; a theme switch redraws the turns so the charts
+  // read the new colour tokens (chat.js reads them when it mounts a chart).
+  let chartFrame = 0;
+  const queueChartResize = () => {
+    if (chartFrame) return;
+    chartFrame = requestAnimationFrame(() => { chartFrame = 0; resizeChatCharts(); });
+  };
+  window.addEventListener("resize", queueChartResize);
+  const streamObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(queueChartResize);
+  if (streamObserver) streamObserver.observe(streamBox);
+  const unsubTheme = subscribe((reason) => {
+    if (reason !== "theme") return;
+    rendered.clear();
+    renderStream();
+    if (drawer.open && drawerBody.contains(wbPane)) renderWorkbench();
+    queueChartResize();
+  });
+
   onRouteCleanup(() => {
     if (drawer.open) drawer.close();
+    window.removeEventListener("resize", queueChartResize);
+    if (streamObserver) streamObserver.disconnect();
+    if (chartFrame) cancelAnimationFrame(chartFrame);
+    unsubTheme();
     unsub();
     emitChatStore("leave-studio");
   });

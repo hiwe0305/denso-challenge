@@ -12,6 +12,7 @@ import {
   getCurrentRound,
   getCurrentTask,
   getJSON,
+  getRoundsForTask,
   jigReadingLines,
   hasI18nKey,
   hasIndexAccess,
@@ -166,6 +167,115 @@ function scorerLabel(raw) {
   if (raw === null || raw === undefined || raw === "") return "–";
   const m = String(raw).match(/@(\d+)$/) || String(raw).match(/^(\d+)$/);
   return m ? t("exp.scorerVersion", { v: m[1] }) : String(raw);
+}
+
+// The 60-rollout ladder (story.jig.compare60.ladder, Hiếu 28/11/2026): run M at repeat 0 beside
+// the four round-1 runs, counts per rule. Columns follow the task's rounds and each round's run
+// list in data/tasks.json (round 1 first, then the jig round); a ladder run the rounds do not list
+// goes last in the ladder's order. A withheld run never reaches here (filterWithheldStory).
+// Descriptive only: no verdict, no difference and no colour that ranks the runs.
+export function compare60Ladder(story) {
+  const c60 = story && story.jig && story.jig.compare60;
+  const ladder = (c60 && c60.ladder) || (story && story.compare60 && story.compare60.ladder) || null;
+  if (!ladder || !Array.isArray(ladder.runs)) return null;
+  const listed = getRoundsForTask(state.taskId).flatMap((rd) =>
+    (Array.isArray(rd.runs) ? rd.runs : []).map((x) => (x && typeof x === "object" ? x.id : x)));
+  const rank = (id) => { const i = listed.indexOf(id); return i < 0 ? listed.length : i; };
+  const runs = ladder.runs.filter((r) => r && r.run)
+    .map((r, i) => ({ r, i })).sort((a, b) => rank(a.r.run) - rank(b.r.run) || a.i - b.i).map((x) => x.r);
+  const top = story && story.compare60;
+  const repeats = (Array.isArray(ladder.repeats) && ladder.repeats) || (c60 && c60.repeats) || (top && top.repeats) || [];
+  return runs.length ? { ...ladder, runs, repeats } : null;
+}
+
+// "47/60 · 78,3 %": the count over its base and the share at one decimal, in the page's locale.
+function ladderCount(k, n) {
+  if (!Number.isFinite(k) || !Number.isFinite(n) || n <= 0) return t("state.na");
+  const pct = formatNumber((k / n) * 100, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return `${formatNumber(k)}/${formatNumber(n)} · ${pct}${state.lang === "vi" ? " %" : "%"}`;
+}
+
+function ladderPair(obj) {
+  if (!obj || typeof obj !== "object") return t("state.na");
+  const one = (v) => (Number.isFinite(v) ? formatNumber(v, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : t("state.na"));
+  return `${one(obj.p50)} / ${one(obj.p90)}`;
+}
+
+function ladderSceneLines(r) {
+  return [r.scene === "jig2" ? t("exp.ladderSceneJig") : t("exp.ladderSceneTray"), scorerLabel(r.scorer_version)];
+}
+
+export function renderCompare60Ladder(ladder) {
+  if (!ladder) return null;
+  const runs = ladder.runs;
+  const thresholds = (Array.isArray(ladder.thresholds_cm) ? ladder.thresholds_cm : [7.5, 10, 15, 20])
+    .filter((v) => Number.isFinite(Number(v)) && Number(v) > 5).map(Number);
+  const cm = (v) => formatNumber(v, { maximumFractionDigits: 1 });
+  const relaxedOf = (r, thr) => {
+    const map = r.relaxed || {};
+    const hit = Object.keys(map).find((k) => Number(k) === thr);
+    return hit === undefined ? null : Number(map[hit]);
+  };
+  const rows = [
+    [t("exp.ladderSuccess"), (r) => ladderCount(r.successes, r.n)],
+    ...thresholds.map((thr) => [t("exp.ladderRelaxed", { cm: cm(thr) }), (r) => ladderCount(relaxedOf(r, thr), r.n)]),
+    [t("exp.ladderReachB"), (r) => ladderCount(r.reach_b, r.n)],
+    [t("exp.ladderDistance"), (r) => ladderPair(r.distance_cm)],
+    [t("exp.ladderYaw"), (r) => ladderPair(r.yaw_deg)],
+    [t("exp.ladderYawOk", { deg: formatNumber(ladder.yaw_max_deg ?? 10) }), (r) => ladderCount(r.yaw_ok, r.reach_b)],
+  ];
+  const reps = (ladder.repeats || []).map((x) => Number(x.successes)).filter(Number.isFinite);
+  const repN = (ladder.repeats || [])[0] ? ladder.repeats[0].n : null;
+  const notes = [
+    t("exp.ladderNoteRelaxed"),
+    t("exp.ladderNoteDistance"),
+    t("exp.ladderNoteM") + (reps.length > 1 && repN
+      ? " " + t(reps.length === 3 ? "exp.ladderNoteRepeatsThree" : "exp.ladderNoteRepeats", { count: formatNumber(reps.length), lo: formatNumber(Math.min(...reps)), hi: formatNumber(Math.max(...reps)), n: formatNumber(repN) })
+      : ""),
+  ];
+  const table = el("div", { className: "table-wrap" }, [
+    el("table", { className: cls("table", "ladder-table") }, [
+      el("thead", {}, [el("tr", {}, [
+        el("th", { scope: "col", text: t("exp.ladderColRule") }),
+        ...runs.map((r) => el("th", { scope: "col", className: "num" }, [
+          el("span", { className: "mono ladder-run", text: r.run }),
+          ...ladderSceneLines(r).map((line) => el("small", { className: "ladder-scene", text: line })),
+        ])),
+      ])]),
+      el("tbody", {}, rows.map(([label, cell]) => el("tr", {}, [
+        el("th", { scope: "row", text: label }),
+        ...runs.map((r) => el("td", { className: "num", text: cell(r) })),
+      ]))),
+    ]),
+  ]);
+  const chartSteps = [5, ...thresholds];
+  const chart = renderChartBlock({
+    title: t("exp.ladderChartTitle"),
+    subtitle: t("exp.ladderChartSub", { n: formatNumber(runs[0].n) }),
+    height: 280,
+    buildOption: ({ soft, line, colors }) => ({
+      animation: false,
+      color: colors,
+      grid: { left: 44, right: 16, top: 36, bottom: 30 },
+      legend: { top: 0, textStyle: { color: soft } },
+      tooltip: { trigger: "axis", valueFormatter: (v) => `${formatNumber(v)}/${formatNumber(runs[0].n)}` },
+      xAxis: { type: "category", data: chartSteps.map((v) => `≤ ${cm(v)} cm`), axisLabel: { color: soft } },
+      yAxis: { type: "value", min: 0, max: runs[0].n || 60, axisLabel: { color: soft }, splitLine: { lineStyle: { color: line } } },
+      series: runs.map((r) => ({
+        name: r.run,
+        type: "bar",
+        data: chartSteps.map((thr) => (thr === 5 ? r.successes : relaxedOf(r, thr))),
+      })),
+    }),
+  });
+  return el("div", { className: "ladder-block" }, [
+    el("section", { className: cls("card", "ladder-card") }, [
+      el("div", { className: "task-head" }, [el("h2", { text: t("exp.ladderTitle") })]),
+      table,
+      el("ul", { className: cls("tiny", "ladder-notes") }, notes.map((n) => el("li", { text: n }))),
+    ]),
+    chart,
+  ]);
 }
 
 // Numbers inside a preformatted index string ("7.3–33.6") in the page's decimal style.
@@ -1275,7 +1385,10 @@ export function renderEvalPage() {
       // Hiếu, 28/11/2026 (story DA-53, AC 11): repeat 0 of the jig round's run beside the earlier
       // runs at the same size. Descriptive only: no difference, interval or verdict is shown.
       const c60 = story.jig && story.jig.compare60 ? story.jig.compare60 : null;
-      const compare60Card = c60
+      const ladder60 = compare60Ladder(story);
+      const compare60Card = ladder60
+        ? renderCompare60Ladder(ladder60)
+        : c60
         ? (() => {
             const earlierScorer = c60.earlier_scorer
               ? scorerLabel(c60.earlier_scorer)

@@ -4110,12 +4110,40 @@ body:has(.is-studio-route) { height: 100dvh; min-height: 0; }
 .analysis-start h1 { margin: 0 0 15px; font-size: clamp(20px, 3vw, 32px); }
 .analysis-prompts, .sim-pager { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
 .analysis-layout .studio-turn-pair { flex-shrink: 0; }
-.analysis-layout .md-body { max-width: 74ch; }
+/* Chat page answers: prose keeps a reading width; tables and charts take the message width.
+   Investigate answers carry Kết luận / Bằng chứng / Diễn giải / Giới hạn / Hướng tiếp theo as h4. */
+.analysis-layout .md-body { max-width: none; min-width: 0; font-size: 14px; line-height: 1.55; }
+.analysis-layout .md-body > :is(p, ul, ol, h3, h4, blockquote) { max-width: 74ch; }
+.analysis-layout .md-body :is(h3, h4) { margin: 12px 0 0; font-size: 15px; font-weight: 650; color: var(--ink); }
+.analysis-layout .md-body > :is(h3, h4):first-child { margin-top: 0; }
+.analysis-layout .md-body .md-table-wrap { margin-block: 2px; border-radius: 8px; }
+.analysis-layout .md-body table.md-table { font-size: 13px; font-variant-numeric: tabular-nums; }
+.analysis-layout .md-body table.md-table { width: max-content; min-width: 100%; }
+.analysis-layout .md-body table.md-table :is(th, td) { overflow-wrap: normal; word-break: normal; max-width: 40ch; }
+.analysis-layout .md-body table.md-table th { white-space: nowrap; }
+.analysis-layout .md-body .chat-chart-host { width: 100%; min-width: 0; height: clamp(220px, 34vh, 340px); }
+@media (max-width: 560px) {
+  .analysis-layout .md-body { font-size: 13.5px; }
+  .analysis-layout .md-body .chat-chart-host { height: 220px; }
+}
 .analysis-result { display: grid; gap: 10px; min-width: 0; margin: 8px 0; }
 .analysis-result .mini-table-wrap { max-height: 320px; overflow: auto; }
 .analysis-activity { margin-block: 8px; }
 .analysis-activity summary { color: var(--soft); cursor: pointer; }
-.analysis-activity .agent-steps { max-height: 240px; overflow: auto; }
+/* "Quá trình suy luận" under each answer: ordered steps, label | rows | ms on one line */
+.reasoning-block > summary { font-size: 13px; }
+.reasoning-steps { list-style: none; counter-reset: step; margin: 8px 0 4px; padding: 0; display: grid; gap: 4px; max-height: 320px; overflow: auto; }
+.reasoning-step { counter-increment: step; display: grid; grid-template-columns: 22px 16px minmax(0, 1fr) auto auto auto; align-items: center; gap: 8px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13px; }
+.reasoning-step::before { content: counter(step) "."; color: var(--soft); font-variant-numeric: tabular-nums; text-align: right; }
+.reasoning-step .reasoning-label { min-width: 0; overflow-wrap: anywhere; }
+.reasoning-step .reasoning-rows { color: var(--soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.reasoning-step .turn-action-btn { padding: 2px 8px; font-size: 12px; }
+.reasoning-total { display: block; margin-top: 2px; }
+@media (max-width: 560px) {
+  .reasoning-step { grid-template-columns: 22px 16px minmax(0, 1fr) auto; }
+  .reasoning-step .reasoning-rows { grid-column: 3; grid-row: 2; }
+  .reasoning-step .turn-action-btn { grid-column: 3 / -1; grid-row: 3; justify-self: start; }
+}
 .analysis-latest { align-self: center; }
 .analysis-drawer { color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; width: min(550px, 94vw); max-height: 88dvh; overflow: auto; padding: 16px; }
 .analysis-drawer::backdrop { background: rgb(0 0 0 / 30%); }
@@ -4440,3 +4468,16 @@ a.lineage-box:hover {
 .timeline-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; }
 .timeline-round { padding: 0; border: 0; background: none; cursor: pointer; font: inherit; }
 @media (max-width: 560px) { .timeline-row { grid-template-columns: 1fr; gap: 2px; } }
+
+/* 60-rollout ladder on the eval page: runs as columns, one neutral style for every column */
+.ladder-block { display: grid; gap: 16px; min-width: 0; }
+.ladder-card .table-wrap { overflow-x: auto; }
+.ladder-table { min-width: 640px; font-variant-numeric: tabular-nums; }
+.ladder-table th { text-transform: none; letter-spacing: normal; }
+.ladder-table thead th { vertical-align: bottom; }
+.ladder-table thead th .ladder-run { display: block; font-size: 13px; color: var(--ink); }
+.ladder-table thead th .ladder-scene { display: block; font-weight: 400; color: var(--soft); white-space: nowrap; font-size: 11.5px; line-height: 1.35; }
+.ladder-table tbody th { font-weight: 500; text-align: left; white-space: nowrap; }
+.ladder-table td.num { white-space: nowrap; }
+.ladder-notes { margin: 10px 0 0; padding-left: 18px; color: var(--soft); display: grid; gap: 2px; }
+.ladder-table tbody tr:last-child > * { border-bottom: 0; }

@@ -941,6 +941,13 @@ export function filterWithheldStory(doc, withheldSet = getAllWithheldRuns()) {
     return copy;
   };
   const out = { ...doc };
+  // The 60-rollout ladder (compare60.ladder, in jig or at the top): never a withheld run's column.
+  const keepLadder = (c60) => {
+    if (!c60 || typeof c60 !== "object" || !c60.ladder || typeof c60.ladder !== "object") return c60;
+    const runs = Array.isArray(c60.ladder.runs) ? c60.ladder.runs.filter((r) => !(r && withheldSet.has(r.run))) : c60.ladder.runs;
+    return { ...c60, ladder: { ...c60.ladder, runs } };
+  };
+  if (out.compare60 && typeof out.compare60 === "object") out.compare60 = keepLadder(out.compare60);
   if (out.pair && typeof out.pair === "object") {
     out.pair = {
       ...out.pair,
@@ -970,7 +977,7 @@ export function filterWithheldStory(doc, withheldSet = getAllWithheldRuns()) {
     if (nextJig.compare60 && typeof nextJig.compare60 === "object") {
       nextJig.compare60 = withheldSet.has(nextJig.compare60.run)
         ? null
-        : { ...nextJig.compare60, earlier: keep(nextJig.compare60.earlier) };
+        : keepLadder({ ...nextJig.compare60, earlier: keep(nextJig.compare60.earlier) });
     }
     out.jig = nextJig;
   }
