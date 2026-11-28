@@ -9,6 +9,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from flywheel.console.index import hidden
 from flywheel.console.index.cards import merged
 from flywheel.console.index.posters import write_posters
 from flywheel.console.paths import ConsolePaths
@@ -22,8 +23,10 @@ def load_rows(paths: ConsolePaths, strict: bool = True) -> list[dict[str, Any]]:
     """Catalog rows: the seed rows overlaid with the dataset cards under ``fw_root``.
 
     Absent seed file and no cards means none. ``strict`` raises ``CardError`` on a bad card;
-    live server paths pass ``strict=False`` so one bad card is skipped instead."""
-    return merged(paths, strict=strict)[0]
+    live server paths pass ``strict=False`` so one bad card is skipped instead. Rows of a hidden
+    run (``hidden.catalog_rows``) are left out, so no ``ds/<id>/`` folder is built for them."""
+    rows, edges = merged(paths, strict=strict)
+    return hidden.catalog_rows(rows, edges, hidden.load(paths))[0]
 
 
 def read_jsonl(p: Path) -> list[dict[str, Any]]:

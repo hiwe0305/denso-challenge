@@ -75,7 +75,11 @@ def _fwdata(fw: ConsolePaths) -> None:
         _write(
             root / f"agentqa/cases/{case}/assembly.json", {"clusters": [cl], "status": "complete"}
         )
-    ledger = "story,amount_usd,estimated_or_measured\nDA-50,12.5,measured\nDA-50,10,estimated\n"
+    ledger = (
+        "story,quantity,unit,amount_usd,estimated_or_measured\n"
+        "DA-50,125,compute_unit,12.5,measured\nDA-50,100,compute_unit,10,estimated\n"
+        "DA-50,2,hour,0,measured\n"
+    )
     _write(fw.repo / "docs/g0/ledger/DA-50.csv", ledger)
 
 
@@ -106,7 +110,11 @@ def test_index_build_writes_nothing_of_a_hidden_run(fw: ConsolePaths, tmp_path: 
     assert [s["session"] for s in j["active_sessions"]] == ["da48-m"]
     assert [s["session"] for s in d["colab_sessions"]] == ["da48-m"]
     assert [a["case_id"] for a in j["agentqa"]] == ["jig-m-100k-a"]
-    assert d["ledger"] == [["DA-50", 10.0, 12.5]]  # money spent stays
+    # money spent stays, merged into one "other" row under its own label (decision Q1)
+    assert d["ledger"] == [
+        {"story": "other", "label": "Thí nghiệm khác (không trình bày)",
+         "est_cu": 100.0, "mea_cu": 125.0, "est_usd": 10.0, "mea_usd": 12.5}
+    ]  # fmt: skip
 
 
 def test_round_runs_leave_out_a_hidden_run(fw: ConsolePaths) -> None:

@@ -2,7 +2,14 @@
 
 Every input may be missing on a laptop; a missing input gives an empty value, never an error.
 A run in a round's ``withhold_runs`` (``hidden.py``) is never written: not as a train entry, a
-Colab session or anything of the ``jig`` block; the ledger rows stay (money spent).
+Colab session or anything of the ``jig`` block; the ledger rows stay (money spent), those of a
+hidden story summed into one "other" row (decision Q1, 28/11/2026).
+
+Audit 28/11/2026 (02 · Nội dung và số liệu): ``ledger`` rows are ``{story, label, est_cu,
+mea_cu, est_usd, mea_usd}``; a ``.attempt`` train folder is not a run; Colab sessions come from
+every batch folder; train entries carry ``samples_per_s`` and ``steps_per_s``; ``jig.cost`` holds
+the jig round's measured cost; ``diag`` holds round 1's clusters, step-4 checks and
+generation/QA cost (``cited.diag_block``).
 """
 
 from __future__ import annotations
@@ -162,7 +169,12 @@ def _parse_metrics_dir(
     stats_doc = _dict(stats_file) if stats_file.is_file() else {}
     ep_count = _stat_max_plus_one(stats_doc, "episode_index")
     fr_count = _stat_max_plus_one(stats_doc, "index")
+    # ``throughput`` is samples per second (global batch / seconds per logged step,
+    # flywheel_psi0/trainer/metrics_log.py), not steps per second (audit 02 P1-2)
     thr_vals = [_num(r.get("throughput")) for r in tail if r.get("throughput") is not None]
+    batch = launch.get("global_batch_size")
+    batch = batch if isinstance(batch, int) and not isinstance(batch, bool) and batch > 0 else None
+    thr_med = round(statistics.median(thr_vals), 2) if thr_vals else None
     vram_vals = [_num(r.get("vram_gb")) for r in tail if r.get("vram_gb") is not None]
     run_tail, run_phases = _read_vm_log(f.parent)
     return (
@@ -178,7 +190,10 @@ def _parse_metrics_dir(
             "frames": fr_count,
             "loss_last": round(sum(_num(r.get("loss")) for r in tail) / len(tail), 3),
             "val_last": round(_num(val[-1].get("loss")), 4) if val else None,
-            "thr_med": round(statistics.median(thr_vals), 2) if thr_vals else None,
+            "thr_med": thr_med,  # samples/s (kept for the pages that read it)
+            "samples_per_s": thr_med,
+            "global_batch_size": batch,
+            "steps_per_s": round(thr_med / batch, 3) if thr_med is not None and batch else None,
             "vram_max": round(max(vram_vals), 2) if vram_vals else None,
             "loss": _series(train, "loss", 4),
             "val": [[r["step"], round(_num(r.get("loss")), 4)] for r in val],
@@ -196,10 +211,14 @@ def _parse_metrics_dir(
 
 
 def _runs(fw: Path, train_dir: str, max_steps: int) -> tuple[list[dict[str, Any]], list[Path]]:
-    """Training runs of a round (``<train_dir>/<run>/<job>/metrics.jsonl``)."""
+    """Training runs of a round (``<train_dir>/<run>/<job>/metrics.jsonl``). A ``<run>.attempt*``
+    folder is a stopped earlier attempt (``C70_R1.attempt1``), not a run: left out (audit 02
+    P1-3)."""
     runs: list[dict[str, Any]] = []
     dirs: list[Path] = []
     for f in sorted(fw.glob(f"{train_dir}/*/*/metrics.jsonl")):
+        if ".attempt" in f.parent.parent.name:
+            continue
         entry, d = _parse_metrics_dir(f, f.parent.parent.name, max_steps)
         if entry is not None and d is not None:
             dirs.append(d)
@@ -318,21 +337,116 @@ def _h1m(fw: Path) -> dict[str, Any]:
     return {}
 
 
-def _ledger(repo: Path) -> list[list[Any]]:
-    out: list[list[Any]] = []
-    for f in sorted((repo / "docs" / "g0" / "ledger").glob("*.csv")):
-        est = mea = 0.0
+OTHER_STORY = hidden.OTHER_STORY
+OTHER_LABEL = hidden.OTHER_LABEL
+_CU = "compute_unit"
+
+
+def _story_title(repo: Path, story: str) -> str | None:
+    """Title of ``docs/product/stories/<story>-*.md`` (its first line ``# <id> · <title>``)."""
+    for f in sorted((repo / "docs" / "product" / "stories").glob(f"{story}-*.md")):
         try:
-            with f.open(encoding="utf-8", newline="") as fh:
-                for row in csv.DictReader(fh):
-                    amt = _num(row.get("amount_usd"))
-                    if row.get("estimated_or_measured") == "measured":
-                        mea += amt
-                    else:
-                        est += amt
-        except OSError:
+            first = f.read_text(encoding="utf-8").splitlines()[0]
+        except (OSError, IndexError):
             continue
-        out.append([f.stem, round(est, 2), round(mea, 2)])
+        head = first.lstrip("#").strip()
+        return head.split("·", 1)[1].strip() if "·" in head else head or None
+    return None
+
+
+def _ledger_sums(f: Path) -> dict[str, float | None] | None:
+    """CU and USD of one ledger CSV, estimated and measured apart (``estimated_or_measured``).
+
+    CU sums ``quantity`` of the rows whose ``unit`` is ``compute_unit``; USD sums
+    ``amount_usd`` of every row. A side with no row is None, never 0."""
+    sums: dict[str, float | None] = dict.fromkeys(("est_cu", "mea_cu", "est_usd", "mea_usd"))
+    try:
+        with f.open(encoding="utf-8", newline="") as fh:
+            for row in csv.DictReader(fh):
+                side = "mea" if row.get("estimated_or_measured") == "measured" else "est"
+                usd = f"{side}_usd"
+                sums[usd] = (sums[usd] or 0.0) + _num(row.get("amount_usd"))
+                if row.get("unit") == _CU:
+                    cu = f"{side}_cu"
+                    sums[cu] = (sums[cu] or 0.0) + _num(row.get("quantity"))
+    except OSError:
+        return None
+    return sums
+
+
+def _ledger(repo: Path, hide: hidden.Hidden | None = None) -> list[dict[str, Any]]:
+    """One row per ledger CSV of ``docs/g0/ledger``: ``{story, label, est_cu, mea_cu, est_usd,
+    mea_usd}`` (audit 02 P1-1: CU and USD, estimated and measured apart, as the ledger keeps
+    them). ``label`` is the story's title. The rows of hidden stories (``withhold_runs`` ·
+    ``stories``, e.g. DA-50) are summed into one last row ``story: "other"`` with the label
+    ``OTHER_LABEL`` and the same numbers (decision Q1, 28/11/2026)."""
+    hide = hide or hidden.Hidden()
+    out: list[dict[str, Any]] = []
+    other: dict[str, float | None] = dict.fromkeys(("est_cu", "mea_cu", "est_usd", "mea_usd"))
+    any_other = False
+    for f in sorted((repo / "docs" / "g0" / "ledger").glob("*.csv")):
+        sums = _ledger_sums(f)
+        if sums is None:
+            continue
+        if hide.story(f.stem):
+            any_other = True
+            for k, v in sums.items():
+                if v is not None:
+                    other[k] = (other[k] or 0.0) + v
+            continue
+        label = _story_title(repo, f.stem)
+        out.append({"story": f.stem, "label": label} | _rounded(sums))
+    if any_other:
+        out.append({"story": OTHER_STORY, "label": OTHER_LABEL} | _rounded(other))
+    return out
+
+
+def _rounded(sums: dict[str, float | None]) -> dict[str, float | None]:
+    return {k: round(v, 2) if v is not None else None for k, v in sums.items()}
+
+
+def _jig_cost(
+    paths: ConsolePaths, rnd: tasks.Round | None, ledger: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Cost of the jig round (``story.json · jig.cost``; audit 02 B14): for each part of the
+    round's ``cost_stories`` (train DA-48, eval DA-47), the ledger row of that story with
+    ``cu``/``usd`` = the measured sums when the ledger has measured rows (``measure_kind``
+    "measured"), else the estimated ones, beside the cited total of the doc
+    (``jig.cost.<part>``) and ``matches_doc``. A hidden story is never named here."""
+    if rnd is None:
+        return {}
+    spec = rnd.raw.get("cost_stories")
+    if not isinstance(spec, dict):
+        return {}
+    by_story = {r["story"]: r for r in ledger}
+    try:
+        cites = {c.key: c for c in cited.load(paths)}
+    except (OSError, KeyError, TypeError, ValueError):
+        cites = {}
+    out: dict[str, Any] = {}
+    for part, story in spec.items():
+        row = by_story.get(story)
+        if not isinstance(story, str) or row is None:
+            continue
+        measured = row.get("mea_cu") is not None or row.get("mea_usd") is not None
+        kind = "measured" if measured else "estimated"
+        side = "mea" if measured else "est"
+        c = cites.get(f"jig.cost.{part}")
+        doc = {"value": c.value, "source": f"{c.doc} §{c.section}", "quote": c.quote} if c else None
+        cu = row.get(f"{side}_cu")
+        out[part] = {
+            "story": story,
+            "label": row.get("label"),
+            "cu": cu,
+            "usd": row.get(f"{side}_usd"),
+            "measure_kind": kind,
+            "est_cu": row.get("est_cu"),
+            "source": f"docs/g0/ledger/{story}.csv",
+            "doc": doc,
+            "matches_doc": doc is not None and cu is not None and abs(cu - doc["value"]) < 0.005,
+        }
+    if out:
+        out["total_cu"] = round(sum(v["cu"] or 0.0 for v in out.values()), 2)
     return out
 
 
@@ -342,24 +456,36 @@ def _guards(fw: Path) -> Iterator[dict[str, Any]]:
 
 
 def _colab(fw: Path) -> tuple[list[list[Any]], list[dict[str, Any]]]:
+    """Colab balance points and sessions. Sessions come from every ``colab/batch-*`` folder
+    (audit 02 P1-5: the newest folder alone may hold only a hidden run's session): one per
+    session ``name`` (else the file stem up to its first dot, so ``da34-c70r1.attempt1.json`` is
+    session ``da34-c70r1``), the record with the latest ``beat``, then the later folder and
+    the file without a suffix. ``batch`` names its folder."""
     bal = sorted(
         [r["time"], round(_num(r["balance"]), 2)]
         for r in _guards(fw)
         if r.get("balance") is not None and "time" in r
     )
-    batches = sorted(p for p in fw.glob("colab/batch-*") if p.is_dir())
-    sessions: list[dict[str, Any]] = []
-    for s in sorted(batches[-1].glob("*.json")) if batches else []:
-        j = _dict(s)
-        if j:
-            sessions.append(
-                {
-                    "session": s.stem,
-                    "gpu": j.get("gpu"),
-                    "state": j.get("state"),
-                    "cap": j.get("cap"),
-                }
-            )
+    latest: dict[str, tuple[tuple[float, str, int], dict[str, Any]]] = {}
+    for batch in sorted(p for p in fw.glob("colab/batch-*") if p.is_dir()):
+        for s in sorted(batch.glob("*.json")):
+            j = _dict(s)
+            if not j:
+                continue
+            raw_name = j.get("name")
+            name = raw_name if isinstance(raw_name, str) else s.stem.split(".")[0]
+            beat = j.get("beat")
+            rank = (_num(beat), batch.name, int(s.stem == name))
+            if name in latest and latest[name][0] >= rank:
+                continue
+            latest[name] = (rank, {
+                "session": name,
+                "gpu": j.get("gpu"),
+                "state": j.get("state"),
+                "cap": j.get("cap"),
+                "batch": batch.name,
+            })  # fmt: skip
+    sessions = sorted((v for _, v in latest.values()), key=lambda x: (x["batch"], x["session"]))
     return bal, sessions
 
 
@@ -510,8 +636,14 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
     else:
         jruns, jtail, jphases = [], [], {}
     jig_block = jig.build(fw, jrnd, jruns, jtail, jphases, tray_steps, sessions, jlog)
+    ledger = _ledger(paths.repo, hide)
     if jig_block:  # AC 11: repeat 0 of the jig baseline beside the story.pair round's runs
         jig_block["compare60"] = jig.compare60(jig_block, jrnd, pair, rnd)
+        jig_block["cost"] = _jig_cost(paths, jrnd, ledger)
+    try:
+        diag: dict[str, Any] = cited.diag_block(paths)
+    except (OSError, KeyError, TypeError, ValueError):
+        diag = {}
     h1m = _h1m(fw)
     data: dict[str, Any] = {
         "runs": runs,
@@ -519,7 +651,7 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         "vm_phases": phases,
         **ego,
         "h1m": h1m,
-        "ledger": _ledger(paths.repo),
+        "ledger": ledger,
         "colab_balance": bal,
         "colab_sessions": sessions,
         "ds": ds,
@@ -531,6 +663,7 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         "follow": _follow(fw, eval_dir, rnd.follow) if rnd and eval_dir else {},
         "demo": demo.build(fw, pair, round_cited, h1m, demo_cited, rnd),
         "jig": jig_block,
+        "diag": diag,
     }
     data = hidden.story(data, hide)  # belt and braces: nothing above should carry a hidden run
     out.mkdir(parents=True, exist_ok=True)
@@ -541,5 +674,5 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         k: len(v)
         for k, v in data.items()
         if isinstance(v, (list, dict))
-        and k not in ("ds", "eval", "pair", "round", "follow", "demo", "jig")
+        and k not in ("ds", "eval", "pair", "round", "follow", "demo", "jig", "diag")
     } | {"ds_rows": len(ds.get("rows", [])), "pair_runs": len(data["pair"].get("runs", []))}

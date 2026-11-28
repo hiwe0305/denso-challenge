@@ -23,10 +23,14 @@ def test_packaged_manifest_is_valid(fw: ConsolePaths) -> None:
     # design 28/10 §3.2 (7 steps of the tray scorer); spec §5.1 (6 steps of the two-table task)
     assert len(tray.stages) == 7 and len(two.stages) == 6
     assert tray.stages[0].id == "approach_a" and tray.stages[-1].id == "release_stand"
-    # story DA-53: the jig-scene round comes first, so the pages open on it
-    assert two.rounds == () and tray.rounds == ("tray-jig-r1", "tray-r1")
+    # decision Q2 of Hiếu, 28/11/2026: the pages open on round 1, then the jig round
+    assert two.rounds == () and tray.rounds == ("tray-r1", "tray-jig-r1")
     r = m.round("tray-r1")
     assert m.story_round() is r and m.sim_round() is r
+    assert m.sim_rounds() == (r, m.round("tray-jig-r1"))
+    # audit 02 P1-9: the old eval of policy C @40k belongs to round 1, not to the task
+    assert "story.eval" in r.index and "story.eval" not in tray.index
+    assert "story.diag" in r.index
     assert {x.role for x in r.runs} == {"baseline", "after_round", "control"}
     assert r.follow is not None and r.max_steps > 0
     assert r.sessions[next(iter(r.sessions))] in r.run_ids
@@ -38,7 +42,8 @@ def test_packaged_manifest_is_valid(fw: ConsolePaths) -> None:
 def test_packaged_jig_round(fw: ConsolePaths) -> None:
     m = tasks.load(fw)
     j = m.round("tray-jig-r1")
-    assert m.jig_round() is j and j.index == ("story.jig",)
+    assert m.jig_round() is j and j.index == ("story.jig", "sim")
+    assert j.cut == "da48/cuts/M.tar" and j.hidden_stories == ("DA-50",)
     assert j.run_ids == ("M", "N") and j.controls == () and j.withhold_eval == ()
     assert [x.role for x in j.runs] == ["baseline", "after_round"]
     # Hiếu, 28/11/2026: run N stays declared but is not presented

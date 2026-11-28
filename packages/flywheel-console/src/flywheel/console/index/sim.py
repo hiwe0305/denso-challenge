@@ -1,4 +1,4 @@
-"""Simulation library index (one-site design 7): the episodes of the latest training cut and a
+"""Simulation library index (one-site design 7): the episodes of each round's training cut and a
 fixed sample of their videos.
 
 Reads ``meta/`` of the round's training cut (``cut`` in seed/tasks.yaml, a tar of several GB)
@@ -83,10 +83,16 @@ def _poster(video: Path, at: float = 0.5) -> str | None:
 
 
 def _labels(subset: dict[str, Any], n: int) -> list[tuple[str, int, int, str]]:
-    """(label, first index, count, release) for each part of the cut."""
-    base = subset.get("base") or {}
+    """(label, first index, count, release) for each part of the cut.
+
+    A round cut (``C70_R1``) keeps its base parts under ``base`` (coverage, then the previous
+    cut) and adds ``targeted``. A plain cut (run M, ``da48/cuts/M.tar``) lists its parts at the
+    top level; every one of them is coverage data (``purpose: coverage`` in each episode).
+    """
+    flat = "base" not in subset and isinstance(subset.get("parts"), list)
+    base = subset if flat else subset.get("base") or {}
     parts = list(base.get("parts") or [])
-    names = ["coverage", "prev"]
+    names = ["coverage"] * len(parts) if flat else ["coverage", "prev"]
     out = [
         (
             names[i] if i < len(names) else "coverage",
@@ -152,6 +158,14 @@ def _sample(eps: list[dict[str, Any]], follow_case: tuple[int, int] | None) -> l
     return sorted(seen.values(), key=lambda e: e["i"])
 
 
+def _cut_run(rnd: tasks.Round) -> str | None:
+    """The run whose training cut ``rnd.cut`` is: the run whose ``cut`` record is
+    ``<rnd.cut>.json`` (run M), else the round's after-round run (``C70_R1``). Never a run of
+    ``withhold_runs``."""
+    owner = next((r.id for r in rnd.shown_runs if r.cut and r.cut == f"{rnd.cut}.json"), None)
+    return owner or rnd.shown_after_round
+
+
 def _cut(paths: ConsolePaths, media: Path, rnd: tasks.Round) -> dict[str, Any]:
     if not rnd.cut:
         return {}
@@ -196,11 +210,14 @@ def _cut(paths: ConsolePaths, media: Path, rnd: tasks.Round) -> dict[str, Any]:
                 lab[i] = name
         eps = [_episode(e, lab.get(int(e["episode_index"]), "coverage")) for e in rows]
         k: Counter[str] = Counter()
+        chunk_size = int(info.get("chunks_size") or 1000)
         for e in _sample(eps, rnd.follow):
             rel = f"{sha8}/ep_{e['i']:06d}.mp4"
             dest = media / rel
             if not dest.is_file():
-                src = t.extractfile(f"{root}videos/chunk-000/egocentric/episode_{e['i']:06d}.mp4")
+                chunk = e["i"] // chunk_size
+                name = f"{root}videos/chunk-{chunk:03d}/egocentric/episode_{e['i']:06d}.mp4"
+                src = t.extractfile(name) if name in names else None
                 if src is None:
                     continue
                 _copy(src, dest)
@@ -210,7 +227,8 @@ def _cut(paths: ConsolePaths, media: Path, rnd: tasks.Round) -> dict[str, Any]:
             jpg = _poster(dest, at)
             e["poster"] = f"{sha8}/{jpg}" if jpg else None
     base = subset.get("base") or {}
-    cuts = {rnd.after_round: {"sha256": sha, "of": "tar"}}
+    owner = _cut_run(rnd)
+    cuts: dict[str, dict[str, str]] = {owner: {"sha256": sha, "of": "tar"}} if owner else {}
     if base.get("marker_sha256"):
         cuts["S70"] = {"sha256": base["marker_sha256"], "of": "marker"}
     if (base.get("from_cut") or {}).get("marker_sha256"):
@@ -250,27 +268,42 @@ def _teleop(paths: ConsolePaths, media: Path, task: tasks.Task) -> list[dict[str
     return out
 
 
-def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
-    """Write ``out/sim.json``; return the episode and sampled-media counts."""
-    media = paths.sim_media
-    m = tasks.load(paths)
-    rnd = m.sim_round()
-    doc: dict[str, Any] = {
+def _empty(rnd: tasks.Round | None) -> dict[str, Any]:
+    return {
         "source": rnd.cut if rnd else None,
+        "round": rnd.id if rnd else None,
         "sha8": None,
         "parts": [],
         "cuts": {},
+        "format": None,
         "batch": {},
         "episodes": [],
     }
-    if rnd is not None:
-        doc.update(_cut(paths, media, rnd))
+
+
+def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
+    """Write ``out/sim.json``; return the episode and sampled-media counts.
+
+    Every round listing ``sim`` gets one block under ``rounds.<round id>`` (audit 02 A12: the
+    jig round shows the cut of run M). The top level repeats the first such round's block
+    (``tray-r1``), the shape the pages read before rounds were added.
+    """
+    media = paths.sim_media
+    m = tasks.load(paths)
+    rounds: dict[str, dict[str, Any]] = {}
+    for rnd in m.sim_rounds():
+        block = _empty(rnd) | _cut(paths, media, rnd)
+        for e in block["episodes"]:
+            e.pop("public", None)
+        rounds[rnd.id] = block
+    first = m.sim_round()
+    doc: dict[str, Any] = dict(rounds[first.id]) if first is not None else _empty(None)
+    doc["rounds"] = rounds
     doc["teleop"] = [x for t in m.tasks for x in _teleop(paths, media, t)]
-    for e in doc["episodes"]:
-        e.pop("public", None)
     out.mkdir(parents=True, exist_ok=True)
     (out / "sim.json").write_text(
         json.dumps(doc, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
     )
-    n_media = sum(1 for e in doc["episodes"] if e["video"]) + len(doc["teleop"])
-    return {"sim_episodes": len(doc["episodes"]), "sim_media": n_media}
+    eps = [e for b in rounds.values() for e in b["episodes"]]
+    n_media = sum(1 for e in eps if e["video"]) + len(doc["teleop"])
+    return {"sim_episodes": len(eps), "sim_media": n_media}

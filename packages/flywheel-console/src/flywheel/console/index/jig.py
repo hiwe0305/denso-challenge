@@ -27,12 +27,13 @@ Shape::
          "headline": {n, conditions, successes, p, ci, wilson, wilson_method, failures,
                       step_pass},               # copied verbatim
          "levels": {"1": {...same...}, "2": {...}},
-         "place": {"p", "successes", "n", "ci": None},   # headline step_pass.place
+         "place": {"p", "successes", "n", "ci"},   # headline step_pass.place; ci copied from
+                                                    # headline.step_ci.place, else None
          "bootstrap_seed", "scorer_version", "plan_mismatch",
          "readings": [{"rule": "1", "scope": "whole_task", "threshold", "lower", "verdict"},
                       {"rule": "2", "scope": "level", "level": "1", ...}, {... "level": "2"},
-                      {"rule": "3", "scope": "place", "threshold", "lower": None,
-                       "verdict": None, "why": "no_ci"}]}],
+                      {"rule": "3", "scope": "place", "threshold", "lower",
+                       "verdict", "why": "no_ci" when results.json has no place CI}]}],
       "paired": None when the variant or the baseline is hidden, else
                 {"variant", "baseline", "status", "source", "command" (when missing), "problems",
                  "headline", "by_level",         # copied from paired.repeats of the variant
@@ -67,8 +68,10 @@ number (never 0). A run listed in the round's ``withhold_eval`` gives only
 
 Rules 1 and 2 say "met" when the lower bound is **at or above** the threshold
 (``docs/he/tray-jig.md`` §2: "từ 0,80 trở lên"). The lower bound is compared after rounding to 9
-decimals, which only absorbs float noise of a mean of per-condition rates. ``results.json`` has no
-interval for the ``place`` step, so rule 3 shows the rate and gives no verdict (story DA-53,
+decimals, which only absorbs float noise of a mean of per-condition rates. Rule 3 reads the CI of
+the ``place`` step from ``headline.step_ci.place`` (a bootstrap CI of the per-condition place
+rates, resampled within each level, as ``eval_results.bootstrap_ci``; audit 02 P1-10, F2). A
+``results.json`` without it gives the rate and no verdict (``why: "no_ci"``; story DA-53,
 "Điều chỉnh" point 3).
 """
 
@@ -87,6 +90,7 @@ RESULTS = "results.json"
 # copied verbatim from results.json (headline and each level)
 FIGURE_KEYS = (
     "n", "conditions", "successes", "p", "ci", "wilson", "wilson_method", "failures", "step_pass",
+    "step_ci",
 )  # fmt: skip
 CI_VS_0 = {"above": "better", "below": "worse", "contains": "not_distinguished"}
 # jig-n-rules rule 3: N against M on level 2 alone ("Đây là nơi dữ liệu thêm nhắm tới")
@@ -177,19 +181,21 @@ def _readings(
     out = [one("1", "whole_task", rules.get("whole_task", 0.0), headline.get("ci"))]
     for lv in sorted(levels):
         out.append(one("2", "level", rules.get("per_level", 0.0), levels[lv].get("ci"), level=lv))
-    place = rules.get("place", 0.0)
-    out.append(
-        {"rule": "3", "scope": "place", "threshold": place, "lower": None, "verdict": None,
-         "why": "blocked" if blocked else "no_ci"}
-    )  # fmt: skip
+    out.append(one("3", "place", rules.get("place", 0.0), _place_ci(headline)))
     return out
+
+
+def _place_ci(headline: dict[str, Any]) -> list[float] | None:
+    """The CI of the ``place`` step: ``headline.step_ci.place`` of results.json, else None."""
+    return _ci(_obj(headline.get("step_ci")).get("place"))
 
 
 def _place(headline: dict[str, Any]) -> dict[str, Any]:
     p = (headline.get("step_pass") or {}).get("place")
     n = headline.get("n")
+    ci = _place_ci(headline)
     if isinstance(p, (int, float)) and isinstance(n, int) and not isinstance(n, bool):
-        return {"p": p, "successes": round(p * n), "n": n, "ci": None}
+        return {"p": p, "successes": round(p * n), "n": n, "ci": ci}
     return {"p": None, "successes": None, "n": None, "ci": None}
 
 

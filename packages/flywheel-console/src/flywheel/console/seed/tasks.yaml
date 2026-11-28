@@ -35,11 +35,12 @@ tasks:
       vi: khay trong ô đích trên bàn B, lệch tối đa target_pos_tol và target_yaw_tol_deg
       en: tray inside the target zone on table B, within target_pos_tol and target_yaw_tol_deg
       source: configs/eval/scorer/tray.yaml thresholds (giả định, chưa hiệu chỉnh)
-    # newest round first: the pages open on it (story DA-53, 28/11/2026)
-    rounds: [tray-jig-r1, tray-r1]
+    # the pages open on the first round: tray-r1, then tray-jig-r1 (decision Q2 of Hiếu,
+    # 28/11/2026, audit 00 · Tổng hợp; was newest first under story DA-53)
+    rounds: [tray-r1, tray-jig-r1]
     # story.json keys that belong to this task (besides the keys of its rounds)
     index: [story.sources, story.heat, story.reasons, story.qa_sample, story.h1m, story.ledger,
-            story.colab_balance, story.colab_sessions, story.ds, story.eval, story.loop_chain,
+            story.colab_balance, story.colab_sessions, story.ds, story.loop_chain,
             story.loop_detail]
     evals: []
     clusters: []
@@ -229,9 +230,11 @@ rounds:
     controls: [C_ALL, B_70, B_ALL]
     follow: {level: 1, seed: 1000107}
     deck_corrections: true           # the box "số cập nhật sau khi nộp slide" (#/base)
-    # story.json / sim.json keys that hold the round's numbers
+    # story.json / sim.json keys that hold the round's numbers. story.eval (policy C at 40k,
+    # before round 1, docs/he/tray.md §16.6) belongs here, not to the task (audit 02 P1-9).
+    # story.diag: clusters c1-c8, step 4 H1-H3 and the generation/QA cost (cited, tray.md §20)
     index: [story.pair, story.round, story.follow, story.demo, sim, story.runs,
-            story.train_log_tail, story.vm_phases]
+            story.train_log_tail, story.vm_phases, story.eval, story.diag]
 
   # Story DA-53 (Hiếu, 28/11/2026, option A): runs M and N on the jig scene as one Failure → Data
   # round. Each run names its own folders; the eval numbers are copied from the `results.json`
@@ -250,6 +253,8 @@ rounds:
     max_steps: 100000
     log_run: M                       # whose VM log the training page shows (else any run with one)
     scene: jig2
+    # the training cut of run M (sim library of this round, sim.json · rounds.tray-jig-r1)
+    cut: da48/cuts/M.tar
     # the eval set both runs were scored on; results are read only when the set's
     # conditions.sha256 file holds this value, the file counts this many rollouts with none
     # missing, and its scorer version and bootstrap seed match (story DA-53, "Luật đọc")
@@ -293,9 +298,14 @@ rounds:
     baseline: M
     after_round: N
     controls: []
+    # the round's cost (story.json · jig.cost): ledger story of each part, checked against the
+    # cited total of docs/he/tray-jig.md (seed/cited.yaml jig.cost.<part>)
+    cost_stories: {train: DA-48, eval: DA-47}
     # Hiếu, 28/11/2026: run N is not presented at all (training, data cut, Colab sessions, eval,
     # N minus M). Unlike withhold_eval, nothing of the run is shown and tasks.json does not list
     # it. Its files stay in fwdata; docs/he/tray-jig.md and the ledger keep their records.
+    # stories: DA-50 is run N's story; its catalog rows are dropped and its ledger rows merge
+    # into one "other" row with the same numbers (decision Q1, 28/11/2026)
     withhold_runs:
-      - {id: N, sessions: ["da50-*"]}
-    index: [story.jig]
+      - {id: N, sessions: ["da50-*"], stories: [DA-50]}
+    index: [story.jig, sim]
