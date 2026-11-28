@@ -1,0 +1,78 @@
+{
+ "time": "2026-11-25T10:01:22+07:00",
+ "fw_root": "fwdata",
+ "stages": [
+  {
+   "id": "collect",
+   "label": "Thu dữ liệu",
+   "state": "done",
+   "task": "tray",
+   "now": "Xong: Ingest robot",
+   "issue": null,
+   "how": null,
+   "jobs": [
+    "j-20261115-200514-5972"
+   ],
+   "link": "#/data/nhap",
+   "updated": "2026-11-15T20:05:18+07:00"
+  },
+  {
+   "id": "process",
+   "label": "Xử lý",
+   "state": "done",
+   "task": "tray",
+   "now": "Xong: Pipeline robot",
+   "issue": null,
+   "how": null,
+   "jobs": [
+    "j-20261115-200609-ef62"
+   ],
+   "link": "#/jobs?view=pipeline",
+   "updated": "2026-11-15T20:06:15+07:00"
+  }
+ ],
+ "jobs": [
+  {
+   "id": "j-20261115-200618-507d",
+   "kind": "eval.diag_system",
+   "stage": "eval",
+   "state": "ok",
+   "created": "2026-11-15T20:06:18+07:00",
+   "started": "2026-11-15T20:06:18+07:00",
+   "ended": "2026-11-15T20:06:19+07:00",
+   "rc": 0,
+   "chain_id": null
+  },
+  {
+   "id": "j-20261115-200614-310a",
+   "kind": "data.report",
+   "stage": "process",
+   "state": "ok",
+   "created": "2026-11-15T20:06:14+07:00",
+   "started": "2026-11-15T20:06:14+07:00",
+   "ended": "2026-11-15T20:06:15+07:00",
+   "rc": 0,
+   "chain_id": "j-20261115-200609-ef62"
+  }
+ ],
+ "machines": {
+  "laptop": {
+   "running_jobs": 0,
+   "slots": 2
+  },
+  "rtx3060": {
+   "tunnel": "down",
+   "models": [],
+   "agent_ready": false
+  },
+  "colab": {
+   "balance": 165.19,
+   "sessions": [],
+   "time": "2026-11-12T02:00:10+00:00",
+   "rate": 0.0,
+   "fresh": false
+  }
+ },
+ "locked": false,
+ "chat_on": true
+}

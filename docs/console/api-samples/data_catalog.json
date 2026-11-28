@@ -1,0 +1,146 @@
+{
+ "generated": "2026-11-11",
+ "rows": [
+  {
+   "id": "egodex-test",
+   "name": "egodex-test (Apple EgoDex test.zip)",
+   "title": "Apple EgoDex test.zip (chỉ từ xa)",
+   "kind": "raw source",
+   "group": "egocentric",
+   "data_type": "egocentric",
+   "task": "other",
+   "episodes": null,
+   "frames": null,
+   "hours": null,
+   "fps": 30,
+   "format": "zip (mp4+hdf5)",
+   "licence": "CC-BY-NC-ND-4.0",
+   "data_class": "public",
+   "locations": [
+    {
+     "where": "remote",
+     "path": "https://ml-site.cdn-apple.com/datasets/egodex/test.zip",
+     "raw": "https://ml-site.cdn-apple.com/datasets/egodex/test.zip (remote only, 17.3 GB)",
+     "exists": false
+    }
+   ],
+   "size": "17.3 GB (remote)",
+   "status": "upstream",
+   "notes": "never downloaded whole; read by HTTP range",
+   "qa": "-",
+   "qa_counts": null,
+   "view": "remote",
+   "laptop_dir": null,
+   "parents": [],
+   "children": [
+    "egodex-da30",
+    "egodex-da30-probe"
+   ],
+   "thumbs": [],
+   "aliases": [],
+   "lerobot": null,
+   "ego_viewer": null,
+   "unique": false
+  },
+  {
+   "id": "egodex-da30",
+   "name": "egodex-test-first2 / egodex-test-da30-part1",
+   "title": "EgoDex · 218 clip (DA-30)",
+   "kind": "raw source",
+   "group": "egocentric",
+   "data_type": "egocentric",
+   "task": "other",
+   "episodes": 218,
+   "frames": 90906,
+   "hours": 0.842,
+   "fps": 30,
+   "format": "EgoDex raw (mp4+hdf5, part1, 111 tasks x2)",
+   "licence": "CC-BY-NC-ND-4.0",
+   "data_class": "public",
+   "locations": [
+    {
+     "where": "laptop",
+     "path": "fwdata/egodex-da30",
+     "raw": "laptop:fwdata/egodex-da30",
+     "exists": true
+    },
+    {
+     "where": "rtx3060",
+     "path": "~/denso-da30/data/egodex",
+     "raw": "rtx3060:~/denso-da30/data/egodex",
+     "exists": false
+    }
+   ],
+   "size": "2.1 GB",
+   "status": "current",
+   "notes": "frames from src_158e report; manifest pins D2 deid waiver",
+   "qa": "-",
+   "qa_counts": null,
+   "view": "meta",
+   "laptop_dir": "fwdata/egodex-da30",
+   "parents": [
+    "egodex-test"
+   ],
+   "children": [
+    "src_050b9bf56a4e843c",
+    "src_158ec3c813ffe9a6"
+   ],
+   "thumbs": [],
+   "aliases": [],
+   "lerobot": null,
+   "ego_viewer": null,
+   "unique": true
+  }
+ ],
+ "edges": [
+  [
+   "egodex-test",
+   "egodex-da30"
+  ],
+  [
+   "egodex-test",
+   "egodex-da30-probe"
+  ]
+ ],
+ "runs": [
+  {
+   "id": "run-da-30-da30-tray-ego-b-stage1-vlm",
+   "name": "RUN DA-30 da30-tray-ego-b (stage1 VLM)",
+   "title": "Run · DA-30 da30-tray-ego-b (stage1 VLM)",
+   "ext": false
+  },
+  {
+   "id": "run-da-34-b-all-b-70",
+   "name": "RUN DA-34 B_ALL / B_70",
+   "title": "Run · DA-34 B_ALL / B_70",
+   "ext": false
+  }
+ ],
+ "totals": {
+  "egocentric": {
+   "sets": 3,
+   "episodes": 379,
+   "hours": 0.966
+  },
+  "all": {
+   "sets": 10,
+   "episodes": 2572,
+   "hours": 16.869
+  },
+  "teleop": {
+   "sets": 2,
+   "episodes": 193,
+   "hours": 0.586
+  },
+  "s1": {
+   "sets": 3,
+   "episodes": 1032,
+   "hours": 6.095
+  },
+  "s2": {
+   "sets": 2,
+   "episodes": 968,
+   "hours": 9.222
+  }
+ }
+}

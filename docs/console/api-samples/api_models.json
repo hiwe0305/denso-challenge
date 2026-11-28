@@ -1,0 +1,13 @@
+{
+ "tunnel": "down",
+ "models": [],
+ "agent_model": "hf.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB:Q4_K_M",
+ "agent_ready": false,
+ "error": null,
+ "nemotron": "down",
+ "chat": {
+  "provider": "nemotron",
+  "model": "hf.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB:Q4_K_M",
+  "hosted": false
+ }
+}

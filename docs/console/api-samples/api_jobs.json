@@ -1,0 +1,65 @@
+[
+ {
+  "id": "j-20261115-200618-507d",
+  "kind": "eval.diag_system",
+  "stage": "eval",
+  "process_stage": "diagnose",
+  "task": "two_table",
+  "params": {
+   "episode": "<repo>/packages/flywheel-testkit/src/flywheel/testkit/fixtures/trace/tr_clean"
+  },
+  "argv": [
+   "<repo>/.venv/bin/fw",
+   "eval"
+  ],
+  "cwd": "~/project/denso-challenge/.claude/worktrees/flywheel-demo-website-alignment-d2f881",
+  "host": "laptop",
+  "state": "ok",
+  "rc": 0,
+  "created": "2026-11-15T20:06:18+07:00",
+  "started": "2026-11-15T20:06:18+07:00",
+  "ended": "2026-11-15T20:06:19+07:00",
+  "outputs": {
+   "episode": "<repo>/packages/flywheel-testkit/src/flywheel/testkit/fixtures/trace/tr_clean",
+   "store": "fwdata/console/store/eval/j-20261115-200618-507d",
+   "fixture": true,
+   "verdict": "CHƯA RÕ",
+   "findings": 0,
+   "skipped": 2,
+   "record": "fwdata/console/store/eval/j-20261115-200618-507d/diagnosis/system.jsonl"
+  },
+  "pid": 667610,
+  "seconds": 1.21
+ },
+ {
+  "id": "j-20261115-200614-310a",
+  "kind": "data.report",
+  "stage": "process",
+  "process_stage": "data",
+  "task": "two_table",
+  "params": {
+   "work": "fwdata/console/store/work/j-20261115-200609-6aa9"
+  },
+  "argv": [
+   "<repo>/.venv/bin/fw",
+   "data"
+  ],
+  "cwd": "~/project/denso-challenge/.claude/worktrees/flywheel-demo-website-alignment-d2f881",
+  "host": "laptop",
+  "state": "ok",
+  "rc": 0,
+  "created": "2026-11-15T20:06:14+07:00",
+  "started": "2026-11-15T20:06:14+07:00",
+  "ended": "2026-11-15T20:06:15+07:00",
+  "outputs": {
+   "work": "fwdata/console/store/work/j-20261115-200609-6aa9",
+   "page": "fwdata/console/store/work/j-20261115-200609-6aa9/report/index.html",
+   "dataset_report": "fwdata/console/store/work/j-20261115-200609-6aa9/report/dataset_report.json",
+   "episode_count": 99,
+   "ledger": "fwdata/console/store/sites/local/runs"
+  },
+  "chain_id": "j-20261115-200609-ef62",
+  "pid": 667563,
+  "seconds": 0.9
+ }
+]

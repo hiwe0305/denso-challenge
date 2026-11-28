@@ -1,0 +1,255 @@
+{
+ "time": "2026-11-25T10:01:22+07:00",
+ "locked": false,
+ "stages": [
+  "data",
+  "qa"
+ ],
+ "machines": {
+  "laptop": {
+   "slots": 2
+  },
+  "rtx3060_tunnel": "down"
+ },
+ "kinds": [
+  {
+   "kind": "data.ingest",
+   "stage": "data",
+   "title": {
+    "vi": "Nạp dữ liệu robot (tầng 1)",
+    "en": "Ingest robot data (tier 1)"
+   },
+   "label": "Ingest robot",
+   "command": "fw data ingest <dataset> --source-detail … --license … --data-class … --work fwdata/console/store/work/<job>",
+   "args": [
+    {
+     "name": "dataset",
+     "type": "path",
+     "required": true,
+     "help": {
+      "vi": "Dataset LeRobot v2.1 dưới fwdata (được chép vào store của console, tối đa 2 GB)",
+      "en": "LeRobot v2.1 dataset under fwdata (copied into the console store, at most 2 GB)"
+     },
+     "root": "fwdata"
+    },
+    {
+     "name": "source_detail",
+     "type": "enum",
+     "required": true,
+     "help": {
+      "vi": "Loại nguồn",
+      "en": "Source kind"
+     },
+     "choices": [
+      "psi_data",
+      "planner_wbc"
+     ]
+    }
+   ],
+   "samples": [
+    {
+     "label": {
+      "vi": "he/subset-check/src/G1WholebodyLocomotionPickBetweenTablesTeleop-v0 · 99 tập · 216 MB",
+      "en": "he/subset-check/src/G1WholebodyLocomotionPickBetweenTablesTeleop-v0 · 99 episodes · 216 MB"
+     },
+     "params": {
+      "dataset": "he/subset-check/src/G1WholebodyLocomotionPickBetweenTablesTeleop-v0",
+      "source_detail": "psi_data",
+      "license": "unknown",
+      "data_class": "restricted",
+      "split": "train"
+     },
+     "task": "two_table",
+     "fixture": false,
+     "available": true,
+     "episodes": 99,
+     "frames": 62764,
+     "bytes": 215817599,
+     "staged": true,
+     "last_seconds": 2.7
+    },
+    {
+     "label": {
+      "vi": "rtx3060/denso-da33/fwdata/releases/tray_s1_0d84cc87b1e5 · 102 tập · 902 MB",
+      "en": "rtx3060/denso-da33/fwdata/releases/tray_s1_0d84cc87b1e5 · 102 episodes · 902 MB"
+     },
+     "params": {
+      "dataset": "rtx3060/denso-da33/fwdata/releases/tray_s1_0d84cc87b1e5",
+      "source_detail": "planner_wbc",
+      "license": "unknown",
+      "data_class": "public",
+      "split": "train"
+     },
+     "task": "tray",
+     "fixture": false,
+     "available": true,
+     "episodes": 102,
+     "frames": 148013,
+     "bytes": 901531373,
+     "staged": true,
+     "last_seconds": 3.6
+    }
+   ],
+   "needs": [],
+   "runs_on": "laptop",
+   "typical_seconds": 3.2,
+   "n_ok_runs": 8,
+   "outputs": {
+    "vi": "Mọi file (dataset đã chép, work dir, release, dòng sổ chi phí) nằm trong fwdata/console/store/, không thêm vào release hay sổ chi phí của dự án.",
+    "en": "Every file (staged dataset, work dir, release, ledger rows) stays in fwdata/console/store/; nothing is added to the project's releases or ledger."
+   },
+   "available": true,
+   "reason": null
+  },
+  {
+   "kind": "data.pipeline",
+   "stage": "data",
+   "title": {
+    "vi": "Cả pipeline robot",
+    "en": "Whole robot pipeline"
+   },
+   "label": "Pipeline robot",
+   "command": "data.ingest → data.qa → data.release → data.report",
+   "args": [
+    {
+     "name": "dataset",
+     "type": "path",
+     "required": true,
+     "help": {
+      "vi": "Dataset LeRobot v2.1 dưới fwdata (được chép vào store của console, tối đa 2 GB)",
+      "en": "LeRobot v2.1 dataset under fwdata (copied into the console store, at most 2 GB)"
+     },
+     "root": "fwdata"
+    },
+    {
+     "name": "source_detail",
+     "type": "enum",
+     "required": true,
+     "help": {
+      "vi": "Loại nguồn",
+      "en": "Source kind"
+     },
+     "choices": [
+      "psi_data",
+      "planner_wbc"
+     ]
+    }
+   ],
+   "samples": [
+    {
+     "label": {
+      "vi": "he/subset-check/src/G1WholebodyLocomotionPickBetweenTablesTeleop-v0 · 99 tập · 216 MB",
+      "en": "he/subset-check/src/G1WholebodyLocomotionPickBetweenTablesTeleop-v0 · 99 episodes · 216 MB"
+     },
+     "params": {
+      "dataset": "he/subset-check/src/G1WholebodyLocomotionPickBetweenTablesTeleop-v0",
+      "source_detail": "psi_data",
+      "license": "unknown",
+      "data_class": "restricted",
+      "split": "train"
+     },
+     "task": "two_table",
+     "fixture": false,
+     "available": true,
+     "episodes": 99,
+     "frames": 62764,
+     "bytes": 215817599,
+     "staged": true,
+     "last_seconds": 6.3
+    },
+    {
+     "label": {
+      "vi": "rtx3060/denso-da33/fwdata/releases/tray_s1_0d84cc87b1e5 · 102 tập · 902 MB",
+      "en": "rtx3060/denso-da33/fwdata/releases/tray_s1_0d84cc87b1e5 · 102 episodes · 902 MB"
+     },
+     "params": {
+      "dataset": "rtx3060/denso-da33/fwdata/releases/tray_s1_0d84cc87b1e5",
+      "source_detail": "planner_wbc",
+      "license": "unknown",
+      "data_class": "public",
+      "split": "train"
+     },
+     "task": "tray",
+     "fixture": false,
+     "available": true,
+     "episodes": 102,
+     "frames": 148013,
+     "bytes": 901531373,
+     "staged": true,
+     "last_seconds": 7.8
+    }
+   ],
+   "needs": [],
+   "runs_on": "laptop",
+   "typical_seconds": 6.3,
+   "n_ok_runs": 7,
+   "outputs": {
+    "vi": "Mọi file (dataset đã chép, work dir, release, dòng sổ chi phí) nằm trong fwdata/console/store/, không thêm vào release hay sổ chi phí của dự án.",
+    "en": "Every file (staged dataset, work dir, release, ledger rows) stays in fwdata/console/store/; nothing is added to the project's releases or ledger."
+   },
+   "available": true,
+   "reason": null,
+   "chain": [
+    "data.ingest",
+    "data.qa"
+   ]
+  }
+ ],
+ "remote": [
+  {
+   "id": "train",
+   "stage": "train",
+   "title": {
+    "vi": "Dạy model (Ψ₀ stage 3)",
+    "en": "Model training (Ψ₀ stage 3)"
+   },
+   "where": {
+    "vi": "Colab, GPU A100",
+    "en": "Colab, A100 GPU"
+   },
+   "runs_on": [
+    "colab_a100"
+   ],
+   "observe": {
+    "vi": "metrics.jsonl đồng bộ về fwdata/tray/pair60k/<nhánh>/<job>/ (trang Dạy model, /api/status), số dư Colab từ fwdata/colab/*/guard.jsonl; chạy eval.diag_train t…",
+    "en": "metrics.jsonl synced into fwdata/tray/pair60k/<branch>/<job>/ (training page, /api/status), Colab balance from fwdata/colab/*/guard.jsonl; run eval.diag_trai…"
+   },
+   "docs": [
+    "docs/product/09-data-flows.md#f5--train",
+    "docs/he/tray.md"
+   ],
+   "why": {
+    "vi": "Cần GPU; console không chạy job GPU.",
+    "en": "Needs a GPU; the console runs no GPU job."
+   }
+  },
+  {
+   "id": "eval_closed_loop",
+   "stage": "eval",
+   "title": {
+    "vi": "Thi closed-loop trong mô phỏng",
+    "en": "Closed-loop evaluation in simulation"
+   },
+   "where": {
+    "vi": "rtx3060 (MuJoCo) hoặc Colab",
+    "en": "rtx3060 (MuJoCo) or Colab"
+   },
+   "runs_on": [
+    "rtx3060",
+    "colab"
+   ],
+   "observe": {
+    "vi": "Kết quả đồng bộ về fwdata/tray/pair60k/stage1-60k/ và đọc vào index (story.json); trang Thi và chấm.",
+    "en": "Results synced into fwdata/tray/pair60k/stage1-60k/ and read into the index (story.json); evaluation page."
+   },
+   "docs": [
+    "docs/product/09-data-flows.md#f6--eval-closed-loop",
+    "docs/he/tray.md"
+   ],
+   "why": {
+    "vi": "Cần server policy GPU và máy mô phỏng.",
+    "en": "Needs a GPU policy server and the sim box."
+   }
+  }
+ ]
+}
