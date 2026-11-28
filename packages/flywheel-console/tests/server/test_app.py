@@ -619,3 +619,14 @@ def test_locked_status_carries_no_hidden_run(locked_srv: Srv) -> None:
     assert st == 200 and "da50" not in text and "jig-n" not in text
     train = next(s for s in json.loads(body)["stages"] if s["id"] == "train")
     assert [r["branch"] for r in train["runs"]] == ["M"]
+
+
+def test_withhold_strips_a_held_run_from_compare60() -> None:
+    """A stale index whose 60-rollout table (DA-53 AC 11) lists a held run: the run goes."""
+    from flywheel.console.server import withhold
+
+    earlier = [{"run": "C_70", "successes": 10}, {"run": "HELD", "successes": 4}]
+    c60 = {"run": "M", "successes": 47, "n": 60, "earlier": earlier}
+    out = withhold.story({"jig": {"compare60": c60}}, {"HELD"})
+    assert out["jig"]["compare60"]["earlier"] == [{"run": "C_70", "successes": 10}]
+    assert out["jig"]["compare60"]["successes"] == 47

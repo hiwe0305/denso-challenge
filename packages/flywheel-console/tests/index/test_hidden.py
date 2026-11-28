@@ -247,3 +247,11 @@ def test_tasks_doc_filter_cleans_a_stale_tasks_json() -> None:
     assert jig["runs"] == [{"id": "M"}] and jig["after_round"] is None and jig["log_run"] is None
     assert "withhold_runs" not in jig and pair == stale["rounds"][1]
     _no_n(json.dumps(out))
+
+
+def test_story_filter_drops_compare60_of_a_hidden_run() -> None:
+    c60 = {"run": "N", "earlier": [{"run": "C_70"}]}
+    assert hidden.story({"jig": {"compare60": c60}}, H)["jig"]["compare60"] is None
+    c60 = {"run": "M", "earlier": [{"run": "C_70"}, {"run": "N"}]}
+    out = hidden.story({"jig": {"compare60": c60}}, H)["jig"]["compare60"]
+    assert out == {"run": "M", "earlier": [{"run": "C_70"}]}

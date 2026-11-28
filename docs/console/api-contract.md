@@ -56,11 +56,22 @@ Do `fw console index` tạo trong `fwdata/console/index/`, server phục vụ �
 |---|---|---|
 | `data/tasks.json` | [data_tasks.json](api-samples/data_tasks.json) | `{version, source, tasks[], rounds[]}`. Mỗi task: `id` (`tray`, `two_table`…), `name`/`word`/`description` song ngữ `{vi, en}`, `robot`, `model`, `simulator`, `stages[]`, `success`, `rounds[]` (id vòng), `index[]` (khóa của `story.json` mà task được thấy), `process` (stage 0–6: thiếu gì, chạy ở đâu, lệnh), `catalog_totals`, `catalog_rows`. Mỗi round: `id`, `task`, `title`, `runs[]`, `baseline`, `after_round` (có thể `null`, mục 1.3), `controls[]`, `withhold_eval[]`, `follow`, `max_steps`, `index[]`. Run trong `withhold_runs` không có mặt (mục 1.3) |
 | `data/catalog.json` | [data_catalog.json](api-samples/data_catalog.json) | `{generated, rows[], edges[], runs[], totals}`. Mỗi row là một tập dữ liệu: `id`, `title`, `kind`, `group`, `data_type`, `task`, `episodes`, `frames`, `hours`, `fps`, `format`, `licence`, `data_class`, `status`, `parents[]`, `children[]`, `view`, `thumbs[]`. `edges` là cặp `[cha, con]` của cây nguồn gốc. `totals` theo nhóm (`egocentric`, `teleop`, `s1`, `s2`, `all`) |
-| `data/story.json` | [data_story.json](api-samples/data_story.json) | Số liệu cho các trang câu chuyện: `runs`, `train_log_tail`, `sources`, `heat`, `reasons`, `ledger`, `colab_balance`, `colab_sessions`, `eval`, `loop_chain`, `loop_detail`, `pair`, `round`, `follow`, `demo`, `h1m`, `ds`, `vm_phases`, `qa_sample`. Mỗi task chỉ được đọc các khóa có trong `index[]` của task và round (`story.<khóa>`); không hiện số của task khác |
+| `data/story.json` | [data_story.json](api-samples/data_story.json) | Số liệu cho các trang câu chuyện: `runs`, `train_log_tail`, `sources`, `heat`, `reasons`, `ledger`, `colab_balance`, `colab_sessions`, `eval`, `loop_chain`, `loop_detail`, `pair`, `round`, `follow`, `demo`, `h1m`, `ds`, `vm_phases`, `qa_sample`, `jig` (vòng trên cảnh đồ gá, mục 2.1). Mỗi task chỉ được đọc các khóa có trong `index[]` của task và round (`story.<khóa>`); không hiện số của task khác |
 | `data/sim.json` | [data_sim.json](api-samples/data_sim.json) | Tập episode mô phỏng: `source`, `sha8`, `parts[]`, `cuts{}`, `batch{}`, `episodes[]`, `round`, `format`, `teleop[]`. Task không có khóa `sim` trong `index[]` chỉ thấy `teleop[]` lọc theo task |
 | `data/ds/<id>/episodes.json` | (không có mẫu) | Danh sách episode của một tập; đây là nguồn số episode cho `#/data/:id/ep/:n`. Tập robot (do [index/robot.py](../../packages/flywheel-console/src/flywheel/console/index/robot.py) viết): `i`, `n`, `s` (giây), `lv`, `seed`, `part`, `cut`, `out`… Tập egocentric và nguồn: `id`, `title`, `s`, `qa`, `reasons`, `poster`… Tập robot chỉ có khi laptop có dữ liệu LeRobot lúc chạy `fw console index` |
 | `data/ds/<id>/quality.json`, `method.json`, `qa.json`, `env.json` | (không có mẫu) | Chất lượng, cách tạo tập, kết quả QA từng episode, môi trường (chỉ tập robot); file nào thiếu thì khối đó rỗng |
 | `data/ds/<id>/posters/<i>.jpg` | | Ảnh đại diện từng episode |
+
+### 2.1. Khối `jig`: lượt lặp và bảng 60 lượt
+
+Hình dạng đầy đủ của khối `jig` ghi trong docstring của [index/jig.py](../../packages/flywheel-console/src/flywheel/console/index/jig.py). Hai trường thêm cho bảng 60 lượt (story DA-53, AC 11, quyết định của Hiếu 28/11/2026):
+
+| Trường | Nội dung |
+|---|---|
+| `jig.outcomes[].repeats` | `[{repeat, n, successes, levels: {"1": {n, successes}, "2": {...}}}]`, một phần tử cho mỗi lượt lặp. Lượt lặp đọc từ trường `repeat` của dòng `outcomes.jsonl` có cùng `episode_id` với dòng `scores.jsonl`. Hai file không khớp một-một theo `episode_id` thì không có trường này (không đoán) |
+| `jig.compare60` | `null`, hoặc `{run, repeat: 0, n, successes, p, levels, repeats: [{repeat, n, successes}], scorer_version, source: {scores, outcomes}, earlier: [{run, n, successes, p}], earlier_scorer, earlier_source, earlier_doc}`. `run` là baseline của vòng (M); số là lượt lặp 0, chọn trước theo số thứ tự, không phải lượt cao nhất. `earlier` lấy từ `pair.runs` của vòng `tray-r1`, chỉ baseline và các run đối chứng, theo thứ tự hiện của vòng, không bao giờ có run trong `withhold_eval` hay `withhold_runs`. `earlier_scorer` là `null` khi file stage 1 không ghi bộ chấm; trang ghi "bộ chấm bản 1". Khối là `null` khi chưa có lượt lặp 0 hoặc có run trong `earlier` khác cỡ `n` |
+
+Khối chỉ mô tả: không có hiệu, khoảng tin cậy hay câu đọc (quy tắc 4 của `jig-m-rules` trong [tray-jig.md](../he/tray-jig.md)). Trang luôn kèm câu nêu điểm khác (cảnh, bộ chấm, tập điều kiện, số bước train) và không dùng chữ "tốt hơn".
 
 ## 3. API đọc (GET)
 
