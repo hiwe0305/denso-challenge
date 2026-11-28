@@ -293,3 +293,33 @@ def test_withhold_filter_covers_the_jig_block() -> None:
     assert "out.jig" in src
     for key in ("evals", "outcomes", "rollouts", "conditions", "compare60", "featured"):
         assert f"out.jig.{key}" in src or f"nextJig.{key}" in src, key
+
+
+def test_reasoning_block_shows_steps_and_never_the_thinking() -> None:
+    """'Quá trình suy luận' under each chat answer (Hiếu 28/11): saved steps only, open while
+    the answer streams."""
+    src = (WEB / "pages_chat.js").read_text(encoding="utf-8")
+    block = src[src.index("const renderReasoning") : src.index("const renderStudioTurn")]
+    assert "tr.steps" in block and "toolLabel(st)" in block and "stepRows(st.ui)" in block
+    assert "choice === undefined ? isRunning : choice" in block
+    for needle in ("tr.thinking", "system", "/api/chat/traces"):
+        assert needle not in block, needle
+    assert 'reason !== "theme"' in src and "ResizeObserver" in src and "resizeChatCharts" in src
+
+
+def test_compare60_ladder_is_descriptive_and_filtered() -> None:
+    """The 60-rollout ladder on the eval page: counts only, no winner wording or colour scale."""
+    src = (WEB / "pages_story.js").read_text(encoding="utf-8")
+    start = src.index("export function compare60Ladder")
+    ladder = src[start : src.index("// Numbers inside a preformatted")]
+    assert "getRoundsForTask" in ladder and "visualMap" not in ladder
+    for lang in ("vi", "en"):
+        lines = [
+            ln
+            for ln in (WEB / "i18n" / f"{lang}.js").read_text(encoding="utf-8").splitlines()
+            if '"exp.ladder' in ln
+        ]
+        assert len(lines) >= 15
+        for ln in lines:
+            assert not re.search(r"tốt hơn|cao hơn|tăng|better|higher|improv|\+\d", ln), ln
+    assert "keepLadder" in _function("core.js", "filterWithheldStory")
