@@ -331,3 +331,37 @@ def test_compare60_ladder_is_descriptive_and_filtered() -> None:
         for ln in lines:
             assert not re.search(r"tốt hơn|cao hơn|tăng|better|higher|improv|\+\d", ln), ln
     assert "keepLadder" in _function("core.js", "filterWithheldStory")
+
+
+_DOM_INSERT = re.compile(r"\.(append|prepend|before|after|replaceWith|replaceChildren)\(")
+
+
+def _top_level_args(text: str, start: int) -> str:
+    """Top-level argument text of the call whose "(" is at ``start``: what sits inside
+    nested (), [] or {} (an el() call, an array that is filtered) is left out."""
+    depth, out = 0, []
+    for ch in text[start:]:
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+            if depth == 0:
+                break
+        elif depth == 1:
+            out.append(ch)
+    return "".join(out)
+
+
+def test_no_dom_insert_can_write_null_or_undefined() -> None:
+    """Node.append(null) writes the text "null" (seen under the reasoning steps while an
+    answer streamed, 28/11). A DOM insert that may get null or undefined filters it first;
+    el() and setChildren() already skip them."""
+    bad = []
+    for f in sorted(WEB.glob("*.js")):
+        lines = f.read_text(encoding="utf-8").splitlines()
+        text = "\n".join("" if ln.lstrip().startswith("//") else ln for ln in lines)
+        for m in _DOM_INSERT.finditer(text):
+            args = _top_level_args(text, m.end() - 1)
+            if re.search(r":\s*(null|undefined)\b|^\s*(null|undefined)\s*(,|$)", args):
+                bad.append(f"{f.name}:{text.count(chr(10), 0, m.start()) + 1}")
+    assert bad == [], bad
