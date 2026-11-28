@@ -3341,10 +3341,18 @@ export function renderSimLibraryPage() {
             );
           };
 
+          // Descriptive outcome row of the shown run, and its results.json Wilson when ready.
+          const jigOutcomes = jig && Array.isArray(jig.outcomes) ? jig.outcomes : [];
           const latestRun =
-            jig && Array.isArray(jig.runs) && jig.runs.length > 0
-              ? jig.runs[jig.runs.length - 1]
+            jigOutcomes.find((o) => jig && o.run === jig.featured) ||
+            jigOutcomes[jigOutcomes.length - 1] ||
+            null;
+          const latestEval =
+            latestRun && Array.isArray(jig.evals)
+              ? jig.evals.find((e) => e.run === latestRun.run && e.status === "ready") || null
               : null;
+          const latestWilson =
+            latestEval && latestEval.headline ? latestEval.headline.wilson : null;
 
           setChildren(
             modeHolder,
@@ -3357,10 +3365,9 @@ export function renderSimLibraryPage() {
               {
                 label: t("eval.colRate"),
                 value: rollouts.length ? formatPercent(okTotal / rollouts.length) : t("state.na"),
-                sub:
-                  latestRun && Array.isArray(latestRun.wilson)
-                    ? `${t("exp.wilsonDescr")} ${formatPercent(latestRun.wilson[0])}–${formatPercent(latestRun.wilson[1])}`
-                    : "",
+                sub: Array.isArray(latestWilson)
+                  ? `${t("exp.wilsonDescr")} ${formatPercent(latestWilson[0])}–${formatPercent(latestWilson[1])}`
+                  : "",
               },
               {
                 label: t("common.source"),

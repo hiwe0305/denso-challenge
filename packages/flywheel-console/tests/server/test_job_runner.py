@@ -314,6 +314,35 @@ def test_status_reads_pair_round_from_index(rn: ConsolePaths) -> None:
     assert st["loop"]["now"] == "Vòng C70_R1: chọn 181 tập → 4/60 → dừng (F)"
 
 
+def _jig_index(rn: ConsolePaths, status: str) -> None:
+    """story.json with a pair round and a jig block of the DA-53 shape (index/jig.py)."""
+    pair = {"best": "C_70", "runs": [{"run": "C_70", "successes": 10, "n": 60}]}
+    ev: dict[str, Any] = {"run": "M", "role": "baseline", "status": status}
+    if status == "ready":
+        ev["headline"] = {"n": 180, "successes": 136, "p": 0.7556, "ci": [0.7, 0.8111]}
+    jig = {
+        "evals": [ev], "featured": "M" if status == "ready" else None,
+        "runs": [{"branch": "M", "ckpt_step": 100000, "max_steps": 100000}],
+        "next_cut": None, "paired": None,
+    }  # fmt: skip
+    rn.index.mkdir(parents=True, exist_ok=True)
+    (rn.index / "story.json").write_text(json.dumps({"pair": pair, "jig": jig}), encoding="utf-8")
+
+
+def test_status_reads_the_featured_jig_eval(rn: ConsolePaths) -> None:
+    """DA-53 2.4: the jig line is the featured run's results.json headline; no cut name."""
+    _jig_index(rn, "ready")
+    st = {s["id"]: s for s in runner.status()["stages"]}
+    assert st["eval"]["now"] == "Tốt nhất C_70 10/60 · Cảnh jig2: M 136/180"
+    assert ".tar" not in st["loop"]["now"]
+
+
+def test_status_has_no_jig_figure_while_results_json_is_missing(rn: ConsolePaths) -> None:
+    _jig_index(rn, "missing")
+    st = {s["id"]: s for s in runner.status()["stages"]}
+    assert st["eval"]["now"] == "Tốt nhất C_70 10/60"
+
+
 def test_train_runs_skip_abandoned_attempts(rn: ConsolePaths) -> None:
     for branch in ("C70_R1", "C70_R1.attempt1"):
         d = rn.fw_root / "tray/pair60k" / branch / "job"

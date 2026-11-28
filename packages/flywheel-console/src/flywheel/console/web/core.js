@@ -662,6 +662,30 @@ export function filterWithheldStory(doc, withheldSet = getAllWithheldRuns()) {
       ),
     };
   }
+  if (out.jig && typeof out.jig === "object") {
+    // Results of a withheld run in the jig block (defence in depth: the index writes only
+    // {run, role, status: "withheld"} for it). Its train entry in jig.runs stays, as for pair.
+    const keep = (list) =>
+      Array.isArray(list) ? list.filter((r) => !(r && withheldSet.has(r.run))) : list;
+    const nextJig = {
+      ...out.jig,
+      evals: Array.isArray(out.jig.evals)
+        ? out.jig.evals.map((e) =>
+            e && withheldSet.has(e.run) ? { run: e.run, role: e.role, status: "withheld" } : e
+          )
+        : out.jig.evals,
+      outcomes: keep(out.jig.outcomes),
+      rollouts: keep(out.jig.rollouts),
+      conditions: keep(out.jig.conditions),
+    };
+    if (withheldSet.has(nextJig.featured)) nextJig.featured = null;
+    if (nextJig.compare60 && typeof nextJig.compare60 === "object") {
+      nextJig.compare60 = withheldSet.has(nextJig.compare60.run)
+        ? null
+        : { ...nextJig.compare60, earlier: keep(nextJig.compare60.earlier) };
+    }
+    out.jig = nextJig;
+  }
   if (out.follow && typeof out.follow === "object") {
     const nextFollow = { ...out.follow, runs: omitKeys(out.follow.runs) };
     delete nextFollow.r3;
@@ -696,6 +720,29 @@ export function scopeStoryForTask(rawStory) {
     }
   }
   return filterWithheldStory(scoped);
+}
+
+// Short reading lines of one jig eval (story.jig.evals[], index/jig.py): one per rule whose
+// verdict is given, threshold from the reading itself. Empty unless the eval is "ready".
+export function jigReadingLines(ev) {
+  if (!ev || ev.status !== "ready" || !Array.isArray(ev.readings)) return [];
+  const out = [];
+  for (const rd of ev.readings) {
+    if (rd.verdict !== "met" && rd.verdict !== "not_met") continue;
+    const pct = Number.isFinite(rd.threshold) ? formatPercent(rd.threshold, 0) : t("state.na");
+    const scope =
+      rd.scope === "whole_task"
+        ? t("exp.scopeWhole")
+        : rd.scope === "level"
+          ? t("exp.scopeLevel", { lv: rd.level })
+          : t("exp.scopePlace");
+    const verdict =
+      rd.verdict === "met"
+        ? t(rd.scope === "place" ? "exp.verdictPlaceMet" : "exp.verdictMet", { pct })
+        : t("exp.verdictNotMet", { pct });
+    out.push(`${scope}: ${verdict}`);
+  }
+  return out;
 }
 
 export function scopeSimForTask(rawSim) {

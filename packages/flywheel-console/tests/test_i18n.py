@@ -185,3 +185,11 @@ def test_dictionaries_use_steps_not_stations() -> None:
     for name in ("vi.js", "en.js"):
         vals = budget.dict_entries(WEB / "i18n" / name).values()
         assert not [v for v in vals if re.search(r"\b(trạm|station)\b", v, re.I)], name
+
+
+def test_no_dictionary_value_ranks_runs() -> None:
+    """Rule 4 of ``jig-m-rules``: M beside the DA-34 runs is never "better" (story DA-53)."""
+    for name in ("vi.js", "en.js"):
+        vals = budget.dict_entries(WEB / "i18n" / name)
+        bad = [k for k, v in vals.items() if re.search(r"tốt hơn|\bbetter\b", v, re.I)]
+        assert not bad, (name, bad)

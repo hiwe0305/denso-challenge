@@ -20,6 +20,7 @@ import {
   hasI18nKey,
   hasIndexAccess,
   isStageComplete,
+  jigReadingLines,
   onRouteCleanup,
   pickLang,
   postJSON,
@@ -179,11 +180,22 @@ export function renderHomePage() {
       pairRuns.find((r) => pairDoc && r.run === pairDoc.best) || pairRuns[0] || null;
     const withheldList =
       curRound && Array.isArray(curRound.withhold_eval) ? curRound.withhold_eval : [];
+    // The jig round (tray-jig-r1) has its own result: the featured eval when ready, else the
+    // baseline's eval status; never a tray-r1 number (decision 4 of story DA-53).
     const jigDoc =
       hasIndexAccess("story.jig") && scopedStory && scopedStory.jig ? scopedStory.jig : null;
-    const jigRuns = jigDoc && Array.isArray(jigDoc.runs) ? jigDoc.runs : [];
-    const jigBest =
-      jigRuns.find((r) => jigDoc && r.run === jigDoc.best) || jigRuns[0] || null;
+    const jigEvals = jigDoc && Array.isArray(jigDoc.evals) ? jigDoc.evals : [];
+    const jigRunId =
+      (jigDoc && jigDoc.featured) ||
+      (curRound && curRound.baseline) ||
+      (jigEvals[0] && jigEvals[0].run) ||
+      null;
+    const jigEval = jigEvals.find((e) => e.run === jigRunId) || null;
+    const jigTrainRuns = jigDoc && Array.isArray(jigDoc.runs) ? jigDoc.runs : [];
+    const jigTrain =
+      jigTrainRuns.find((r) => r.branch === jigRunId) ||
+      jigTrainRuns.find((r) => jigDoc && r.branch === jigDoc.log_run) ||
+      null;
 
     const spotlightBox = el("div", { className: "stage-spotlight" });
 
@@ -646,13 +658,31 @@ export function renderHomePage() {
       const evalStage = stages.find((s) => s && s.id === "eval");
       const trainStage = stages.find((s) => s && s.id === "train");
       const fallbackEvalLine = evalStage && evalStage.now ? evalStage.now : t("state.na");
-      const bestEvalText = pairBest
-        ? t("ux.homeEvalBestVal", {
-            run: pairBest.run,
-            succ: formatNumber(pairBest.successes),
-            n: formatNumber(pairBest.n),
-          })
-        : fallbackEvalLine;
+      const jigHead = jigEval && jigEval.headline ? jigEval.headline : null;
+      const bestEvalText = jigDoc
+        ? jigEval && jigEval.status === "ready" && jigHead
+          ? t("ux.homeEvalBestVal", {
+              run: jigEval.run,
+              succ: formatNumber(jigHead.successes),
+              n: formatNumber(jigHead.n),
+            })
+          : jigEval && jigEval.status === "blocked"
+            ? t("ux.homeJigEvalBlocked", { run: jigEval.run })
+            : t("exp.evalMissing", { run: jigRunId || "-" })
+        : pairBest
+          ? t("ux.homeEvalBestVal", {
+              run: pairBest.run,
+              succ: formatNumber(pairBest.successes),
+              n: formatNumber(pairBest.n),
+            })
+          : fallbackEvalLine;
+      const bestEvalSub = jigDoc
+        ? jigEval && jigEval.status === "ready"
+          ? jigReadingLines(jigEval).join(" · ")
+          : jigEval && jigEval.status === "missing"
+            ? t("ux.homeJigEvalMissingSub")
+            : ""
+        : "";
       const withheldNote =
         withheldList.length > 0
           ? t("ux.homeEvalWithheldNote", { run: withheldList.join(", ") })
@@ -666,8 +696,6 @@ export function renderHomePage() {
               gpu: activeColabList[0].gpu || "GPU",
             })
           : "";
-      const lv1 = jigBest && jigBest.levels && jigBest.levels["1"];
-      const lv2 = jigBest && jigBest.levels && jigBest.levels["2"];
 
       taskAttentionBanner = el(
         "div",
@@ -702,7 +730,8 @@ export function renderHomePage() {
                     total: formatNumber(stages.length),
                   }),
             }),
-            trainStage && trainStage.now
+            // the server's train line lists every scene's runs; the jig round shows its own below
+            trainStage && trainStage.now && !jigDoc
               ? el("div", { className: cls("tiny", "mono"), text: trainStage.now })
               : null,
           ]),
@@ -712,41 +741,36 @@ export function renderHomePage() {
               el("b", { style: "font-size:15px", text: bestEvalText }),
               el("a", { className: "link", href: "#/eval" }, [t("nav.item.eval")]),
             ]),
+            bestEvalSub ? el("div", { className: "tiny", text: bestEvalSub }) : null,
             withheldNote ? el("div", { className: "tiny", text: withheldNote }) : null,
           ]),
-          jigBest
+          jigTrain
             ? el("div", { className: "outcome-col" }, [
                 el("span", { className: "eyebrow", text: t("ux.homeJigLatestLabel") }),
                 el("div", { className: "actions" }, [
                   el("b", {
                     style: "font-size:15px",
-                    text: t("ux.homeJigLatestVal", {
-                      run: jigBest.run,
-                      succ: formatNumber(jigBest.successes),
-                      n: formatNumber(jigBest.n),
-                      pct: formatPercent(jigBest.p),
+                    text: t("ux.homeJigTrainVal", {
+                      run: jigTrain.branch,
+                      step: formatNumber(jigTrain.ckpt_step || jigTrain.step),
+                      max: formatNumber(jigTrain.max_steps),
                     }),
                   }),
                   el("a", { className: "link", href: "#/runs" }, [t("nav.item.runs")]),
                 ]),
-                lv1 && lv2
-                  ? el("div", {
-                      className: "tiny",
-                      text: t("ux.homeJigLevelsSub", {
-                        l1: `${formatNumber(lv1.successes)}/${formatNumber(lv1.n)}`,
-                        l2: `${formatNumber(lv2.successes)}/${formatNumber(lv2.n)}`,
-                      }),
-                    })
-                  : null,
-                jigDoc && jigDoc.next_cut && jigDoc.next_cut.name
-                  ? el("div", {
-                      className: cls("tiny", "mono"),
-                      text: t("ux.homeNextCutSub", {
-                        cut: jigDoc.next_cut.name,
-                        colab: colabSuffix,
-                      }),
-                    })
-                  : null,
+                el("div", {
+                  className: "tiny",
+                  text: [
+                    jigTrain.loss_last != null
+                      ? t("ux.homeJigLossSub", {
+                          loss: formatNumber(jigTrain.loss_last, { maximumFractionDigits: 3 }),
+                        })
+                      : "",
+                    colabSuffix.replace(/^ · /, ""),
+                  ]
+                    .filter(Boolean)
+                    .join(" · "),
+                }),
               ])
             : null,
         ]

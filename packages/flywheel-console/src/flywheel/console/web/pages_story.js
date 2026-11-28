@@ -11,6 +11,7 @@ import {
   getCurrentRound,
   getCurrentTask,
   getJSON,
+  jigReadingLines,
   hasI18nKey,
   hasIndexAccess,
   pickLang,
@@ -116,7 +117,6 @@ export function renderRunsPage() {
   const wrap = el("div", {});
   wrap.appendChild(renderLoadingView(t("runs.title")));
   let activeMetric = "loss";
-  let campFilter = "all";
   let useEma = true;
   let selectedBranch = null;
 
@@ -126,7 +126,11 @@ export function renderRunsPage() {
       const story = scopeStoryForTask(rawStory);
       const round = getCurrentRound();
 
-      if (!hasIndexAccess("story.runs")) {
+      // The round's training runs: story.runs when the round lists it (tray-r1), else the runs of
+      // the jig block (tray-jig-r1, which names a train folder per run). Never both.
+      const topScope = hasIndexAccess("story.runs");
+      const jigDoc = !topScope && hasIndexAccess("story.jig") && story.jig ? story.jig : null;
+      if (!topScope && !jigDoc) {
         setChildren(
           wrap,
           ...renderCrumbHeading({
@@ -137,18 +141,20 @@ export function renderRunsPage() {
         );
         return;
       }
+      const src = topScope ? story : jigDoc;
+      const roundLogTail = Array.isArray(src.train_log_tail) ? src.train_log_tail : [];
+      const roundPhases = src.vm_phases && typeof src.vm_phases === "object" ? src.vm_phases : {};
+      const logRun = topScope ? (round && round.log_run) || null : jigDoc.log_run || null;
 
-      const rawRuns = Array.isArray(story.runs) ? story.runs : [];
+      const rawRuns = Array.isArray(src.runs) ? src.runs : [];
       const validRuns = rawRuns.filter((r) => r && !String(r.branch || "").includes(".attempt"));
-      const jigRunsList = validRuns.filter((r) => r.scene === "jig2");
-      const r1RunsList = validRuns.filter((r) => r.scene !== "jig2");
-      const filteredRuns =
-        campFilter === "jig" ? jigRunsList : campFilter === "r1" ? r1RunsList : validRuns;
+      const filteredRuns = validRuns;
 
       if (!selectedBranch || !validRuns.some((r) => r.branch === selectedBranch)) {
         selectedBranch =
-          (jigRunsList.length > 0 && jigRunsList[jigRunsList.length - 1].branch) ||
-          (round && round.baseline) ||
+          [logRun, round && round.baseline].find(
+            (id) => id && validRuns.some((r) => r.branch === id)
+          ) ||
           (validRuns[0] && validRuns[0].branch) ||
           null;
       }
@@ -276,39 +282,29 @@ export function renderRunsPage() {
           train_set: r.scene || "-",
           role: "current",
         }));
-      const allTableRows =
+      const displayRoundRuns =
         roundRuns.length > 0
           ? [...extraRuns, ...roundRuns]
           : validRuns.map((r) => ({ id: r.branch, train_set: r.scene || "-", role: "info" }));
-      const displayRoundRuns = allTableRows.filter((rr) => {
-        if (campFilter === "jig") return extraRuns.some((e) => e.id === rr.id);
-        if (campFilter === "r1") return roundIdsSet.has(rr.id);
-        return true;
-      });
 
-      const jigInfo = story.jig || null;
-      const liveEvalList =
-        jigInfo && Array.isArray(jigInfo.live_evals) ? jigInfo.live_evals : [];
-      const jigColab =
-        jigInfo && Array.isArray(jigInfo.active_sessions) && jigInfo.active_sessions.length > 0
-          ? t("ux.homeColabActive", {
-              session: jigInfo.active_sessions[0].session || "",
-              gpu: jigInfo.active_sessions[0].gpu || "GPU",
-            })
-          : "";
+      const liveEvalList = jigDoc && Array.isArray(jigDoc.live_evals) ? jigDoc.live_evals : [];
       const modelRuns =
         story.demo && story.demo.models && story.demo.models.runs ? story.demo.models.runs : {};
 
+      // The round-level log and phases belong to log_run only; another run shows its own or none.
+      const ownLog = (r) => Boolean(r) && (r.branch === logRun || !logRun);
       const selPhasesObj =
         selectedRun && selectedRun.vm_phases && Object.keys(selectedRun.vm_phases).length > 0
           ? selectedRun.vm_phases
-          : story.vm_phases || {};
+          : ownLog(selectedRun)
+            ? roundPhases
+            : {};
       const vmPhases = Object.entries(selPhasesObj);
       const logTail =
         selectedRun && Array.isArray(selectedRun.log_tail) && selectedRun.log_tail.length > 0
           ? selectedRun.log_tail
-          : Array.isArray(story.train_log_tail)
-            ? story.train_log_tail
+          : ownLog(selectedRun)
+            ? roundLogTail
             : [];
 
       const groupsFirst = (selectedRun && selectedRun.groups_first) || {};
@@ -340,18 +336,7 @@ export function renderRunsPage() {
               }),
               el("a", { className: cls("btn", "primary"), href: "#/eval" }, [t("nav.item.eval")]),
             ])
-          : jigInfo && jigInfo.next_cut && jigInfo.next_cut.name
-            ? el("div", { className: cls("attention-banner", "is-ok") }, [
-                el("span", {
-                  text: t("ux.runsJigBanner", {
-                    cut: jigInfo.next_cut.name,
-                    files: formatNumber(jigInfo.next_cut.files),
-                    colab: jigColab,
-                  }),
-                }),
-                el("a", { className: "link", href: "#/eval" }, [t("nav.item.eval")]),
-              ])
-            : null,
+          : null,
 
         renderStatStrip([
           {
@@ -360,14 +345,12 @@ export function renderRunsPage() {
             sub: t("exp.statValidRunsSub"),
           },
           {
-            label: t("exp.statLatestCamp"),
-            value: jigRunsList.map((r) => r.branch).join(" · ") || t("state.na"),
+            label: t("exp.statRound"),
+            value: (round && (pickLang(round.title) || round.id)) || t("state.na"),
             sub:
-              jigRunsList.length > 0
-                ? `${formatNumber(jigRunsList[0].max_steps)} steps`
-                : round
-                  ? round.id
-                  : "",
+              round && round.max_steps != null
+                ? t("exp.statRoundSteps", { steps: formatNumber(round.max_steps) })
+                : "",
           },
           {
             label: t("exp.statPerf"),
@@ -375,30 +358,6 @@ export function renderRunsPage() {
             sub: maxVram != null ? `VRAM ${formatNumber(maxVram, { maximumFractionDigits: 1 })} GB` : "",
           },
         ]),
-
-        el(
-          "div",
-          { className: "tabs", role: "tablist", style: "margin-bottom:8px" },
-          [
-            { id: "all", label: t("exp.campAll", { count: formatNumber(validRuns.length) }) },
-            { id: "jig", label: t("exp.campJig", { count: formatNumber(jigRunsList.length) }) },
-            { id: "r1", label: t("exp.campR1", { count: formatNumber(r1RunsList.length) }) },
-          ].map((cf) =>
-            el(
-              "button",
-              {
-                type: "button",
-                role: "tab",
-                className: cls("tab", campFilter === cf.id && "active"),
-                onClick: () => {
-                  campFilter = cf.id;
-                  load();
-                },
-              },
-              [cf.label]
-            )
-          )
-        ),
 
         el("div", { className: "toolbar" }, [
           el("span", { className: "muted", text: t("runs.metricLabel") }),
@@ -466,6 +425,9 @@ export function renderRunsPage() {
                 const effStep = matched ? matched.ckpt_step || matched.step : null;
                 const hasRemoteCkpt =
                   matched && matched.ckpt_step && matched.step && matched.ckpt_step > matched.step + 10;
+                // the local metrics.jsonl is a partial copy only when the VM's train did not end
+                const partialFile =
+                  matched && matched.fetched_final === false && matched.fetched_train !== "done";
                 const isSel = selectedRun && selectedRun.branch === rr.id;
 
                 return el(
@@ -505,6 +467,14 @@ export function renderRunsPage() {
                                   text: t("exp.ckptDoneRemote", {
                                     ckpt: formatNumber(matched.ckpt_step),
                                     local: formatNumber(matched.step),
+                                  }),
+                                })
+                              : null,
+                            partialFile
+                              ? el("div", {
+                                  className: "tiny",
+                                  text: t("exp.fetchedPartial", {
+                                    step: formatNumber(matched.fetched_step ?? matched.step),
                                   }),
                                 })
                               : null,
@@ -602,11 +572,17 @@ export function renderRunsPage() {
                 { className: "meta-strip" },
                 vmPhases.map(([k, v]) =>
                   el("div", { className: "meta-box" }, [
-                    el("span", { className: "mono", text: k }),
+                    el("span", {
+                      className: "mono",
+                      text: k === "persist" ? t("exp.phasePersist") : k,
+                    }),
                     el("b", { text: `${formatNumber(v, { maximumFractionDigits: 1 })} s` }),
                   ])
                 )
               ),
+              selPhasesObj.persist != null
+                ? el("p", { className: cls("tiny", "muted"), text: t("exp.phasePersistNote") })
+                : null,
             ])
           : null,
 
@@ -646,16 +622,33 @@ export function renderEvalPage() {
       const task = getCurrentTask();
       const pair = story.pair || null;
       const jig = story.jig || null;
-      const jigRuns = jig && Array.isArray(jig.runs) ? jig.runs : [];
-      const jigBest =
-        jigRuns.find((r) => jig && r.run === jig.best) || jigRuns[0] || null;
-      const jigRollouts = jig && Array.isArray(jig.rollouts) ? jig.rollouts : [];
+      const round = getCurrentRound();
+      const jigEvals = jig && Array.isArray(jig.evals) ? jig.evals : [];
+      const jigOutcomes = jig && Array.isArray(jig.outcomes) ? jig.outcomes : [];
+      // One run is shown: the featured one (its results.json is ready), else the round's baseline.
+      const jigRunId =
+        (jig && jig.featured) ||
+        (round && round.baseline) ||
+        (jigEvals[0] && jigEvals[0].run) ||
+        null;
+      const jigEval = jigEvals.find((e) => e.run === jigRunId) || jigEvals[0] || null;
+      // The descriptive blocks (scores.jsonl) restate the success count, so they only show beside
+      // figures copied from results.json: none while it is missing ("Chưa có", story DA-53).
+      const jigHasFigures =
+        Boolean(jigEval) && (jigEval.status === "ready" || jigEval.status === "blocked");
+      const jigDesc = jigHasFigures
+        ? jigOutcomes.find((o) => o.run === jigEval.run) || null
+        : null;
+      const jigRollouts =
+        jigDesc && jig && Array.isArray(jig.rollouts)
+          ? jig.rollouts.filter((r) => r.run === jigDesc.run)
+          : [];
       const jigLiveEvals = jig && Array.isArray(jig.live_evals) ? jig.live_evals : [];
       const jigSteps =
         (jig && Array.isArray(jig.steps) && jig.steps.length > 0
           ? jig.steps
-          : jigBest && jigBest.step_pass
-            ? Object.keys(jigBest.step_pass)
+          : jigDesc && jigDesc.step_pass
+            ? Object.keys(jigDesc.step_pass)
             : []) || [];
       const ladderR1 = story.demo && story.demo.ladder ? story.demo.ladder : null;
       const earlyEval = story.eval || null;
@@ -668,87 +661,225 @@ export function renderEvalPage() {
           ? Object.keys(pairRuns[0].step_pass)
           : (pair && pair.steps) || [];
 
-      const renderJigScorecard = (jr) => {
-        const lv1 = (jr.levels && jr.levels["1"]) || {};
-        const lv2 = (jr.levels && jr.levels["2"]) || {};
-        const placeRate = jr.step_pass && jr.step_pass.place != null ? jr.step_pass.place : null;
-        const placePassCount = placeRate != null ? Math.round(placeRate * jr.n) : null;
-        // Wilson over rollouts is descriptive only: tray-jig.md section 2 reads the targets at the
-        // lower bound of a bootstrap over conditions, which the index does not carry yet (DA-53)
-        const wilsonText = (w) =>
-          Array.isArray(w) ? `${t("exp.wilsonDescr")} ${formatPercent(w[0])}–${formatPercent(w[1])}` : "";
-
-        const cards = [
-          {
-            title: t("exp.ruleAllTitle"),
-            val: formatPercent(jr.p),
-            frac: `${formatNumber(jr.successes)} / ${formatNumber(jr.n)}`,
-            ci: wilsonText(jr.wilson),
-            target: t("exp.targetGe80"),
-          },
-          {
-            title: t("exp.ruleL1Title"),
-            val: formatPercent(lv1.p),
-            frac: `${formatNumber(lv1.successes)} / ${formatNumber(lv1.n)}`,
-            ci: wilsonText(lv1.wilson),
-            target: t("exp.targetGe70"),
-          },
-          {
-            title: t("exp.ruleL2Title"),
-            val: formatPercent(lv2.p),
-            frac: `${formatNumber(lv2.successes)} / ${formatNumber(lv2.n)}`,
-            ci: wilsonText(lv2.wilson),
-            target: t("exp.targetGe70"),
-          },
-          {
-            title: t("exp.rulePlaceTitle"),
-            val: formatPercent(placeRate),
-            frac:
-              placePassCount != null
-                ? `${formatNumber(placePassCount)} / ${formatNumber(jr.n)}`
-                : "-",
-            ci: "",
-            target: t("exp.targetGt50", {
-              reachB: `${formatNumber(jr.reach_b ?? 0)}/${formatNumber(jr.n)}`,
+      // Rates, intervals and verdict codes are copied from results.json by the index (index/jig.py);
+      // thresholds come from the readings (seed/tasks.yaml), never from this file.
+      const isPair = (v) => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite);
+      const pct0 = (x) => (Number.isFinite(x) ? formatPercent(x, 0) : t("state.na"));
+      const figFor = (ev, rd) =>
+        rd.scope === "whole_task"
+          ? ev.headline || {}
+          : rd.scope === "level"
+            ? (ev.levels || {})[rd.level] || {}
+            : ev.place || {};
+      const ruleTitle = (rd, fig) =>
+        rd.scope === "whole_task"
+          ? t("exp.ruleAllTitle", { rule: rd.rule })
+          : rd.scope === "level"
+            ? t("exp.ruleLevelTitle", {
+                rule: rd.rule,
+                lv: rd.level,
+                cond: formatNumber(fig.conditions),
+              })
+            : t("exp.rulePlaceTitle", { rule: rd.rule });
+      const verdictOf = (rd) => {
+        if (rd.verdict === "met") {
+          return {
+            chip: "",
+            text: t(rd.scope === "place" ? "exp.verdictPlaceMet" : "exp.verdictMet", {
+              pct: pct0(rd.threshold),
             }),
-          },
-        ];
+          };
+        }
+        if (rd.verdict === "not_met") {
+          return { chip: "warning", text: t("exp.verdictNotMet", { pct: pct0(rd.threshold) }) };
+        }
+        if (rd.why === "blocked") return { chip: "neutral", text: t("exp.verdictBlocked") };
+        return { chip: "neutral", text: t("exp.verdictNoCi") };
+      };
 
+      const renderJigScorecard = (ev) => {
+        const readings = Array.isArray(ev.readings) ? ev.readings : [];
         const grid = el(
           "div",
           { className: "scorecard-grid-4" },
-          cards.map((c) =>
-            el("div", { className: "scorecard-box" }, [
-              el("div", { className: "task-head" }, [el("span", { className: "tiny", text: c.title })]),
-              el("div", { className: "actions" }, [
-                el("span", { className: cls("scorecard-val", "mono"), text: c.val }),
-                el("span", { className: cls("muted", "mono"), text: c.frac }),
+          readings.map((rd) => {
+            const fig = figFor(ev, rd);
+            const v = verdictOf(rd);
+            return el("div", { className: "scorecard-box" }, [
+              el("div", { className: "task-head" }, [
+                el("span", { className: "tiny", text: ruleTitle(rd, fig) }),
               ]),
-              c.ci ? el("div", { className: cls("tiny", "mono"), text: c.ci }) : null,
-              el("div", { className: "tiny muted", text: c.target }),
-            ])
-          )
+              el("div", { className: "actions" }, [
+                el("span", { className: cls("scorecard-val", "mono"), text: formatPercent(fig.p) }),
+                el("span", {
+                  className: cls("muted", "mono"),
+                  text: `${formatNumber(fig.successes)} / ${formatNumber(fig.n)}`,
+                }),
+              ]),
+              isPair(fig.ci)
+                ? el("div", {
+                    className: cls("tiny", "mono"),
+                    text: t("exp.ciBootstrap", {
+                      lo: formatPercent(fig.ci[0]),
+                      hi: formatPercent(fig.ci[1]),
+                    }),
+                  })
+                : null,
+              isPair(fig.wilson)
+                ? el("div", {
+                    className: cls("tiny", "mono", "muted"),
+                    title: fig.wilson_method || "",
+                    text: `${t("exp.wilsonDescr")} ${formatPercent(fig.wilson[0])}–${formatPercent(fig.wilson[1])}`,
+                  })
+                : null,
+              el("div", {
+                className: "tiny muted",
+                text: t(rd.scope === "place" ? "exp.targetPlace" : "exp.targetAt", {
+                  pct: pct0(rd.threshold),
+                }),
+              }),
+              el("span", { className: cls("chip", v.chip), text: v.text }),
+            ]);
+          })
         );
-        return el("div", {}, [grid, el("p", { className: "tiny muted", text: t("exp.verdictNote") })]);
+        const method = ev.headline && ev.headline.wilson_method;
+        return el("div", {}, [
+          grid,
+          el("p", { className: "tiny muted", text: t("exp.verdictNoteRules") }),
+          method
+            ? el("p", {
+                className: cls("tiny", "muted", "mono"),
+                text: t("exp.wilsonMethod", { method }),
+              })
+            : null,
+        ]);
+      };
+
+      // The figures of the whole task and of each level, with the failure labels of results.json.
+      const renderJigLevelTable = (ev) => {
+        const rows = [
+          { name: t("exp.scopeWhole"), fig: ev.headline || {} },
+          ...Object.entries(ev.levels || {}).map(([lv, fig]) => ({
+            name: t("exp.scopeLevel", { lv }),
+            fig: fig || {},
+          })),
+        ];
+        return el("table", { className: "table", style: "margin-top:10px" }, [
+          el("thead", {}, [
+            el("tr", {}, [
+              el("th", { text: t("exp.colScope") }),
+              el("th", { className: "num", text: t("exp.colConditions") }),
+              el("th", { className: "num", text: t("eval.colSuccN") }),
+              el("th", { className: "num", text: t("eval.colRate") }),
+              el("th", { className: "num", text: t("exp.colCiBootstrap") }),
+              el("th", { text: t("eval.colTopFail") }),
+            ]),
+          ]),
+          el(
+            "tbody",
+            {},
+            rows.map(({ name, fig }) =>
+              el("tr", {}, [
+                el("td", { text: name }),
+                el("td", { className: "num", text: formatNumber(fig.conditions) }),
+                el("td", {
+                  className: "num",
+                  text: `${formatNumber(fig.successes)} / ${formatNumber(fig.n)}`,
+                }),
+                el("td", { className: "num", text: formatPercent(fig.p) }),
+                el("td", {
+                  className: "num",
+                  text: isPair(fig.ci)
+                    ? `${formatPercent(fig.ci[0])}–${formatPercent(fig.ci[1])}`
+                    : t("state.na"),
+                }),
+                el("td", {
+                  className: "mono",
+                  text:
+                    Object.entries(fig.failures || {})
+                      .map(([fk, fv]) => `${fk}: ${fv}`)
+                      .join(" · ") || "-",
+                }),
+              ])
+            )
+          ),
+        ]);
+      };
+
+      const renderJigEvalSection = (ev) => {
+        const status = ev.status || "missing";
+        const rulesSrc = jig && jig.rules ? pickLang(jig.rules.source) : "";
+        const head = el("div", { className: "task-head" }, [
+          el("h2", { text: t("exp.jigEvalTitle", { run: ev.run }) }),
+          renderStateChip(
+            status === "ready" ? "done" : status === "blocked" ? "blocked" : status === "withheld" ? "waiting" : "missing"
+          ),
+        ]);
+        const meta = el("div", {}, [
+          el("p", {
+            className: "muted",
+            style: "margin:4px 0 6px",
+            text: t("exp.jigEvalSceneNote", {
+              scene: (jig && jig.scene) || "-",
+              n: formatNumber(jig && jig.rollouts_expected),
+              scorer: (jig && jig.scorer_version) ?? "-",
+            }),
+          }),
+          rulesSrc
+            ? el("p", { className: "tiny", text: t("exp.rulesSource", { source: rulesSrc }) })
+            : null,
+          el("p", { className: cls("tiny", "muted"), text: t("exp.jigLimits") }),
+        ]);
+        let body;
+        if (status === "withheld") {
+          body = el("div", { className: "empty", text: t("exp.evalWithheld") });
+        } else if (status === "missing") {
+          body = el("div", {}, [
+            el("div", { className: "empty", text: t("exp.evalMissing", { run: ev.run }) }),
+            el("p", { className: "tiny", text: t("exp.evalMissingHow") }),
+            ev.command ? el("pre", { className: cls("log-box", "mono"), text: ev.command }) : null,
+          ]);
+        } else {
+          const problems = Array.isArray(ev.problems) ? ev.problems : [];
+          body = el("div", {}, [
+            status === "blocked"
+              ? el("div", { className: cls("attention-banner", "is-warn") }, [
+                  el("span", {
+                    text: t("exp.evalBlocked", { problems: problems.join(" · ") || "-" }),
+                  }),
+                ])
+              : null,
+            renderJigScorecard(ev),
+            renderJigLevelTable(ev),
+          ]);
+        }
+        return el("section", { className: cls("card", "table-wrap") }, [
+          head,
+          meta,
+          body,
+          ev.results_source
+            ? el("p", { className: cls("tiny", "muted", "mono"), text: ev.results_source })
+            : null,
+        ]);
       };
 
       const jigStepChart =
-        jigBest && jigSteps.length > 0
+        jigDesc && jigSteps.length > 0
           ? renderChartBlock({
-              title: t("exp.jigStepChartTitle"),
-              subtitle: jigBest.source || "",
+              title: t("exp.jigStepChartTitle", { n: formatNumber(jigSteps.length) }),
+              subtitle: jigDesc.source || "",
               height: 305,
               buildOption: ({ soft, line, colors }) => {
-                const lvStep = jigBest.levels_step_pass || {};
-                const lv1Obj = (jigBest.levels && jigBest.levels["1"]) || {};
-                const lv2Obj = (jigBest.levels && jigBest.levels["2"]) || {};
+                const lvStep = jigDesc.levels_step_pass || {};
+                const lv1Obj = (jigDesc.levels && jigDesc.levels["1"]) || {};
+                const lv2Obj = (jigDesc.levels && jigDesc.levels["2"]) || {};
                 const series = [
                   {
-                    name: t("exp.jigStepAll", { run: jigBest.run, n: formatNumber(jigBest.n) }),
+                    name: t("exp.jigStepAll", { run: jigDesc.run, n: formatNumber(jigDesc.n) }),
                     type: "line",
                     data: jigSteps.map((sk) =>
-                      jigBest.step_pass && jigBest.step_pass[sk] != null
-                        ? Number((jigBest.step_pass[sk] * 100).toFixed(1))
+                      jigDesc.step_pass && jigDesc.step_pass[sk] != null
+                        ? Number((jigDesc.step_pass[sk] * 100).toFixed(1))
                         : null
                     ),
                     lineStyle: { width: 3, color: colors[0] },
@@ -758,7 +889,7 @@ export function renderEvalPage() {
                 if (lvStep["1"]) {
                   series.push({
                     name: t("exp.jigStepLv", {
-                      run: jigBest.run,
+                      run: jigDesc.run,
                       lv: "1",
                       n: formatNumber(lv1Obj.n),
                     }),
@@ -773,7 +904,7 @@ export function renderEvalPage() {
                 if (lvStep["2"]) {
                   series.push({
                     name: t("exp.jigStepLv", {
-                      run: jigBest.run,
+                      run: jigDesc.run,
                       lv: "2",
                       n: formatNumber(lv2Obj.n),
                     }),
@@ -803,7 +934,7 @@ export function renderEvalPage() {
                 el("thead", {}, [
                   el("tr", {}, [
                     el("th", { text: t("eval.colStep") }),
-                    el("th", { className: "num", text: jigBest.run }),
+                    el("th", { className: "num", text: jigDesc.run }),
                     el("th", { className: "num", text: "L1" }),
                     el("th", { className: "num", text: "L2" }),
                   ]),
@@ -816,21 +947,21 @@ export function renderEvalPage() {
                       el("td", { className: "mono", text: sk }),
                       el("td", {
                         className: "num",
-                        text: formatPercent(jigBest.step_pass ? jigBest.step_pass[sk] : null),
+                        text: formatPercent(jigDesc.step_pass ? jigDesc.step_pass[sk] : null),
                       }),
                       el("td", {
                         className: "num",
                         text: formatPercent(
-                          jigBest.levels_step_pass && jigBest.levels_step_pass["1"]
-                            ? jigBest.levels_step_pass["1"][sk]
+                          jigDesc.levels_step_pass && jigDesc.levels_step_pass["1"]
+                            ? jigDesc.levels_step_pass["1"][sk]
                             : null
                         ),
                       }),
                       el("td", {
                         className: "num",
                         text: formatPercent(
-                          jigBest.levels_step_pass && jigBest.levels_step_pass["2"]
-                            ? jigBest.levels_step_pass["2"][sk]
+                          jigDesc.levels_step_pass && jigDesc.levels_step_pass["2"]
+                            ? jigDesc.levels_step_pass["2"][sk]
                             : null
                         ),
                       }),
@@ -844,7 +975,7 @@ export function renderEvalPage() {
       const jigScatterChart =
         jigRollouts.length > 0
           ? renderChartBlock({
-              title: t("exp.jigScatterTitle"),
+              title: t("exp.jigScatterTitle", { n: formatNumber(jigRollouts.length) }),
               subtitle: t("exp.jigScatterSub"),
               height: 305,
               buildOption: ({ soft, line, colors }) => {
@@ -923,16 +1054,16 @@ export function renderEvalPage() {
           : null;
 
       const jigRepeatAndRelaxed =
-        jigBest && (jigBest.repeat_dist || jigBest.relaxed)
+        jigDesc && (jigDesc.repeat_dist || jigDesc.relaxed)
           ? el("div", { className: "grid" }, [
-              jigBest.repeat_dist
+              jigDesc.repeat_dist
                 ? el("section", { className: "card" }, [
                     el("h2", { text: t("exp.repeatCardTitle") }),
                     el("p", { className: "muted", text: t("exp.repeatCardSub") }),
                     el(
                       "div",
                       { className: "repeat-bars" },
-                      Object.entries(jigBest.repeat_dist).map(([lvKey, arr]) => {
+                      Object.entries(jigDesc.repeat_dist).map(([lvKey, arr]) => {
                         const [k3 = 0, k2 = 0, k1 = 0, k0 = 0] = Array.isArray(arr) ? arr : [];
                         const tot = Math.max(1, k3 + k2 + k1 + k0);
                         const segs = [
@@ -971,22 +1102,22 @@ export function renderEvalPage() {
                     ),
                   ])
                 : null,
-              jigBest.relaxed
+              jigDesc.relaxed
                 ? el("section", { className: "card" }, [
                     el("h2", { text: t("exp.relaxedJigTitle") }),
                     el("p", { className: "muted", text: t("exp.relaxedJigSub") }),
                     comparisonPlot(
-                      jigBest.run,
+                      jigDesc.run,
                       [
-                        ...Object.entries(jigBest.relaxed).map(([cm, cnt]) => ({
+                        ...Object.entries(jigDesc.relaxed).map(([cm, cnt]) => ({
                           name: `≤ ${cm} cm`,
-                          value: (Number(cnt) / Math.max(1, jigBest.n)) * 100,
-                          label: `${formatPercent(Number(cnt) / Math.max(1, jigBest.n))} (${cnt}/${jigBest.n})`,
+                          value: (Number(cnt) / Math.max(1, jigDesc.n)) * 100,
+                          label: `${formatPercent(Number(cnt) / Math.max(1, jigDesc.n))} (${cnt}/${jigDesc.n})`,
                         })),
                         {
                           name: t("exp.reachTableB"),
-                          value: (Number(jigBest.reach_b || 0) / Math.max(1, jigBest.n)) * 100,
-                          label: `${formatPercent(Number(jigBest.reach_b || 0) / Math.max(1, jigBest.n))} (${jigBest.reach_b || 0}/${jigBest.n})`,
+                          value: (Number(jigDesc.reach_b || 0) / Math.max(1, jigDesc.n)) * 100,
+                          label: `${formatPercent(Number(jigDesc.reach_b || 0) / Math.max(1, jigDesc.n))} (${jigDesc.reach_b || 0}/${jigDesc.n})`,
                         },
                       ],
                       { bound: 100, unit: "%" }
@@ -1088,8 +1219,6 @@ export function renderEvalPage() {
         }),
         renderReportSubnav("eval"),
 
-        compare60Card,
-
         jigLiveEvals.length > 0
           ? el("div", { className: cls("attention-banner", "is-warn") }, [
               el("span", {
@@ -1104,68 +1233,13 @@ export function renderEvalPage() {
             ])
           : null,
 
-        jigRuns.length > 0
-          ? el("section", { className: cls("card", "table-wrap") }, [
-              el("div", { className: "task-head" }, [
-                el("h2", { text: t("ux.jigEvalCardTitle") }),
-                el("span", {
-                  className: cls("muted", "mono"),
-                  text: jigRuns[0].source || "",
-                }),
-              ]),
-              el("p", {
-                className: "muted",
-                style: "margin:4px 0 12px",
-                text: t("ux.jigEvalSceneNote", {
-                  scorer: jigRuns[0].scorer_version || "v2",
-                }),
-              }),
-              jigBest ? renderJigScorecard(jigBest) : null,
-              successPlot(jigRuns),
-              el("table", { className: "table", style: "margin-top:10px" }, [
-                el("thead", {}, [
-                  el("tr", {}, [
-                    el("th", { text: t("follow.colModel") }),
-                    el("th", { className: "num", text: t("eval.colSuccN") }),
-                    el("th", { className: "num", text: t("eval.colRate") }),
-                    el("th", { text: t("ux.jigColLevels") }),
-                    el("th", { className: "num", text: t("ux.jigColPlace") }),
-                    el("th", { text: t("eval.colTopFail") }),
-                  ]),
-                ]),
-                el(
-                  "tbody",
-                  {},
-                  jigRuns.map((jr) => {
-                    const lvText = Object.entries(jr.levels || {})
-                      .map(
-                        ([lk, lv]) =>
-                          `L${lk}: ${formatNumber(lv.successes)}/${formatNumber(lv.n)}`
-                      )
-                      .join(" · ");
-                    const placeRate =
-                      jr.step_pass && jr.step_pass.place != null
-                        ? formatPercent(jr.step_pass.place)
-                        : t("state.na");
-                    return el("tr", {}, [
-                      el("td", { className: "mono" }, [el("b", { text: jr.run })]),
-                      el("td", {
-                        className: "num",
-                        text: `${formatNumber(jr.successes)} / ${formatNumber(jr.n)}`,
-                      }),
-                      el("td", { className: "num", text: formatPercent(jr.p) }),
-                      el("td", { className: "mono", text: lvText || t("state.na") }),
-                      el("td", { className: "num", text: placeRate }),
-                      el("td", {
-                        className: "mono",
-                        text: Object.entries(jr.failures || {})
-                          .map(([fk, fv]) => `${fk}: ${fv}`)
-                          .join(" · "),
-                      }),
-                    ]);
-                  })
-                ),
-              ]),
+        jigEval ? renderJigEvalSection(jigEval) : null,
+
+        compare60Card,
+
+        jigDesc && (jigStepChart || jigScatterChart || jigRepeatAndRelaxed)
+          ? el("div", { className: "sect" }, [
+              el("h2", { text: t("exp.jigDescTitle", { run: jigDesc.run }) }),
             ])
           : null,
 
@@ -1425,7 +1499,7 @@ export function renderEvalPage() {
             ])
           : null,
 
-        !pair ? renderProcessEmptyBlock(4) : null
+        !pair && !jig ? renderProcessEmptyBlock(4) : null
       );
     } catch (err) {
       setChildren(wrap, renderErrorBlock(err, load));
@@ -1665,6 +1739,84 @@ export function renderDiagnosePage() {
   return wrap;
 }
 
+// The jig round (tray-jig-r1) shows its baseline only (after_round null; Hiếu, 28/11/2026): the
+// run's eval status and data cut, and a plain "no after-round run yet" instead of a number.
+function renderJigLoop(round, jig) {
+  const evals = Array.isArray(jig.evals) ? jig.evals : [];
+  const runId = round.baseline || (evals[0] && evals[0].run) || null;
+  const ev = evals.find((e) => e.run === runId) || null;
+  const train = (Array.isArray(jig.runs) ? jig.runs : []).find((r) => r.branch === runId) || null;
+  const cut = (jig.cuts && runId && jig.cuts[runId]) || jig.m_cut || null;
+  const head = ev && ev.headline ? ev.headline : null;
+  const hasFigures = ev && (ev.status === "ready" || ev.status === "blocked") && head;
+  const evalText = !ev
+    ? t("state.na")
+    : hasFigures
+      ? t("loop.jigEvalVal", {
+          succ: formatNumber(head.successes),
+          n: formatNumber(head.n),
+          pct: formatPercent(head.p),
+        })
+      : ev.status === "withheld"
+        ? t("exp.evalWithheld")
+        : t("exp.evalMissing", { run: ev.run });
+  const evalSub = !ev
+    ? ""
+    : ev.status === "blocked"
+      ? t("exp.verdictBlocked")
+      : ev.status === "missing"
+        ? t("loop.jigEvalMissingSub")
+        : jigReadingLines(ev).join(" · ");
+  const node = (num, label, value, sub, title = null, accent = false) =>
+    el("div", { className: cls("loop-evo-node", accent && "is-accent") }, [
+      el("span", { className: "tax-badge", text: num }),
+      el("span", { className: "tiny", text: label }),
+      el("b", { className: "mono", text: value, title: title || "" }),
+      sub ? el("span", { className: "tiny", text: sub }) : null,
+    ]);
+  const sources = [ev && ev.results_source, cut && cut.source].filter(Boolean);
+  return [
+    ...renderCrumbHeading({
+      crumbs: [{ label: t("app.crumbRoot"), href: "#/tasks" }, { label: t("loop.title") }],
+      title: pickLang(round.title) || t("loop.title"),
+      actions: [
+        el("a", { className: "btn", href: "#/runs" }, [t("nav.item.runs")]),
+        el("a", { className: cls("btn", "primary"), href: "#/eval" }, [t("nav.item.eval")]),
+      ],
+    }),
+    renderReportSubnav("loop"),
+    el("div", { className: "sect" }, [el("h2", { text: t("loop.visualFlowTitle") })]),
+    el("div", { className: "loop-evo-strip" }, [
+      node(
+        "01",
+        t("loop.statBaseline"),
+        runId || t("state.na"),
+        train
+          ? t("loop.jigTrainSub", {
+              step: formatNumber(train.ckpt_step || train.step),
+              max: formatNumber(train.max_steps),
+            })
+          : ""
+      ),
+      node("02", t("nav.item.eval"), evalText, evalSub),
+      node(
+        "03",
+        t("loop.jigCutLabel", { run: runId || "-" }),
+        cut ? cut.name || "-" : t("state.na"),
+        cut
+          ? t("loop.jigCutSub", { files: formatNumber(cut.files), size: formatBytes(cut.bytes) })
+          : "",
+        cut ? cut.source : null
+      ),
+      node("04", t("loop.statAfter"), t("loop.noAfterRound"), t("loop.noAfterRoundSub"), null, true),
+    ]),
+    el("section", { className: "card" }, [
+      el("p", { text: t("loop.jigNote", { run: runId || "-" }) }),
+      ...sources.map((src) => el("p", { className: cls("tiny", "muted", "mono"), text: src })),
+    ]),
+  ];
+}
+
 // ============================================================================
 // #/loop — Failure -> Data Loop
 // ============================================================================
@@ -1677,6 +1829,11 @@ export function renderLoopPage() {
       const rawStory = await ensureStoryRaw();
       const story = scopeStoryForTask(rawStory);
       const round = getCurrentRound();
+
+      if (round && !story.round && story.jig) {
+        setChildren(wrap, ...renderJigLoop(round, story.jig));
+        return;
+      }
 
       if (!round || !story.round) {
         setChildren(
