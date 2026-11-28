@@ -1,0 +1,462 @@
+{
+ "scorer_version": 2,
+ "scorer_version_note": null,
+ "levels": {
+  "1": {
+   "n": 90,
+   "conditions": 30,
+   "successes": 77,
+   "p": 0.8555555555555555,
+   "wilson": [
+    0.6900674297582453,
+    0.9403230462069324
+   ],
+   "wilson_n_eff": 30.0,
+   "wilson_method": "clustered: n_eff = conditions, descriptive (CI: bootstrap)",
+   "wilson_design_effect": 1.0,
+   "failures": {
+    "L-PLACE-POSE": 8,
+    "L-TRAY-TILT": 5
+   },
+   "step_pass": {
+    "approach_a": 1.0,
+    "grasp": 1.0,
+    "lift": 1.0,
+    "carry": 1.0,
+    "reach_b": 1.0,
+    "place": 0.9111111111111111,
+    "release_stand": 0.8555555555555555
+   },
+   "steps_unknown": 0,
+   "reached": {
+    "5": 8,
+    "6": 5,
+    "7": 77
+   },
+   "unit": "condition",
+   "ci": [
+    0.788888888888889,
+    0.9222222222222223
+   ]
+  },
+  "2": {
+   "n": 90,
+   "conditions": 30,
+   "successes": 59,
+   "p": 0.6555555555555556,
+   "wilson": [
+    0.4768283767548246,
+    0.7989674564799406
+   ],
+   "wilson_n_eff": 30.0,
+   "wilson_method": "clustered: n_eff = conditions, descriptive (CI: bootstrap)",
+   "wilson_design_effect": 1.067,
+   "failures": {
+    "L-PLACE-POSE": 20,
+    "L-TIMEOUT": 1,
+    "L-TRAY-TILT": 8,
+    "L-PART-DROP": 1,
+    "L-ONE-HAND": 1
+   },
+   "step_pass": {
+    "approach_a": 0.9777777777777777,
+    "grasp": 0.9777777777777777,
+    "lift": 0.9777777777777777,
+    "carry": 0.9777777777777777,
+    "reach_b": 0.9777777777777777,
+    "place": 0.8777777777777778,
+    "release_stand": 0.6555555555555556
+   },
+   "steps_unknown": 0,
+   "reached": {
+    "0": 2,
+    "5": 9,
+    "6": 20,
+    "7": 59
+   },
+   "unit": "condition",
+   "ci": [
+    0.5555555555555556,
+    0.7555555555555556
+   ]
+  }
+ },
+ "headline": {
+  "n": 180,
+  "conditions": 60,
+  "successes": 136,
+  "p": 0.7555555555555555,
+  "wilson": [
+   0.6336434231297559,
+   0.846713185775398
+  ],
+  "wilson_n_eff": 60.0,
+  "wilson_method": "clustered: n_eff = conditions, descriptive (CI: bootstrap)",
+  "wilson_design_effect": 1.093,
+  "failures": {
+   "L-PLACE-POSE": 28,
+   "L-TRAY-TILT": 13,
+   "L-TIMEOUT": 1,
+   "L-PART-DROP": 1,
+   "L-ONE-HAND": 1
+  },
+  "step_pass": {
+   "approach_a": 0.9888888888888889,
+   "grasp": 0.9888888888888889,
+   "lift": 0.9888888888888889,
+   "carry": 0.9888888888888889,
+   "reach_b": 0.9888888888888889,
+   "place": 0.8944444444444445,
+   "release_stand": 0.7555555555555555
+  },
+  "steps_unknown": 0,
+  "reached": {
+   "0": 2,
+   "5": 17,
+   "6": 25,
+   "7": 136
+  },
+  "levels": [
+   1,
+   2
+  ],
+  "ci": [
+   0.7,
+   0.8111111111111112
+  ]
+ },
+ "all": {
+  "n": 180,
+  "conditions": 60,
+  "successes": 136,
+  "p": 0.7555555555555555,
+  "wilson": [
+   0.6336434231297559,
+   0.846713185775398
+  ],
+  "wilson_n_eff": 60.0,
+  "wilson_method": "clustered: n_eff = conditions, descriptive (CI: bootstrap)",
+  "wilson_design_effect": 1.093,
+  "failures": {
+   "L-PLACE-POSE": 28,
+   "L-TRAY-TILT": 13,
+   "L-TIMEOUT": 1,
+   "L-PART-DROP": 1,
+   "L-ONE-HAND": 1
+  },
+  "step_pass": {
+   "approach_a": 0.9888888888888889,
+   "grasp": 0.9888888888888889,
+   "lift": 0.9888888888888889,
+   "carry": 0.9888888888888889,
+   "reach_b": 0.9888888888888889,
+   "place": 0.8944444444444445,
+   "release_stand": 0.7555555555555555
+  },
+  "steps_unknown": 0,
+  "reached": {
+   "0": 2,
+   "5": 17,
+   "6": 25,
+   "7": 136
+  },
+  "levels": [
+   1,
+   2
+  ]
+ },
+ "rule0": null,
+ "full_eval_set": false,
+ "rollouts": 180,
+ "missing": [],
+ "extra_rollouts": 0,
+ "extra_by_condition": {},
+ "reruns": 0,
+ "scorer_v1_vs_v2": {
+  "rollouts": 180,
+  "versions": [
+   2
+  ],
+  "successes": {
+   "v1": 135,
+   "own": 136
+  },
+  "labels": {
+   "L-PART-DROP -> L-TRAY-TILT": 1,
+   "L-PLACE-POSE -> L-TRAY-TILT": 1,
+   "L-TRAY-TILT -> L-PART-DROP": 1,
+   "L-TRAY-TILT -> L-PLACE-POSE": 2,
+   "L-TRAY-TILT -> success": 1
+  },
+  "v1_tilt_released": 1,
+  "approach_a": {
+   "v1": 170,
+   "own": 178
+  }
+ },
+ "repeats": 3,
+ "per_condition": {
+  "1:1000100": {
+   "successes": 1,
+   "rollouts": 3
+  },
+  "1:1000101": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "1:1000102": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000103": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000104": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "1:1000105": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "1:1000106": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000107": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000108": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "1:1000109": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000110": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000111": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000112": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000113": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000114": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000115": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "1:1000116": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000117": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000118": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "1:1000119": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000120": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "1:1000121": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "1:1000122": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000123": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "1:1000124": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000125": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000126": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "1:1000127": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "1:1000128": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "1:1000129": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "2:1000100": {
+   "successes": 1,
+   "rollouts": 3
+  },
+  "2:1000101": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "2:1000102": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "2:1000103": {
+   "successes": 1,
+   "rollouts": 3
+  },
+  "2:1000104": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "2:1000105": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "2:1000106": {
+   "successes": 1,
+   "rollouts": 3
+  },
+  "2:1000107": {
+   "successes": 1,
+   "rollouts": 3
+  },
+  "2:1000108": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "2:1000109": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "2:1000110": {
+   "successes": 1,
+   "rollouts": 3
+  },
+  "2:1000111": {
+   "successes": 1,
+   "rollouts": 3
+  },
+  "2:1000112": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "2:1000113": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "2:1000114": {
+   "successes": 1,
+   "rollouts": 3
+  },
+  "2:1000115": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "2:1000116": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "2:1000117": {
+   "successes": 1,
+   "rollouts": 3
+  },
+  "2:1000118": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "2:1000119": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "2:1000120": {
+   "successes": 1,
+   "rollouts": 3
+  },
+  "2:1000121": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "2:1000122": {
+   "successes": 1,
+   "rollouts": 3
+  },
+  "2:1000123": {
+   "successes": 2,
+   "rollouts": 3
+  },
+  "2:1000124": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "2:1000125": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "2:1000126": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "2:1000127": {
+   "successes": 1,
+   "rollouts": 3
+  },
+  "2:1000128": {
+   "successes": 3,
+   "rollouts": 3
+  },
+  "2:1000129": {
+   "successes": 3,
+   "rollouts": 3
+  }
+ },
+ "stats": {
+  "method": "bootstrap_by_condition",
+  "resamples": 10000,
+  "seed": 20261125
+ },
+ "label": "preliminary, on dev",
+ "yaw": {
+  "episodes": 180,
+  "cycles": 405893,
+  "raw_over": 47546,
+  "wrapped_over": 5,
+  "max_wrapped": 3.0639119959141254,
+  "threshold_rad": 2.5
+ },
+ "repeats_note": null,
+ "bootstrap_seed": 20261125,
+ "plan_mismatch": {
+  "set_run_plan_id": "rp_a410d01efa62",
+  "plan_run_plan_id": "rp_a04c14e79dfd",
+  "plan": "he-tray-v2.yaml",
+  "bootstrap_seed_from": "--bootstrap-seed"
+ }
+}

@@ -19,6 +19,11 @@ def _round(fw: ConsolePaths) -> tasks.Round:
     return rnd
 
 
+def _ev(rnd: tasks.Round) -> str:
+    assert rnd.eval_dir is not None  # a story.pair round always names it
+    return rnd.eval_dir
+
+
 def test_downsample_cap() -> None:
     pts = [(float(i), float(i * 2)) for i in range(100_000)]
     out = story.downsample(pts)
@@ -120,7 +125,7 @@ def test_pair_reads_stage1_files(fw: ConsolePaths) -> None:
     (folder / "stage1-broken.json").write_text("{not json")
     (folder / "place-error-C_70.json").write_text("{}")
     rnd = _round(fw)
-    d = story._pair(fw.fw_root, rnd.eval_dir, rnd.run_ids)
+    d = story._pair(fw.fw_root, _ev(rnd), rnd.run_ids)
     assert [r["run"] for r in d["runs"]] == ["C_ALL", "C_70", "C70_R1"]
     assert d["best"] == "C_70" and d["steps"] == ["approach_a", "place"]
     r1 = d["runs"][2]
@@ -169,7 +174,7 @@ def test_follow_reads_one_trial_across_runs(fw: ConsolePaths) -> None:
     r3 = {"C_70": {"n": 60, "got": [0, 23], "rest": [10, 37]}}
     (folder / "r3.json").write_text(json.dumps(r3))
     rnd = _round(fw)
-    d = story._follow(fw.fw_root, rnd.eval_dir, rnd.follow)
+    d = story._follow(fw.fw_root, _ev(rnd), rnd.follow)
     assert (d["level"], d["seed"]) == (1, 1000107) and d["tol"] == tol
     assert set(d["runs"]) == {"C_70", "B_ALL"}
     assert (
@@ -181,8 +186,8 @@ def test_follow_reads_one_trial_across_runs(fw: ConsolePaths) -> None:
 
 def test_follow_is_empty_without_the_folder(fw: ConsolePaths) -> None:
     rnd = _round(fw)
-    assert story._follow(fw.fw_root, rnd.eval_dir, rnd.follow) == {}
-    assert story._follow(fw.fw_root, rnd.eval_dir, None) == {}
+    assert story._follow(fw.fw_root, _ev(rnd), rnd.follow) == {}
+    assert story._follow(fw.fw_root, _ev(rnd), None) == {}
 
 
 # ------------------------------------------------------------------ DA-53: per-run train folders
@@ -206,7 +211,7 @@ def test_round_runs_name_the_jig_run_by_its_manifest_id(fw: ConsolePaths) -> Non
     (root / "tray/jig-m/M-stats_psi0.json").write_text(json.dumps(stats))
     _metrics(root / "tray/jig-n/da50-ft-n-s0", last=8000, every=1000)  # copy stopped early
     (root / "tray/jig-n/da50-ft-n-s0/fetched.json").write_text(
-        json.dumps({"final": False, "progress": {"step": 8198}})
+        json.dumps({"final": False, "train": "running", "progress": {"step": 8198}})
     )
     runs, dirs = story.round_runs(root, rnd)
     m, n = runs
@@ -218,7 +223,8 @@ def test_round_runs_name_the_jig_run_by_its_manifest_id(fw: ConsolePaths) -> Non
     assert m["loss"][-1] == [100_000, 0.5] and m["val"][-1] == [100_000, 0.25]
     assert m["thr"][0] == [0, 21.5] and m["vram"][0] == [0, 17.0] and m["gn"][0] == [0, 0.5]
     assert (m["episodes"], m["frames"]) == (1037, 948639)
-    assert (m["fetched_final"], m["fetched_step"]) == (None, None)
+    assert (m["fetched_final"], m["fetched_train"], m["fetched_step"]) == (None, None, None)
+    assert n["fetched_train"] == "running"
     assert (n["step"], n["max_steps"], n["fetched_final"], n["fetched_step"]) == (
         8000,
         100_000,
