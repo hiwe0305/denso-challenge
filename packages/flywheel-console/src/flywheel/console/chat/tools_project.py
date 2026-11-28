@@ -358,9 +358,11 @@ def _loss(say: Say, v: Any) -> list[tuple[str, Any]]:
         trend = "flat" if abs(rel) < FLAT else ("falling" if rel < 0 else "rising")
     tw = TREND.get(trend or "")
     lo, hi = (round(top / 2, -2), round(top, -2)) if top >= 1000 else (top / 2, top)
-    return [("loss_first", _num(say, pts[0][1])), (f"loss_end_mean{len(last)}", _num(say, end)),
+    # every number is a value of its own: one inside a key name or a range token ("mean20",
+    # "50000-100000") is not evidence the answer's numbers can be checked against
+    return [("loss_first", _num(say, pts[0][1])), ("loss_end_mean", _num(say, end)), ("loss_end_points", len(last)),
             ("loss_trend_late", tw[0 if say.vi else 1] if tw else None),
-            ("late_window", f"{int(lo)}-{int(hi)}" if trend else None)]  # fmt: skip
+            ("late_from_step", int(lo) if trend else None), ("late_to_step", int(hi) if trend else None)]  # fmt: skip
 
 
 def _phases(say: Say, ph: Any, steps: Any, speed: Any) -> list[tuple[str, Any]]:

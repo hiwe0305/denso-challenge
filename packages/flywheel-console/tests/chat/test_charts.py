@@ -149,3 +149,10 @@ def test_a_near_miss_threshold_is_a_value_the_check_can_read() -> None:
     assert 'within_cm=say.num(t), rollouts=v) for t, v in more]' in src and 'f"within_{say.num(t)}_cm"' not in src
     row = "NEAR_MISS | run=M | standard_cm=5,0 | n=180 | within_cm=7,5 | rollouts=145"
     assert all(n["grounded"] for n in llm.ground("145/180 lượt nằm trong 7,5 cm, dung sai 5,0 cm", [row]))
+
+
+def test_training_rows_give_each_number_as_a_value() -> None:
+    src = (Path(llm.__file__).parent / "tools_project.py").read_text(encoding="utf-8")
+    assert '("late_from_step", int(lo)' in src and '"late_window"' not in src and 'f"loss_end_mean{' not in src
+    row = "RUN | round=tray-jig-r1 | run=M | loss_end_mean=0,33 | loss_end_points=20 | late_from_step=50000 | late_to_step=100000"
+    assert all(n["grounded"] for n in llm.ground("đi ngang từ bước 50000 đến 100000; trung bình 20 điểm cuối 0,33", [row]))
