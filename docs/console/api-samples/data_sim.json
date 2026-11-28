@@ -130,5 +130,233 @@
    "video": "teleop/ep_000012.mp4",
    "poster": "teleop/ep_000012.p30.jpg"
   }
- ]
+ ],
+ "rounds": {
+  "tray-r1": {
+   "source": "tray/pair-cuts/C70_R1.tar",
+   "round": "tray-r1",
+   "sha8": "e84ec995",
+   "parts": [
+    {
+     "label": "coverage",
+     "first": 0,
+     "n": 301,
+     "release": "tray_s1_41899efb4b27"
+    },
+    {
+     "label": "prev",
+     "first": 301,
+     "n": 124,
+     "release": "tray_s1_4a8f4a8c6a8d"
+    }
+   ],
+   "cuts": {
+    "C70_R1": {
+     "sha256": "e84ec9953ebb69fbef06250f839a08c319c8c725a469f3c2ce4160f0ddc0aa46",
+     "of": "tar"
+    },
+    "S70": {
+     "sha256": "7c0c3f569d02a4344850e8aec9043c224d3892fa0284154028896f226c4f0610",
+     "of": "marker"
+    },
+    "ALL": {
+     "sha256": "c58f41a59619430f444be91d61946a0596b7c338dc2c2d960725842ca5150d2a",
+     "of": "marker"
+    }
+   },
+   "format": "LeRobot v2.1",
+   "batch": {
+    "attempts": 610,
+    "successes": 542,
+    "recorded": 542,
+    "qa_pass": 541,
+    "failures": {
+     "L-ONE-HAND": 18,
+     "L-PLACE-POSE": 15,
+     "L-TRAY-TILT": 16,
+     "abort:timeout:ARRIVE_B": 2,
+     "abort:timeout:LIFT": 7,
+     "abort:timeout:REACH": 5,
+     "abort:timeout:RELEASE": 5
+    },
+    "wall_s_mean": 85.9,
+    "wall_s_p95": 107.4,
+    "worker_s": 52392.9,
+    "retried_shards": [],
+    "failed_shards": []
+   },
+   "episodes": [
+    {
+     "i": 0,
+     "label": "coverage",
+     "purpose": "coverage",
+     "cluster": null,
+     "for": null,
+     "seed": 1028,
+     "level": 1,
+     "len": 1414,
+     "tray": {
+      "x": 1.131617107861269,
+      "y": -0.011398355641703509,
+      "yaw": 0.06119548904049296
+     },
+     "target": {
+      "x": -1.1318621389955175,
+      "y": 0.03380242449096703,
+      "yaw": -0.00889818925440869
+     },
+     "spawn": {
+      "x": 0.45,
+      "y": 0.0,
+      "yaw": 0.0
+     },
+     "steps": [
+      true,
+      true
+     ],
+     "video": "e84ec995/ep_000000.mp4",
+     "poster": "e84ec995/ep_000000.p03.jpg"
+    },
+    {
+     "i": 1,
+     "label": "coverage",
+     "purpose": "coverage",
+     "cluster": null,
+     "for": null,
+     "seed": 1042,
+     "level": 1,
+     "len": 1362,
+     "tray": {
+      "x": 1.0857408481825477,
+      "y": -0.012779134115972868,
+      "yaw": 0.02653028302882221
+     },
+     "target": {
+      "x": -1.075290810771603,
+      "y": -0.031539264868253404,
+      "yaw": 0.02953294183613872
+     },
+     "spawn": {
+      "x": 0.45,
+      "y": 0.0,
+      "yaw": 0.0
+     },
+     "steps": [
+      true,
+      true
+     ],
+     "video": null,
+     "poster": null
+    }
+   ]
+  },
+  "tray-jig-r1": {
+   "source": "da48/cuts/M.tar",
+   "round": "tray-jig-r1",
+   "sha8": "204ff448",
+   "parts": [
+    {
+     "label": "coverage",
+     "first": 0,
+     "n": 356,
+     "release": "tray_s1_bfbdcbcf719e"
+    },
+    {
+     "label": "coverage",
+     "first": 356,
+     "n": 142,
+     "release": "tray_s1_8631ace9b1b3"
+    }
+   ],
+   "cuts": {
+    "M": {
+     "sha256": "204ff44876be4b7a23102718aa639d6e7a421721b7c02dd09d1054ce2469da8f",
+     "of": "tar"
+    }
+   },
+   "format": "LeRobot v2.1",
+   "batch": {
+    "attempts": 442,
+    "successes": 420,
+    "recorded": 420,
+    "qa_pass": 420,
+    "failures": {
+     "L-ONE-HAND": 8,
+     "L-PLACE-POSE": 1,
+     "L-TRAY-TILT": 2,
+     "abort:timeout:LOWER": 1,
+     "abort:timeout:RELEASE": 10
+    },
+    "wall_s_mean": 72.6,
+    "wall_s_p95": 85.7,
+    "worker_s": 32107.9,
+    "retried_shards": [],
+    "failed_shards": []
+   },
+   "episodes": [
+    {
+     "i": 0,
+     "label": "coverage",
+     "purpose": "coverage",
+     "cluster": null,
+     "for": null,
+     "seed": 500008,
+     "level": 1,
+     "len": 1358,
+     "tray": {
+      "x": 1.1290843670070607,
+      "y": 0.03808250262295605,
+      "yaw": 0.05997540840073903
+     },
+     "target": {
+      "x": -1.1,
+      "y": 0.0,
+      "yaw": 0.0
+     },
+     "spawn": {
+      "x": 0.45,
+      "y": 0.0,
+      "yaw": 0.0
+     },
+     "steps": [
+      true,
+      true
+     ],
+     "video": "204ff448/ep_000000.mp4",
+     "poster": "204ff448/ep_000000.p03.jpg"
+    },
+    {
+     "i": 1,
+     "label": "coverage",
+     "purpose": "coverage",
+     "cluster": null,
+     "for": null,
+     "seed": 500016,
+     "level": 1,
+     "len": 1374,
+     "tray": {
+      "x": 1.1352161964047527,
+      "y": 0.015135341070191544,
+      "yaw": -0.06491911449730221
+     },
+     "target": {
+      "x": -1.1,
+      "y": 0.0,
+      "yaw": 0.0
+     },
+     "spawn": {
+      "x": 0.45,
+      "y": 0.0,
+      "yaw": 0.0
+     },
+     "steps": [
+      true,
+      true
+     ],
+     "video": null,
+     "poster": null
+    }
+   ]
+  }
+ }
 }

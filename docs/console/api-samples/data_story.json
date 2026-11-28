@@ -13,6 +13,9 @@
    "loss_last": 0.247,
    "val_last": 0.2372,
    "thr_med": 41.5,
+   "samples_per_s": 41.5,
+   "global_batch_size": 16,
+   "steps_per_s": 2.594,
    "vram_max": 16.12,
    "loss": [
     [
@@ -109,6 +112,9 @@
    "loss_last": 0.264,
    "val_last": 0.1347,
    "thr_med": 40.5,
+   "samples_per_s": 40.5,
+   "global_batch_size": 16,
+   "steps_per_s": 2.531,
    "vram_max": 16.12,
    "loss": [
     [
@@ -283,14 +289,38 @@
   }
  },
  "ledger": [
-  [
-   "DA-17",
-   0.0
-  ],
-  [
-   "DA-18",
-   0.0
-  ]
+  {
+   "story": "DA-17",
+   "label": "Kiểm dữ liệu bằng phát lại action trên MuJoCo của SIMPLE",
+   "est_cu": null,
+   "mea_cu": null,
+   "est_usd": 0.0,
+   "mea_usd": 0.0
+  },
+  {
+   "story": "DA-18",
+   "label": "Egocentric sang dữ liệu stage 1 của Ψ₀",
+   "est_cu": null,
+   "mea_cu": null,
+   "est_usd": 0.0,
+   "mea_usd": 0.0
+  },
+  {
+   "story": "DA-34",
+   "label": "Thí nghiệm egocentric thay một phần demo robot trên task bê khay",
+   "est_cu": 784.8,
+   "mea_cu": 148.82,
+   "est_usd": 78.42,
+   "mea_usd": 14.86
+  },
+  {
+   "story": "other",
+   "label": "Thí nghiệm khác (không trình bày)",
+   "est_cu": 52.0,
+   "mea_cu": 63.16,
+   "est_usd": 5.19,
+   "mea_usd": 6.31
+  }
  ],
  "colab_balance": [
   [
@@ -302,7 +332,22 @@
    38.42
   ]
  ],
- "colab_sessions": [],
+ "colab_sessions": [
+  {
+   "session": "da34-t5-ft-cplus-s0",
+   "gpu": "L4",
+   "state": "stopped",
+   "cap": 17.0,
+   "batch": "batch-20261109-012155"
+  },
+  {
+   "session": "da34-b-70",
+   "gpu": "A100",
+   "state": "stopped",
+   "cap": 82.0,
+   "batch": "batch-20261111-103700"
+  }
+ ],
  "ds": {
   "generated": "2026-11-11",
   "cards": 24,
@@ -1272,6 +1317,9 @@
     "loss_last": 0.27,
     "val_last": 0.1737,
     "thr_med": 23.05,
+    "samples_per_s": 23.05,
+    "global_batch_size": 16,
+    "steps_per_s": 1.441,
     "vram_max": 16.12,
     "loss": [
      [
@@ -1406,7 +1454,8 @@
       "reach_b": 0.9888888888888889,
       "place": 0.8944444444444445,
       "release_stand": 0.7555555555555555
-     }
+     },
+     "step_ci": null
     },
     "levels": {
      "1": {
@@ -1435,7 +1484,8 @@
        "reach_b": 1.0,
        "place": 0.9111111111111111,
        "release_stand": 0.8555555555555555
-      }
+      },
+      "step_ci": null
      },
      "2": {
       "n": 90,
@@ -1466,7 +1516,8 @@
        "reach_b": 0.9777777777777777,
        "place": 0.8777777777777778,
        "release_stand": 0.6555555555555556
-      }
+      },
+      "step_ci": null
      }
     },
     "place": {
@@ -1912,6 +1963,131 @@
    "earlier_scorer": null,
    "earlier_source": "fwdata/tray/pair60k/stage1-60k",
    "earlier_doc": "docs/he/tray.md §19, §20"
+  },
+  "cost": {
+   "train": {
+    "story": "DA-48",
+    "label": "Train vòng mới trên cảnh đồ gá",
+    "cu": 56.15,
+    "usd": 5.61,
+    "measure_kind": "measured",
+    "est_cu": null,
+    "source": "docs/g0/ledger/DA-48.csv",
+    "doc": {
+     "value": 56.15,
+     "source": "docs/he/tray-jig.md §4",
+     "quote": "| Tổng | 56,15 CU (số dư 214,88 xuống 158,73), khoảng 21 giờ train."
+    },
+    "matches_doc": true
+   },
+   "eval": {
+    "story": "DA-47",
+    "label": "Eval trên cảnh đồ gá và outcome K1 có thời điểm lỗi",
+    "cu": 6.8,
+    "usd": 0.68,
+    "measure_kind": "measured",
+    "est_cu": null,
+    "source": "docs/g0/ledger/DA-47.csv",
+    "doc": {
+     "value": 6.8,
+     "source": "docs/he/tray-jig.md §5",
+     "quote": "Chi phí eval, thực đo: một phiên L4 chạy ba server Ψ₀, 2 giờ 24 phút, 6,8 CU"
+    },
+    "matches_doc": true
+   },
+   "total_cu": 62.95
+  }
+ },
+ "diag": {
+  "round": "tray-r1",
+  "source": "docs/he/tray.md §20.2, §20.9, §20.11, §20.13, §20.16, §20.18 (seed/cited.yaml)",
+  "clusters": [
+   {
+    "id": "c1",
+    "key": {
+     "step": "place",
+     "label": "L-PLACE-POSE",
+     "level": 1
+    },
+    "n_fail": 14,
+    "diagnosis": "KỸ NĂNG YẾU 5/5",
+    "intervention": "sinh quanh lỗi",
+    "gets_data": true,
+    "source": [
+     "docs/he/tray.md §20.2",
+     "docs/he/tray.md §20.13"
+    ],
+    "quote": "| c1 | `place` | `L-PLACE-POSE` | 1 | 14 | Bước 5–8 |"
+   },
+   {
+    "id": "c2",
+    "key": {
+     "step": "place",
+     "label": "L-PLACE-POSE",
+     "level": 2
+    },
+    "n_fail": 12,
+    "diagnosis": "KỸ NĂNG YẾU 4/5",
+    "intervention": "sinh quanh lỗi",
+    "gets_data": true,
+    "source": [
+     "docs/he/tray.md §20.2",
+     "docs/he/tray.md §20.13"
+    ],
+    "quote": "| c2 | `place` | `L-PLACE-POSE` | 2 | 12 | Bước 5–8 |"
+   }
+  ],
+  "step4": [
+   {
+    "id": "H1",
+    "claim": "chuỗi bước gãy ở approach_a",
+    "clusters": [
+     "c6",
+     "c7"
+    ],
+    "verdict": "CHƯA RÕ (ngưỡng bộ chấm)",
+    "ticket": "DA-37",
+    "source": "docs/he/tray.md §20.11",
+    "quote": "**H1: chuỗi bước gãy ở `approach_a`.** CHƯA RÕ (ngưỡng bộ chấm), phiếu cho DA-37."
+   },
+   {
+    "id": "H2",
+    "claim": "hết giờ ở approach_a",
+    "clusters": [
+     "c3",
+     "c8"
+    ],
+    "verdict": "lỗi của policy (quyết định R8)",
+    "ticket": null,
+    "source": "docs/he/tray.md §20.9",
+    "quote": "- R8: c3, c8 đọc là lỗi của policy, đi bước 5–8 cùng c1, c2."
+   }
+  ],
+  "gen_qa_cost": {
+   "host": "rtx3060",
+   "cu": 0,
+   "diagnosis_cu": 0,
+   "generation": {
+    "attempts": 290,
+    "recorded": 262,
+    "hours": 1.16
+   },
+   "qa": {
+    "hours": 0.67,
+    "qa_pass": 261,
+    "quality": 204
+   },
+   "selected": 181,
+   "train_serve_cu": 109.22,
+   "train_serve_parts": {
+    "train_1": 8.55,
+    "train_2": 77.27,
+    "serve": 23.4
+   },
+   "source": [
+    "docs/he/tray.md §20.11",
+    "docs/he/tray.md §20.16"
+   ]
   }
  }
 }
