@@ -4,7 +4,7 @@
 
 | Trường | Giá trị |
 |---|---|
-| Trạng thái | Hiếu đã chốt bốn câu ngày 28/11/2026 (mục "Quyết định của Hiếu"); mã chỉ bắt đầu sau khi PR #252 (`chore-console-ui-rebuild`) vào master |
+| Trạng thái | Hiếu đã chốt bốn câu ngày 28/11/2026 (mục "Quyết định của Hiếu"), rồi cùng ngày quyết không trình bày run N (mục "Quyết định 28/11/2026 về run N"). PR #252 đã vào master. 2.1–2.3 xong; 2.5 và 2.6 làm trước 2.4 |
 | Người làm | Hiếu, cùng Claude |
 | Làn | Ngoài ba làn: `packages/flywheel-console` (index, seed, giao diện). Không sửa nhân, làn, adapter hay đường ống eval |
 | Nguồn yêu cầu | Hiếu, 27/11/2026: lần train gần nhất (run M) và kết quả tốt nhất không thấy trên Console |
@@ -84,6 +84,18 @@ Hiếu chốt ngày 28/11/2026, cả bốn câu theo đề xuất:
 3. **M và N nằm ngoài `withhold_eval`.** Công tắc vẫn chỉ dành cho `C70_R1` theo quyết định ngày 16/11/2026.
 4. **"Kết quả tốt nhất" theo vòng đang chọn.** Không trộn cảnh `tray` với cảnh `jig2` trên trang tổng quan và trang chọn bài toán.
 
+### Quyết định 28/11/2026 về run N
+
+Hiếu quyết ngày 28/11/2026, sau khi có kết quả eval của run N (124/180, thấp hơn run M 136/180; [tray-jig.md](../../he/tray-jig.md) mục 9):
+
+1. **Run N không được trình bày** trên Console, chat và kịch bản demo: không hiện đường cong train, tập `N.tar`, phiên Colab, eval đang chạy, kết quả eval của N hay phép N trừ M. Chỉ trình bày run M. Quyết định này thay câu 2 và câu 3 ở mục trên, và làm AC 6 (N trừ M) không còn hiệu lực cho tới khi Hiếu quyết lại.
+2. **Tài liệu đo và sổ chi phí giữ nguyên.** [tray-jig.md](../../he/tray-jig.md) mục 7–9 và `docs/g0/ledger/DA-50.csv` không sửa, không xóa (sổ là append-only). Trang chi phí vẫn cộng dòng tổng của `DA-50` vì đó là tiền đã tiêu; file trong `fwdata` giữ nguyên.
+3. **So run M với các run cũ trên cùng cỡ 60 lượt.** Trang Đánh giá có bảng đặt lượt lặp 0 của M (60 rollout: 30 điều kiện mức 1, 30 mức 2) cạnh `C_ALL`, `B_ALL`, `B_70`, `C_70` của DA-34 giai đoạn 1 (60 rollout mỗi run). Lượt 0 được chọn trước theo số thứ tự, không chọn lượt cao nhất; bảng ghi kèm số của cả ba lượt. Bảng luôn đi kèm câu nêu điểm khác (cảnh có đồ gá, bộ chấm `simple-tray-predicates@2`, tập điều kiện, số bước train) và ghi mức chênh không quy riêng cho dữ liệu, theo quy tắc 4 và 5 của `jig-m-rules`. Số đọc từ file outcome bằng mã.
+
+Cách làm (Claude đề xuất): vòng `tray-jig-r1` vẫn khai báo run N (đường dẫn của N là thứ cho bộ lọc biết cần ẩn gì, và mối nối M → N còn sẵn nếu Hiếu quyết lại), thêm khóa cấp vòng `withhold_runs` liệt kê run bị ẩn kèm mẫu tên phiên Colab và thư mục eval của nó (`da50-*`). Khác `withhold_eval` (chỉ giữ kết quả thi lại, vẫn hiện train, tập cắt và chi phí), `withhold_runs` ẩn cả run: `tasks.json` không liệt kê run đó, vòng ghi `after_round: null`. Lọc ở ba lớp: lúc dựng index, lúc server gửi `data/story.json` và `data/tasks.json` (phòng index cũ), và ở các bộ đọc `fwdata` trực tiếp của server và chat. Tiêu đề vòng chỉ nêu run M, `log_run` là M.
+
+Hệ quả cho các nhiệm vụ còn lại: 3.1 chỉ ghi `results.json` của M; 2.4 chỉ dựng trang cho run M.
+
 ### Điều chỉnh sau khi đọc dữ liệu (Claude, 28/11/2026)
 
 Đọc `fwdata` thật và mã ở `origin/master` `dd1338ce` trước khi viết code:
@@ -131,20 +143,25 @@ Story này thay cách quét đó bằng vòng `tray-jig-r1` (quyết định 1) 
    - Không trang nào có chữ "tốt hơn" khi đặt M cạnh run DA-34.
    - Có test.
 5. Pha `persist` hiện phần đồng bộ sau train (`persist − train`), `setup` và `train` giữ nguyên. Trên report của C_70, pha `persist` khoảng 213 s chứ không phải 38 262,6 s. Có test.
-6. Khi có `results.json` chạy với `--baseline` của M, vòng hiện N trừ M (trung bình hiệu, khoảng tin cậy, câu đọc theo quy tắc 2 và 3 của `jig-n-rules`). Khi chưa có thì ghi "Chưa có", không ghi 0. Có test.
+6. (Tạm không hiệu lực từ 28/11/2026, xem mục "Quyết định 28/11/2026 về run N".) Khi có `results.json` chạy với `--baseline` của M, vòng hiện N trừ M (trung bình hiệu, khoảng tin cậy, câu đọc theo quy tắc 2 và 3 của `jig-n-rules`). Khi chưa có thì ghi "Chưa có", không ghi 0. Có test.
 7. `withhold_eval` vẫn chặn kết quả thi lại của `C70_R1` ở mọi trang và trong chat. Test cũ vẫn qua.
 8. `docs/console/api-contract.md` và `docs/console/api-samples/` cập nhật cho các khối mới trong `story.json` và `tasks.json`.
+10. Run trong `withhold_runs` (hiện là N) không có mặt trong `data/story.json` (đường cong train, kết quả và rollout eval, tập cắt, phiên Colab, eval đang chạy, N trừ M), trong `data/tasks.json`, trong `/api/status` và danh sách run train của server, và trong câu trả lời của chat; kể cả khi index trên đĩa được dựng trước thay đổi này. Dòng tổng của sổ chi phí không đổi. Có test theo mẫu test của `withhold_eval`.
+11. Trang Đánh giá có bảng 60 lượt theo quyết định 28/11/2026 câu 3: số của M là lượt lặp 0 đọc từ `outcomes.jsonl` và `scores.jsonl`, số của bốn run DA-34 đọc từ `stage1-*.json`; không có run nào thuộc `withhold_eval` hay `withhold_runs`; có câu nêu điểm khác; không có chữ "tốt hơn" hay "tăng X điểm". Cỡ hai bên khác nhau thì không dựng bảng. Có test.
 9. `uv run ruff check`, `uv run mypy` (không thêm lỗi), `uv run pytest`, `uv run lint-imports`, `scripts/repo/check_links.py`, `scripts/repo/pr_guard.py` qua.
 
 ## Nhiệm vụ
 
 - [x] 1.1 Viết story (file này)
 - [x] 1.2 Hiếu chốt bốn câu; ghi quyết định vào file này (mục "Quyết định của Hiếu")
+- [x] 1.3 Ghi quyết định 28/11/2026 về run N, thêm AC 10, 11 và nhiệm vụ 2.5, 2.6
 - [x] 2.1 `index/tasks.py` và `seed/tasks.yaml`: vòng `tray-jig-r1`, đường dẫn theo run, ngưỡng và nguồn luật, có test (AC 1)
 - [x] 2.2 `index/story.py`: đọc run train theo đường dẫn của từng run; sửa thời lượng pha VM, có test (AC 2, 5)
 - [x] 2.3 Module mới trong `index/` đọc `results.json`, kiểm điều kiện trước khi đọc, ghi câu đọc theo luật, có test (AC 3, 4, 6)
-- [ ] 2.4 Giao diện: trang Train, Đánh giá, Vòng hiện vòng `tray-jig-r1`; câu so với DA-34 có điểm khác đi kèm (AC 2, 3, 4, 6, 7)
-- [ ] 3.1 (Hiếu, vận hành) Ghi `results.json` của M và N cạnh outcome bằng hai lệnh ở mục "Điều chỉnh sau khi đọc dữ liệu", kéo `metrics.jsonl` đầy đủ của N từ Drive, rồi chạy `fw console index` (AC 3, 6)
+- [ ] 2.5 Ẩn run N theo quyết định 28/11/2026: khóa `withhold_runs` của vòng `tray-jig-r1`, lọc ở index, server và chat, có test chứng minh N không lọt ra (AC 10)
+- [ ] 2.6 Bảng 60 lượt: lượt lặp 0 của M cạnh `C_ALL`, `B_ALL`, `B_70`, `C_70`, kèm số các lượt và câu nêu điểm khác, số đọc từ file outcome (AC 11)
+- [ ] 2.4 Giao diện: trang Train, Đánh giá, Vòng hiện vòng `tray-jig-r1`, chỉ cho run M (quyết định 28/11/2026); câu so với DA-34 có điểm khác đi kèm (AC 2, 3, 4, 7)
+- [ ] 3.1 (Hiếu, vận hành) Ghi `results.json` của M cạnh outcome bằng lệnh đầu ở mục "Điều chỉnh sau khi đọc dữ liệu", rồi chạy `fw console index` (AC 3). Theo quyết định 28/11/2026 không ghi `results.json` của N và không kéo `metrics.jsonl` của N
 - [ ] 3.2 Cập nhật hợp đồng API và mẫu; chạy đủ kiểm tra (AC 8, 9)
 
 ## Phạm vi file
@@ -154,6 +171,8 @@ Theo 07 mục 3.1. File story luôn được sửa.
 - `packages/flywheel-console/src/flywheel/console/index/` (`tasks.py`, `story.py` và một module mới đọc `results.json`)
 - `packages/flywheel-console/src/flywheel/console/seed/tasks.yaml`
 - `packages/flywheel-console/src/flywheel/console/server/runner.py`: chỉ `_train_dirs` (vòng không có `train_dir`) và dòng trạng thái đọc khối `story.jig`. Thêm ngày 28/11/2026 khi viết 2.1
+- `packages/flywheel-console/src/flywheel/console/server/` và `packages/flywheel-console/src/flywheel/console/chat/` (chỉ cho nhiệm vụ 2.5: lọc run trong `withhold_runs`)
+- `docs/console/ui-spec.md` (chỉ mục lọc dữ liệu bị giữ)
 - `packages/flywheel-console/src/flywheel/console/web/` (chỉ trang Train, Đánh giá, Vòng và i18n)
 - `packages/flywheel-console/tests/`
 - `docs/console/api-contract.md`, `docs/console/api-samples/`
@@ -174,6 +193,12 @@ Theo 07 mục 3.1. File story luôn được sửa.
 - `python3 scripts/repo/check_links.py`
 - `python3 scripts/repo/pr_guard.py --base origin/master --head HEAD --branch "$(git branch --show-current)"`
 - Tay: chạy Console với `FW_ROOT` trỏ `fwdata` thật, chọn vòng `tray-jig-r1`, so số trên trang Train và Đánh giá với tray-jig.md mục 4 và 5
+
+## Change log
+
+| Ngày | Thay đổi | Người |
+|---|---|---|
+| 28/11/2026 | Ghi quyết định của Hiếu: không trình bày run N, chỉ trình bày run M và bảng 60 lượt so với các run DA-34. Thay câu 2 và 3 của mục "Quyết định của Hiếu"; AC 6 tạm không hiệu lực; thêm AC 10, 11, nhiệm vụ 1.3, 2.5, 2.6; 3.1 chỉ cho M, 2.4 chỉ dựng trang cho M; nới phạm vi file sang `server/`, `chat/` và `docs/console/ui-spec.md` | Hiếu (soạn với Claude) |
 
 ## Người phụ trách
 
