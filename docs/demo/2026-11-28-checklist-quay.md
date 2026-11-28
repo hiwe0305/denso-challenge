@@ -2,6 +2,7 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 28/11/2026 | 0.2 | Câu "run nào tốt nhất" đã sửa (PR #263, xếp theo kết quả thi): bỏ dòng "tránh hỏi khi quay", thêm câu này vào bảng câu đã thử | Hiếu (soạn với Claude) |
 | 28/11/2026 | 0.1 | Bản đầu, sau đợt đánh giá console ngày 28/11/2026 và các PR #258–#261. Thay mục 6 của [kịch bản 17/11](2026-11-17-kich-ban-video.md) về cách bật server, chat và những gì không được lộ | Hiếu (soạn với Claude) |
 
 File này chỉ thay phần chuẩn bị máy, server và chat. Lời nói và thứ tự cảnh vẫn ở [kịch bản 17/11](2026-11-17-kich-ban-video.md), nhưng chưa được soát lại theo câu chữ mới ở mục 4.
@@ -54,8 +55,7 @@ Các câu đã hỏi thử trên bản khóa ngày 28/11/2026. Câu trả lời 
 | `tray-r1` | Vòng 1 so với vòng đồ gá khác nhau thế nào? | "chỉ đặt cạnh nhau, không so như một kết quả"; bốn bản của vòng 1 có khoảng tin cậy chồng nhau |
 | `tray-r1` | Vì sao run C_70 hỏng nhiều ở bước đặt? | 32 trong 50 lượt hỏng của C_70 là đặt lệch; cụm c1, c2; "chưa kiểm… phỏng đoán"; đóng phiếu DA-38, DA-37 |
 | `tray-r1` | Tổng chi phí cả dự án là bao nhiêu? | Ước tính và thực đo tách riêng, không cộng gộp |
-
-**Tránh hỏi khi quay:** "run nào tốt nhất". Ngày 28/11/2026, trợ lý xếp hạng các run theo loss train thay vì kết quả thi. Câu này còn chờ sửa.
+| `tray-r1` | Run nào tốt nhất? | (bản 0.2) Xếp theo kết quả thi, không theo loss train: "C_70 có số lượt thành công cao nhất, 10/60, nhưng khoảng tin cậy của bốn bản chồng nhau, nên chưa phân biệt được"; không có C70_R1 |
 
 ## 3. Trình duyệt
 
