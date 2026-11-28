@@ -4073,3 +4073,174 @@ body:has(.is-studio-route) { height: 100dvh; min-height: 0; }
   .analysis-layout .composer textarea { flex-basis: 100%; }
   .analysis-layout .composer-foot { width: 100%; }
 }
+
+/* ---- data library pages (audit 28/11) ---- */
+/* pages_data.js polish 28/11: data library gallery + compact table, lineage pair, sim steps */
+.btn-icon-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.data-more {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0 4px;
+}
+
+.data-noimg-head {
+  margin-top: 18px;
+}
+
+.data-format {
+  font-size: 12px;
+  max-width: 190px;
+  overflow-wrap: anywhere;
+}
+
+.data-compact .table td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.tile .ico {
+  width: 18px;
+  height: 18px;
+}
+
+/* One-edge lineage: two boxes and an arrow (P1-15) */
+.lineage-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.lineage-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface2);
+  color: var(--ink);
+  text-decoration: none;
+  min-width: 0;
+}
+
+a.lineage-box:hover {
+  border-color: var(--green);
+  text-decoration: none;
+}
+
+.lineage-box.is-focus {
+  border-color: var(--green);
+  background: var(--pale);
+}
+
+.lineage-box-title {
+  overflow-wrap: anywhere;
+}
+
+.lineage-arrow {
+  align-self: center;
+  color: var(--green);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .lineage-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lineage-arrow {
+    justify-self: center;
+    transform: rotate(90deg);
+  }
+}
+
+/* Step names next to numbered step cells (#/sim, P1-4) */
+.step-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 10px 0 0;
+  color: var(--soft);
+}
+
+.step-legend-item b {
+  color: var(--ink);
+}
+
+.sim-step-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+}
+
+.sim-step-list .latch-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.sim-step-list .latch-cell span:nth-child(2) {
+  flex: 1;
+}
+
+.ego-flag-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 10px;
+  color: var(--soft);
+}
+
+/* ---- story pages and shell polish (audit 28/11) ---- */
+.round-empty { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.round-empty .tag-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.fail-cell { white-space: nowrap; }
+.reading-list { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; }
+.reading-list li { line-height: 1.5; }
+.log-details > summary { cursor: pointer; font-weight: 600; }
+.log-details[open] > summary { margin-bottom: 10px; }
+.rules-cite { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 4px 0; }
+.rules-cite .citation-block { margin-top: 0; }
+.top-label { margin-left: 4px; }
+
+/* Wide tables scroll inside their card; soft edge shadows show there is more to the side. */
+.table-wrap {
+  background:
+    linear-gradient(to right, var(--surface) 30%, transparent) left center / 24px 100% no-repeat local,
+    linear-gradient(to left, var(--surface) 30%, transparent) right center / 24px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--line), transparent) left center / 10px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--line), transparent) right center / 10px 100% no-repeat scroll,
+    var(--surface);
+}
+
+@media (max-width: 760px) {
+  .top { flex-wrap: wrap; row-gap: 8px; }
+  .top .grow { display: none; }
+  .top-controls { margin-left: auto; gap: 6px; flex-wrap: nowrap; }
+  .top-scope-group { order: 3; flex: 1 1 100%; }
+  .top-label { display: none; }
+}
+
+@media (max-width: 560px) {
+  .plot-row { grid-template-columns: minmax(3.5em, auto) 1fr; row-gap: 2px; }
+  .plot-row > .plot-value { grid-column: 1 / -1; text-align: start; color: var(--soft); }
+  .plot-row[aria-hidden="true"] > span:first-child { display: none; }
+  .plot-row[aria-hidden="true"] > .plot-axis { grid-column: 1 / -1; }
+}
+
+@media (max-width: 420px) {
+  #brand-title { display: none; }
+}

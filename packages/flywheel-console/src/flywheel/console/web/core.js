@@ -173,16 +173,15 @@ export function formatPercent(ratio, digits = 1) {
   })}%`;
 }
 
+// Decimal units (1 GB = 10^9 bytes), as the catalog and the docs write sizes (N3, A19).
 export function formatBytes(bytes) {
   if (bytes === null || bytes === undefined || Number.isNaN(bytes)) {
     return t("state.na");
   }
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${formatNumber(bytes / 1024, { maximumFractionDigits: 1 })} KB`;
-  if (bytes < 1024 * 1024 * 1024) {
-    return `${formatNumber(bytes / (1024 * 1024), { maximumFractionDigits: 1 })} MB`;
-  }
-  return `${formatNumber(bytes / (1024 * 1024 * 1024), { maximumFractionDigits: 2 })} GB`;
+  if (bytes < 1e3) return `${bytes} B`;
+  if (bytes < 1e6) return `${formatNumber(bytes / 1e3, { maximumFractionDigits: 1 })} KB`;
+  if (bytes < 1e9) return `${formatNumber(bytes / 1e6, { maximumFractionDigits: 1 })} MB`;
+  return `${formatNumber(bytes / 1e9, { maximumFractionDigits: 2 })} GB`;
 }
 
 export function formatDateTime(isoStr) {
@@ -294,6 +293,23 @@ export function chartPalette() {
   return [1, 2, 3, 4, 5, 6, 7, 8].map((i) => cssVar(`--s${i}`) || cssVar("--green"));
 }
 
+// Value and log axes without their own formatter print numbers in the reader's locale
+// (vi: "10.000", "0,1"; audit 02 A19).
+function localizeAxes(opt) {
+  if (!opt || typeof opt !== "object") return opt;
+  for (const key of ["xAxis", "yAxis"]) {
+    const axes = Array.isArray(opt[key]) ? opt[key] : opt[key] ? [opt[key]] : [];
+    for (const ax of axes) {
+      if (!ax || (ax.type !== "value" && ax.type !== "log")) continue;
+      ax.axisLabel = ax.axisLabel || {};
+      if (ax.axisLabel.formatter == null) {
+        ax.axisLabel.formatter = (v) => formatNumber(v, { maximumFractionDigits: 4 });
+      }
+    }
+  }
+  return opt;
+}
+
 export function mountChart(boxEl, buildOption) {
   if (!boxEl || typeof window.echarts === "undefined") return null;
   const chart = window.echarts.init(boxEl);
@@ -305,7 +321,7 @@ export function mountChart(boxEl, buildOption) {
       surface: cssVar("--surface"),
       colors: chartPalette(),
     });
-    chart.setOption(opt, true);
+    chart.setOption(localizeAxes(opt), true);
   };
   apply();
   let ro = null;

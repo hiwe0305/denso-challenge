@@ -45,6 +45,14 @@ import {
 } from "./pages_story.js";
 import { renderTasksPage } from "./pages_tasks.js";
 
+// Header text that the narrow layout hides (the icon stays; the title keeps the meaning).
+function topLabel(text) {
+  const span = document.createElement("span");
+  span.className = "top-label";
+  span.textContent = text;
+  return span;
+}
+
 // Mandatory legacy route redirects (ui-spec §1)
 export const REDIRECT = {
   "overview": "home",
@@ -351,17 +359,17 @@ function renderHeader() {
     lockBadge.className = "topbtn";
     if (state.statusError && !state.statusLoaded) {
       lockBadge.classList.add("is-error");
-      lockBadge.replaceChildren(icon("alert"), ` ${t("header.statusError")}`);
+      lockBadge.replaceChildren(icon("alert"), topLabel(t("header.statusError")));
       lockBadge.title = state.statusError.serverMessage || "";
     } else if (!state.statusLoaded) {
       lockBadge.textContent = t("header.statusLoading");
       lockBadge.title = "";
     } else if (state.locked) {
       lockBadge.classList.add("is-locked");
-      lockBadge.replaceChildren(icon("lock"), ` ${t("header.locked")}`);
+      lockBadge.replaceChildren(icon("lock"), topLabel(t("header.locked")));
       lockBadge.title = t("header.lockedHint");
     } else {
-      lockBadge.replaceChildren(icon("dot"), ` ${t("header.unlocked")}`);
+      lockBadge.replaceChildren(icon("dot"), topLabel(t("header.unlocked")));
       lockBadge.title = t("header.unlockedHint");
     }
   }
