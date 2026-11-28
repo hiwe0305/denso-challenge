@@ -855,6 +855,9 @@ export function renderTimeline(raw = state.storyRawDoc, { max = 6 } = {}) {
   if (rows.length === 0) return null;
   const latest = raw.latest && typeof raw.latest === "object" ? raw.latest : null;
   const rounds = getRoundsForTask(state.taskId);
+  // the index lists the timeline oldest first; reversing before the stable sort keeps the
+  // later entry of one day on top (DA-47 eval after DA-48 train, both 26/11)
+  rows.reverse();
   rows.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
   const shown = rows.slice(0, max);
   // one marked row: the latest round's row on latest.date, else that round's newest row
