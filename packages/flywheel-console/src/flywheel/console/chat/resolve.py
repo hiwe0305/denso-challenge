@@ -6,10 +6,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-from flywheel.console.index import hidden
 from flywheel.console.paths import active
 
-from .common import Result, catalog, fail, norm
+from .common import Result, catalog, fail, hidden_runs, norm
 
 
 def _pick(q: Any, items: list[tuple[str, list[str]]]) -> tuple[str, Any]:
@@ -68,8 +67,8 @@ def run_index() -> list[dict[str, Any]]:
     """All training runs: job id, branch, dir, from ``tray/pair60k`` and ``tray/jig-*``.
 
     A run in ``withhold_runs`` (run N, Hiếu 28/11/2026) is left out, so the chat answers about
-    it as about an unknown run."""
-    hide = hidden.load(active())
+    it as about an unknown run. Raises ``ManifestUnreadable`` when the seed cannot say which."""
+    hide = hidden_runs()
     out = [
         {"id": f.parent.name, "branch": f.parent.parent.name, "dir": f.parent, "metrics": f}
         for f in sorted(pair_dir().glob("*/*/metrics.jsonl"))

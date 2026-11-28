@@ -134,11 +134,57 @@ def public_ds(ds: str) -> bool:
     return not HOSTED.get() or any(r.get("id") == ds for r in catalog().get("rows", []))
 
 
+# ------------------------------------------------------------------ held and hidden runs (seed)
+class ManifestUnreadable(RuntimeError):
+    """``seed/tasks.yaml`` cannot be read, so which runs are held or hidden is unknown."""
+
+
+UNREADABLE = ("Không đọc được seed/tasks.yaml nên chưa biết lượt nào không được trình bày; "
+              "trợ lý không trả lời số liệu cho đến khi file này đọc được.",
+              "seed/tasks.yaml cannot be read, so it is unknown which runs are not presented; "
+              "the assistant gives no figures until the file can be read.")  # fmt: skip
+_seed_cache: tuple[tuple[Path, int, int], Any] | None = None
+
+
+def seed_manifest() -> Any:
+    """The seed task manifest, read again when the file changes.
+
+    Unlike ``hidden.load``, which gives no hidden run for a seed it cannot read, this raises
+    ``ManifestUnreadable``: an empty list of held or hidden runs must mean "nothing is held",
+    never "unknown" (the server does the same since PR #259, ``runner._manifest``)."""
+    global _seed_cache
+    from flywheel.console.index import tasks as task_idx
+
+    try:
+        f = active().seed / task_idx.FILE
+        st = f.stat()
+        key = (f, st.st_mtime_ns, st.st_size)
+        hit = _seed_cache
+        if hit is None or hit[0] != key:
+            hit = _seed_cache = (key, task_idx.load(active()))
+    except Exception as e:  # missing, unreadable or invalid in any way
+        raise ManifestUnreadable("seed/tasks.yaml cannot be read: no figures are given") from e
+    return hit[1]
+
+
+def hidden_runs() -> hidden.Hidden:
+    """The runs of ``withhold_runs`` in the seed; raises ``ManifestUnreadable``."""
+    return hidden.from_manifest(seed_manifest())
+
+
+def withheld_runs() -> set[str]:
+    """Run ids under ``withhold_eval`` of any round in the **seed** (never the index, which a stale
+    or broken build could leave without the list); raises ``ManifestUnreadable``."""
+    return {str(x) for r in seed_manifest().rounds for x in r.withhold_eval}
+
+
 def story() -> dict[str, Any]:
     """The index ``story.json`` without the runs a round does not present (``withhold_runs``,
-    read from the seed, so an index built before the switch is cleaned too)."""
+    read from the seed, so an index built before the switch is cleaned too). Raises
+    ``ManifestUnreadable`` when the seed cannot say which runs those are."""
+    hide = hidden_runs()
     d = jload(active().index / "story.json", {})
-    d = hidden.story(d, hidden.load(active())) if isinstance(d, dict) else {}
+    d = hidden.story(d, hide) if isinstance(d, dict) else {}
     return d if isinstance(d, dict) else {}
 
 

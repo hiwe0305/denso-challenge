@@ -23,12 +23,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from flywheel.console.index import hidden
 from flywheel.console.paths import active
 from flywheel.console.server import runner
 
 from . import providers, registry, tools_round
-from .common import HOSTED, fail
+from .common import HOSTED, UNREADABLE, ManifestUnreadable, fail, hidden_runs, withheld_runs
 from .numbers import numbers_in, unsupported_numbers
 from .tools_ops import all_jobs
 
@@ -237,8 +236,12 @@ def _plain(ln: str) -> str:
 
 def list_traces(limit: int = 20, hide: Collection[str] = ()) -> list[dict[str, Any]]:
     """The newest turns; a turn that names a run in ``hide`` (held results) is left out, and so
-    is a turn naming a run in ``withhold_runs`` (``hidden.Hidden.mentions``)."""
-    gone = hidden.load(active())
+    is a turn naming a run in ``withhold_runs`` (``hidden.Hidden.mentions``). No turn is listed
+    while the seed cannot say which runs those are."""
+    try:
+        gone = hidden_runs()
+    except ManifestUnreadable:
+        return []
     out: list[dict[str, Any]] = []
     for f in _trace_files():
         for ln in reversed(f.read_text(encoding="utf-8").splitlines()):
@@ -289,7 +292,10 @@ def latest_bench() -> dict[str, Any] | None:
 
 
 def get_trace(turn_id: str, hide: Collection[str] = ()) -> dict[str, Any] | None:
-    gone = hidden.load(active())  # a hidden run's id ("N") cannot be tested as a substring
+    try:
+        gone = hidden_runs()  # a hidden run's id ("N") cannot be tested as a substring
+    except ManifestUnreadable:
+        return None
     for f in _trace_files():
         for ln in f.read_text(encoding="utf-8").splitlines():
             if turn_id in ln and not any(h in ln for h in hide) and not gone.mentions(_plain(ln)):
@@ -504,6 +510,13 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
     conv = body.get("conversation_id") or f"c-{os.urandom(4).hex()}"
     turn = "t-{}-{}".format(datetime.now().strftime("%Y%m%d-%H%M%S"), os.urandom(2).hex())
     msgs, question = build_messages(body, context)
+    # which runs are held or hidden comes from the seed; unknown means no figures and no tool
+    try:
+        hidden_runs()
+        withheld_runs()
+        seed_ok = True
+    except ManifestUnreadable:
+        seed_ok = False
     # the round of the turn: one the question names, else the one chosen in the top bar; every
     # tool reads it and every number of the answer is checked against it (A2, A4)
     try:
@@ -514,9 +527,9 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
         context["round"] = turn_round
     mode = str(body.get("mode") or "ask").strip().lower()
     deep = mode == "investigate"
-    names = registry.offered_names(context.get("route"), question)
-    forced = registry.forced_tool(question)
-    if deep:
+    names = registry.offered_names(context.get("route"), question) if seed_ok else []
+    forced = registry.forced_tool(question) if seed_ok else None
+    if deep and seed_ok:
         # deep analysis always starts from the round's facts; the model may then look further,
         # but opens no page (A4, A14)
         extra = [n for n in names if n not in registry.ANALYSIS_TOOLS and n != "open_page"]
@@ -559,6 +572,16 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
         yield "token", {"text": refusal}
         yield finish("done", {"turn_id": turn, "ms_total": int((time.time() - t0) * 1000), "tokens_in": 0, "tokens_out": 0,
                               "numbers": [], "unverified": [], "guard": why, "round": turn_round or None})  # fmt: skip
+        return
+    # 1b. the seed cannot say which runs are held or hidden: a fixed answer, no model, no tool
+    if not seed_ok:
+        msg = UNREADABLE[0 if lang_of(question) == "Vietnamese" else 1]
+        tr["guard"] = "manifest"
+        tr["error"] = "seed/tasks.yaml unreadable"
+        tr["answer"] = msg
+        yield "token", {"text": msg}
+        yield finish("done", {"turn_id": turn, "ms_total": int((time.time() - t0) * 1000), "tokens_in": 0, "tokens_out": 0,
+                              "numbers": [], "unverified": [], "guard": "manifest", "round": turn_round or None})  # fmt: skip
         return
     # 2. GPU busy / tunnel down -> slash fallback (only when the model sits behind the tunnel)
     why_not = providers.problem(prov)

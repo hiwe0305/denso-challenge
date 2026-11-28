@@ -10,7 +10,8 @@ from typing import Any
 
 import pytest
 from chat_index import make_idx  # noqa: F401
-from flywheel.console.chat import llm, providers, registry, tools_round
+from flywheel.console.chat import common, llm, providers, registry, tools_round
+from flywheel.console.index import hidden
 from flywheel.console.paths import ConsolePaths
 
 NEMO = "http://127.0.0.1:11435"
@@ -54,7 +55,11 @@ def _two_rounds(idx: ConsolePaths, jig: bool = True) -> None:
                                                 "step_pass": {"reach_b": 0.9889, "place": 0.8944, "release_stand": 0.7556}},
                        "levels": {"1": lv(77, 90, 0.8556, [0.7889, 0.9222], {"L-PLACE-POSE": 8}),
                                   "2": lv(59, 90, 0.6556, [0.5556, 0.7556], {"L-PLACE-POSE": 20})},
-                       "place": {"p": 0.8944, "successes": 161, "n": 180, "ci": None}}],
+                       "place": {"p": 0.8944, "successes": 161, "n": 180, "ci": None},
+                       "readings": [{"rule": "1", "scope": "whole_task", "threshold": 0.8, "lower": 0.7, "verdict": "not_met"},
+                                    {"rule": "2", "scope": "level", "level": "1", "threshold": 0.7, "lower": 0.7889, "verdict": "met"},
+                                    {"rule": "2", "scope": "level", "level": "2", "threshold": 0.7, "lower": 0.5556, "verdict": "not_met"},
+                                    {"rule": "3", "scope": "place", "threshold": 0.5, "lower": None, "verdict": None, "why": "no_ci"}]}],
             "outcomes": [{"run": "M", "relaxed": {"5.0": 136, "7.5": 145, "10.0": 150},
                           "repeats": [{"n": 60, "successes": 47}, {"n": 60, "successes": 47}, {"n": 60, "successes": 42}]}],
             "compare60": {"run": "M", "repeat": 0, "n": 60, "successes": 47,
@@ -423,3 +428,131 @@ def test_the_60_rollout_table_is_shown_with_the_verdict(idx: ConsolePaths) -> No
 
 
 WITHHELD_VI = tools_round.WITHHELD[0]
+
+
+# ------------------------------------------------------------------ review of 28/11/2026 (PR #258 shapes)
+def _edit_story(idx: ConsolePaths, **keys: Any) -> None:
+    p = idx.index / "story.json"
+    s = json.loads(p.read_text(encoding="utf-8"))
+    s.update(keys)
+    p.write_text(json.dumps(s), encoding="utf-8")
+
+
+LEDGER_258 = [
+    {"story": "DA-34", "label": "Thí nghiệm egocentric trên task bê khay", "est_cu": 784.8, "mea_cu": 148.82, "est_usd": 78.42, "mea_usd": 14.86},
+    {"story": "DA-17", "label": "Kiểm dữ liệu", "est_cu": None, "mea_cu": None, "est_usd": 0.0, "mea_usd": 0.0},
+    {"story": "other", "label": "Thí nghiệm khác (không trình bày)", "est_cu": 30.0, "mea_cu": 40.5, "est_usd": 3.0, "mea_usd": 4.05},
+]  # fmt: skip
+
+
+def test_ledger_by_story_reads_the_cu_and_usd_rows_and_names_the_other_row_by_its_label(idx: ConsolePaths) -> None:
+    _edit_story(idx, ledger=LEDGER_258)
+    res = registry.call("ledger_query", {"group_by": "story"}, {"lang": "vi"})
+    t = res["model"]
+    assert res["ok"], t
+    rows = res["ui"]["rows"]
+    assert {"story": "DA-34", "measure_kind": "estimated", "cu": 784.8, "usd": 78.42} in rows
+    assert {"story": "DA-34", "measure_kind": "measured", "cu": 148.82, "usd": 14.86} in rows
+    assert {"story": "Thí nghiệm khác (không trình bày)", "measure_kind": "measured", "cu": 40.5, "usd": 4.05} in rows
+    assert not any(r["story"] in ("other", "DA-17") for r in rows)  # a story with nothing spent is left out
+    assert "total estimated=814.8 CU (81.42 USD), total measured=189.32 CU (18.91 USD)" in t
+    assert "never a story id" in t and "'other'" not in t
+    en = registry.call("ledger_query", {"group_by": "story", "measure_kind": "measured"}, {"lang": "en"})
+    assert {r["measure_kind"] for r in en["ui"]["rows"]} == {"measured"}
+    assert any(r["story"] == "Other experiments (not presented)" for r in en["ui"]["rows"])
+
+
+def test_the_older_ledger_shape_passes_only_through_hidden_ledger(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
+    _edit_story(idx, ledger=[["DA-34", 12.0, 9.5], ["DA-50", 1.0, 2.5]])
+    monkeypatch.delattr(hidden, "ledger", raising=False)  # a console before PR #258
+    res = registry.call("ledger_query", {"group_by": "story"}, {"lang": "vi"})
+    assert res["ok"] is False and "DA-50" not in res["model"] and "Rebuild the index" in res["model"]
+
+    def merge(rows: Any, h: Any) -> Any:  # what PR #258's hidden.ledger does with DA-50 hidden
+        kept = [r for r in rows if r[0] != "DA-50"]
+        return kept + [["other", 1.0, 2.5]]
+
+    monkeypatch.setattr(hidden, "ledger", merge, raising=False)
+    res = registry.call("ledger_query", {"group_by": "story"}, {"lang": "vi"})
+    assert res["ok"] and "DA-50" not in json.dumps(res, ensure_ascii=False)
+    assert {"story": "DA-34", "measure_kind": "measured", "cu": None, "usd": 9.5} in res["ui"]["rows"]
+    assert {"story": "Thí nghiệm khác (không trình bày)", "measure_kind": "estimated", "cu": None, "usd": 1.0} in res["ui"]["rows"]
+
+
+def test_the_rule_verdicts_are_quoted_from_the_index_never_recomputed(idx: ConsolePaths) -> None:
+    _two_rounds(idx)
+    s = json.loads((idx.index / "story.json").read_text(encoding="utf-8"))
+    ev = s["jig"]["evals"][0]
+    ev["place"]["ci"] = [0.5, 0.6]  # lower bound equal to the mark: the index reads "at or above"
+    ev["readings"][3] = {"rule": "3", "scope": "place", "threshold": 0.5, "lower": 0.5, "verdict": "met"}
+    ev["readings"][1]["verdict"] = "not_met"  # whatever the CI, the chat says what the index says
+    _edit_story(idx, jig=s["jig"])
+    t = ask("M có đạt mốc 80% không?", "jig-r1")["model"]
+    assert "lượt qua bước đặt), CI 50,0–60,0, đạt mốc 50 %" in t
+    assert "mức 1: 85,6 % (77/90), CI 78,9–92,2, chưa đạt mốc 70 %" in t
+    ev.pop("readings")
+    _edit_story(idx, jig=s["jig"])
+    assert "index chưa ghi kết quả đọc theo mốc 80 %" in ask("M có đạt mốc 80% không?", "jig-r1")["model"]
+
+
+def test_the_jig_cost_names_each_part_measured_or_estimated(idx: ConsolePaths) -> None:
+    _two_rounds(idx)
+    s = json.loads((idx.index / "story.json").read_text(encoding="utf-8"))
+    s["jig"]["cost"] = {  # PR #258, docs/console/api-samples/data_story.json
+        "train": {"story": "DA-48", "label": "Train vòng mới", "cu": 56.15, "usd": 5.61, "measure_kind": "measured"},
+        "eval": {"story": "DA-47", "label": "Eval trên cảnh đồ gá", "cu": 6.8, "usd": 0.68, "measure_kind": "measured"},
+        "total_cu": 62.95,
+    }  # fmt: skip
+    _edit_story(idx, jig=s["jig"])
+    t = ask("Chi phí vòng đồ gá bao nhiêu?", "jig-r1")["model"]
+    assert "Chi phí của vòng: 62,95 CU thực đo, gồm train 56,15 CU (thực đo, DA-48) và eval 6,8 CU (thực đo, DA-47)." in t
+    s["jig"]["cost"]["eval"]["measure_kind"] = "estimated"
+    _edit_story(idx, jig=s["jig"])
+    en = ask("What did the jig round cost?", "jig-r1", "en")["model"]
+    assert "Cost of the round: 62.95 CU, made of training 56.15 CU (measured, DA-48) and evaluation 6.8 CU (estimated, DA-47)." in en
+    assert "CU ." not in t + en
+
+
+def test_an_english_diagnosis_reads_the_english_seed_values(idx: ConsolePaths) -> None:
+    _two_rounds(idx)
+    diag = {
+        "round": "r1", "source": ["docs/he/tray.md §20.11"],
+        "clusters": [{"id": "c1", "key": {"step": "place", "level": 1}, "n_fail": 14, "diagnosis": "KỸ NĂNG YẾU 5/5",
+                      "diagnosis_en": "WEAK SKILL 5/5", "intervention": "sinh quanh lỗi", "gets_data": True},
+                     {"id": "c3", "key": {"step": "approach_a", "level": 1}, "n_fail": 4, "diagnosis": "lỗi của policy", "gets_data": True}],
+        "step4": [{"id": "H1", "claim": "chuỗi bước gãy ở approach_a", "claim_en": "the step chain breaks at approach_a",
+                   "clusters": ["c6"], "verdict": "CHƯA RÕ (ngưỡng bộ chấm)", "verdict_en": "UNCLEAR (scorer threshold)", "ticket": "DA-37"}],
+    }  # fmt: skip
+    _edit_story(idx, diag=diag)
+    en = ask("Which system issues were ruled out?", "r1", "en", tool="round_diagnosis")["model"]
+    assert "diagnosis WEAK SKILL 5/5" in en and "H1 (c6; the step chain breaks at approach_a): UNCLEAR (scorer threshold), ticket DA-37" in en
+    assert "KỸ NĂNG" not in en and "CHƯA RÕ" not in en and "chuỗi bước" not in en
+    assert "c3: step" in en and "diagnosis lỗi của policy" in en  # no English value yet: the Vietnamese one
+    vi = ask("Lỗi hệ thống nào đã loại trừ?", "r1", tool="round_diagnosis")["model"]
+    assert "chẩn đoán KỸ NĂNG YẾU 5/5" in vi and "CHƯA RÕ (ngưỡng bộ chấm)" in vi and "WEAK" not in vi
+    assert tools_round.RESULT_VI["pass"] == "qua"
+
+
+def test_a_seed_that_cannot_be_read_gives_no_figures(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
+    _two_rounds(idx)
+    bad = idx.repo / "badseed"
+    bad.mkdir()
+    (bad / "tasks.yaml").write_text("rounds: [\n", encoding="utf-8")
+    monkeypatch.setattr(ConsolePaths, "seed", property(lambda self: bad))
+    with pytest.raises(common.ManifestUnreadable):
+        common.story()
+    for tool in ("round_report", "round_diagnosis", "pair_comparisons"):
+        res = ask("Phân tích kết quả vòng này", "jig-r1", tool=tool)
+        assert res["ok"] is False and "136" not in res["model"], tool
+    assert registry.call("ledger_query", {"group_by": "story"}, {})["ok"] is False
+    assert llm.list_traces() == []
+    _hosted(monkeypatch)
+
+    def gen(msgs: Any, schemas: Any, deadline: float, *a: Any) -> Any:
+        raise AssertionError("the model is never asked")
+
+    monkeypatch.setattr(llm, "generate", gen)
+    evs = list(llm.events(_body("Phân tích kết quả vòng này")))
+    text = "".join(d.get("text", "") for e, d in evs if e == "token")
+    assert text == common.UNREADABLE[0] and evs[-1][0] == "done" and evs[-1][1]["guard"] == "manifest"
+    assert not any(e == "tool_start" for e, _ in evs)
