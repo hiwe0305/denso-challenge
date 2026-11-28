@@ -6,6 +6,7 @@ import {
   ensureCatalog,
   ensureSimRaw,
   ensureStoryRaw,
+  failureLabel,
   formatDateTime,
   formatNumber,
   formatPercent,
@@ -20,21 +21,48 @@ import {
   renderCrumbHeading,
   renderErrorBlock,
   renderLoadingView,
+  renderRoundEmpty,
   renderStatStrip,
   renderStateChip,
   scopeSimForTask,
   scopeStoryForTask,
+  roundsWithIndex,
   safeThumbUrl,
+  scrubPath,
   setChildren,
   setDataViewMode,
   setSelection,
   shortHashId,
+  stageLabel,
   state,
   t,
   tryGetJSON,
 } from "./core.js";
+import { icon } from "./icons.js";
 
 const DS_TABS = ["overview", "content", "quality", "lineage", "jobs"];
+
+// Step ids of the selected task in order (task.stages in tasks.json); sim episodes and jig
+// rollouts store one boolean per step in this order.
+function taskStageIds() {
+  const task = getCurrentTask();
+  return task && Array.isArray(task.stages) ? task.stages.map((st) => st && st.id).filter(Boolean) : [];
+}
+
+// One line "1 reach table A · 2 grasp tray · …" so the numbered step cells read without ids.
+function renderStepLegend(stepIds) {
+  if (!Array.isArray(stepIds) || stepIds.length === 0) return null;
+  return el(
+    "p",
+    { className: cls("tiny", "step-legend") },
+    stepIds.map((id, idx) =>
+      el("span", { className: "step-legend-item", title: id }, [
+        el("b", { className: "mono", text: String(idx + 1) }),
+        ` ${stageLabel(id)}`,
+      ])
+    )
+  );
+}
 
 const HAND_BONES = [
   [0, 1], [1, 2], [2, 3], [3, 4],
@@ -104,6 +132,40 @@ function datasetSortRank(row) {
   const stRank =
     st === "current" ? 0 : st === "reference" ? 1 : st === "benchmark" ? 2 : st === "superseded" ? 4 : 6;
   return inspectable + stRank;
+}
+
+// Statuses left out of the default filter "Tập chính" (design audit P0-7).
+const HIDDEN_BY_DEFAULT = new Set(["superseded", "duplicate", "archived"]);
+const GALLERY_PAGE = 12;
+const TABLE_PAGE = 20;
+const COMPACT_PAGE = 10;
+
+// Dataset id → a poster of sim.json for the sim cut or release part that dataset is: the cut
+// whose sha256 starts with sim.sha8 (posters live under that folder) and each release part of
+// the cut (first episode with a poster in its range).
+function simPosterByDataset(rawSim) {
+  const out = new Map();
+  const sim = rawSim || {};
+  const eps = Array.isArray(sim.episodes) ? sim.episodes : [];
+  const firstPoster = (lo, hi) => {
+    const hit = eps.find((e) => e && e.poster && e.i >= lo && e.i < hi);
+    return hit ? `/simmedia/${hit.poster}` : null;
+  };
+  const sha8 = String(sim.sha8 || "");
+  const cuts = sim.cuts && typeof sim.cuts === "object" ? sim.cuts : {};
+  for (const [cutId, cut] of Object.entries(cuts)) {
+    if (sha8 && cut && String(cut.sha256 || "").startsWith(sha8)) {
+      const poster = firstPoster(0, Number.MAX_SAFE_INTEGER);
+      if (poster) out.set(cutId, poster);
+    }
+  }
+  for (const part of Array.isArray(sim.parts) ? sim.parts : []) {
+    if (!part || !part.release) continue;
+    const lo = Number(part.first) || 0;
+    const poster = firstPoster(lo, lo + (Number(part.n) || 0));
+    if (poster) out.set(String(part.release), poster);
+  }
+  return out;
 }
 
 function locationLabel(row, forceOnLaptop = false) {
@@ -454,6 +516,9 @@ function renderNativeEgoStudioPlayer(epTrack) {
     )
   );
 
+  // Seconds with two decimals in the reader's locale (vi: comma, A19).
+  const secs = (v) => formatNumber(v, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const frameNow = () =>
     Math.max(0, Math.min(totalFrames - 1, Math.floor(video.currentTime * fps + 1e-3)));
 
@@ -501,7 +566,7 @@ function renderNativeEgoStudioPlayer(epTrack) {
     lastFrame = f;
     drawHands2D(f);
     playhead.style.left = `${((f + 0.5) / totalFrames) * 100}%`;
-    timeLabel.textContent = `f ${f}/${totalFrames - 1} · ${(f / fps).toFixed(2)} s`;
+    timeLabel.textContent = `f ${f}/${totalFrames - 1} · ${secs(f / fps)} s`;
     (epTrack.subtasks || []).forEach((s, idx) => {
       const active = f >= s.start && f < s.end;
       if (segNodes[idx]) segNodes[idx].classList.toggle("is-active", active);
@@ -572,7 +637,7 @@ function renderNativeEgoStudioPlayer(epTrack) {
       [
         el("span", {
           className: cls("ego-sub-when", "mono"),
-          text: `${(s.start / fps).toFixed(2)}–${(s.end / fps).toFixed(2)}s`,
+          text: `${secs(s.start / fps)}–${secs(s.end / fps)} s`,
         }),
         el("span", { text: s.text }),
       ]
@@ -602,27 +667,27 @@ function renderNativeEgoStudioPlayer(epTrack) {
 
   const m = epTrack.meta || {};
   const metaChips = [
-    ["video", `${vw}×${vh} · ${fps} fps`],
-    ["frames", `${totalFrames} (${(totalFrames / fps).toFixed(2)} s)`],
-    ["pose", `${m.pose_source || "-"} (${epTrack.space || "camera"})`],
-    ["hands", m.hands_visible != null ? formatPercent(m.hands_visible) : null],
+    [t("ep.meta.video"), `${vw}×${vh} · ${fps} fps`],
+    [t("ep.meta.frames"), `${formatNumber(totalFrames)} (${secs(totalFrames / fps)} s)`],
+    [t("ep.meta.pose"), `${m.pose_source || "-"} (${epTrack.space || "camera"})`],
+    [t("ep.meta.hands"), m.hands_visible != null ? formatPercent(m.hands_visible) : null],
     [
-      "L / R vis",
+      t("ep.meta.handsLR"),
       m.left_visible != null
         ? `${formatPercent(m.left_visible)} / ${formatPercent(m.right_visible)}`
         : null,
     ],
     [
-      "accel (m/s²)",
+      t("ep.meta.accel"),
       m.left_accel_m_s2 != null
         ? `${formatNumber(m.left_accel_m_s2, { maximumFractionDigits: 1 })} / ${formatNumber(m.right_accel_m_s2, { maximumFractionDigits: 1 })}`
         : null,
     ],
     [
-      "intrinsics",
+      t("ep.meta.intrinsics"),
       Array.isArray(m.intrinsic) ? m.intrinsic.map((v) => Math.round(v)).join(", ") : null,
     ],
-    ["scene", m.scene || m.environment || null],
+    [t("ep.meta.scene"), m.scene || m.environment || null],
   ].filter(([, v]) => v != null && v !== "");
 
   return el("div", { className: "ego-studio-grid" }, [
@@ -676,7 +741,7 @@ function renderNativeEgoStudioPlayer(epTrack) {
           { className: "meta-strip" },
           metaChips.map(([k, v]) =>
             el("div", { className: "meta-box" }, [
-              el("span", { className: "mono", text: k }),
+              el("span", { text: k }),
               el("b", { className: "mono", style: "font-size:12px", text: String(v) }),
             ])
           )
@@ -760,6 +825,35 @@ function renderLineageSankeyCard(edges, rowMap, focusId = null) {
     return `${base} (${tax.shortId})`;
   };
 
+  // One edge: a Sankey draws one block over the whole card and cuts the right label, so
+  // draw two boxes and an arrow instead (design audit P1-15).
+  if (dagLinks.length === 1) {
+    const { source, target } = dagLinks[0];
+    const box = (id) => {
+      const r = rowMap.get(id);
+      const tax = r ? canonicalDatasetTaxonomy(r) : null;
+      const body = [
+        el("b", { className: "lineage-box-title", text: tax ? tax.cleanTitle : shortHashId(id) }),
+        el("span", { className: cls("tiny", "mono"), title: id, text: tax ? tax.shortId : id }),
+        r && r.episodes != null
+          ? el("span", { className: "tiny", text: t("tasks.unitEpisodes", { val: formatNumber(r.episodes) }) })
+          : null,
+      ];
+      const boxCls = cls("lineage-box", id === focusId && "is-focus");
+      return r && id !== focusId
+        ? el("a", { className: boxCls, href: `#/data/${encodeURIComponent(id)}` }, body)
+        : el("div", { className: boxCls }, body);
+    };
+    return el("section", { className: "card" }, [
+      el("h2", { text: t("data.sankeyTitle") }),
+      el("div", { className: "lineage-pair" }, [
+        box(source),
+        el("span", { className: "lineage-arrow", "aria-hidden": "true", text: "→" }),
+        box(target),
+      ]),
+    ]);
+  }
+
   const chartHeight = Math.max(280, Math.min(520, nodeIds.size * 26));
 
   return renderChartBlock({
@@ -794,7 +888,7 @@ function renderLineageSankeyCard(edges, rowMap, focusId = null) {
           nodeWidth: 14,
           nodeGap: 10,
           left: 14,
-          right: 170,
+          right: 230,
           top: 12,
           bottom: 12,
           data: Array.from(nodeIds).map((id, idx) => ({
@@ -844,7 +938,10 @@ export function renderDataCatalogPage() {
 
   const load = async () => {
     try {
-      const cat = await ensureCatalog();
+      const [cat, rawSim] = await Promise.all([
+        ensureCatalog(),
+        ensureSimRaw().catch(() => null),
+      ]);
       const rawRows = Array.isArray(cat.rows) ? cat.rows : [];
       const rows = [...rawRows].sort((a, b) => {
         const diff = datasetSortRank(a) - datasetSortRank(b);
@@ -856,7 +953,13 @@ export function renderDataCatalogPage() {
       const listHolder = el("div", {});
 
       const isCuratedRow = (r) =>
-        isInspectableOnLaptop(r) || r.status === "current" || r.status === "reference";
+        !HIDDEN_BY_DEFAULT.has(String(r.status || "")) &&
+        (isInspectableOnLaptop(r) || r.status === "current" || r.status === "reference");
+
+      // Picture of a dataset: its own poster, else a poster of the sim cut it holds.
+      const borrowed = simPosterByDataset(rawSim);
+      const rowImage = (r) =>
+        (Array.isArray(r.thumbs) ? safeThumbUrl(r.thumbs[0]) : null) || borrowed.get(String(r.id)) || null;
 
       const groups = Array.from(new Set(rows.map((r) => r.group).filter(Boolean))).sort();
       const curatedCount = rows.filter(isCuratedRow).length;
@@ -865,7 +968,159 @@ export function renderDataCatalogPage() {
         (r) => r.status === "current" || r.status === "reference"
       ).length;
 
-      const redrawRows = () => {
+      // How many rows each block shows before "show more" (mobile page height, P1-13).
+      let galleryLimit = GALLERY_PAGE;
+      let tableLimit = TABLE_PAGE;
+      let compactLimit = COMPACT_PAGE;
+
+      const renderMoreButton = (hidden, onMore) =>
+        hidden > 0
+          ? el("div", { className: "data-more" }, [
+              el(
+                "button",
+                { type: "button", className: "btn", onClick: onMore },
+                [t("data.showMore", { count: formatNumber(hidden) })]
+              ),
+            ])
+          : null;
+
+      const renderGalleryCard = (r) => {
+        const img = rowImage(r);
+        const tax = canonicalDatasetTaxonomy(r);
+        return el(
+          "a",
+          {
+            className: "ep-visual-card",
+            href: `#/data/${encodeURIComponent(r.id)}`,
+          },
+          [
+            el("img", { src: img, alt: tax.cleanTitle, loading: "lazy" }),
+            el("div", { className: "ep-visual-body" }, [
+              el("div", { className: "tag-row" }, [
+                el("span", { className: "tax-badge", text: tax.code }),
+                el("span", { className: cls("short-hash", "mono"), title: r.id, text: tax.shortId }),
+              ]),
+              el("div", { className: "ep-visual-title", title: tax.cleanTitle, text: tax.cleanTitle }),
+              el("div", { className: "tag-row" }, [
+                el("span", {
+                  className: cls("mini-tag", "mono"),
+                  text:
+                    r.episodes != null
+                      ? t("tasks.unitEpisodes", { val: formatNumber(r.episodes) })
+                      : t("state.na"),
+                }),
+                r.fps
+                  ? el("span", { className: cls("mini-tag", "mono"), text: `${r.fps} fps` })
+                  : null,
+                renderStateChip(r.status),
+              ]),
+            ]),
+          ]
+        );
+      };
+
+      // Full table (list view) or compact table (rows without a picture under the gallery).
+      const renderRowsTable = (list, compact) =>
+        el("div", { className: cls("card", "table-wrap", compact && "data-compact") }, [
+          el("table", { className: "table" }, [
+            el("thead", {}, [
+              el("tr", {}, [
+                el("th", { text: t("data.colDataset") }),
+                compact ? null : el("th", { text: t("data.colFormatSchema") }),
+                el("th", { className: "num", text: t("data.colVolume") }),
+                compact ? null : el("th", { text: t("data.colQaSummary") }),
+                el("th", { text: t("common.status") }),
+              ]),
+            ]),
+            el(
+              "tbody",
+              {},
+              list.map((r) => {
+                const img = rowImage(r);
+                const canInspect = isInspectableOnLaptop(r);
+                const tax = canonicalDatasetTaxonomy(r);
+                return el("tr", {}, [
+                  el("td", {}, [
+                    el("div", { className: "ds" }, [
+                      compact
+                        ? null
+                        : img
+                          ? el("img", {
+                              className: "ds-thumb-mini",
+                              src: img,
+                              alt: "",
+                              loading: "lazy",
+                            })
+                          : el("div", { className: "tile", "aria-hidden": "true" }, [icon("data")]),
+                      el("div", { className: "row-body" }, [
+                        el(
+                          "a",
+                          {
+                            className: "link",
+                            href: `#/data/${encodeURIComponent(r.id)}`,
+                          },
+                          [tax.cleanTitle]
+                        ),
+                        el("div", { className: "tag-row", style: "margin-top:3px" }, [
+                          el("span", { className: "tax-badge", text: tax.code }),
+                          el("span", {
+                            className: cls("short-hash", "mono"),
+                            title: r.id,
+                            text: tax.shortId,
+                          }),
+                        ]),
+                      ]),
+                    ]),
+                  ]),
+                  compact
+                    ? null
+                    : el("td", {}, [
+                        el("div", {
+                          className: cls("mono", "data-format"),
+                          text: r.format || r.data_type || t("state.na"),
+                        }),
+                        r.fps
+                          ? el("span", { className: cls("tiny", "mono"), text: `${r.fps} fps` })
+                          : null,
+                      ]),
+                  el("td", { className: "num", style: "white-space:nowrap" }, [
+                    el("b", {
+                      className: "mono",
+                      text:
+                        r.episodes != null
+                          ? t("tasks.unitEpisodes", { val: formatNumber(r.episodes) })
+                          : t("state.na"),
+                    }),
+                    r.hours != null
+                      ? el("div", {
+                          className: cls("tiny", "mono"),
+                          text: t("tasks.unitHours", {
+                            val: formatNumber(r.hours, { maximumFractionDigits: 2 }),
+                          }),
+                        })
+                      : null,
+                  ]),
+                  compact ? null : el("td", {}, [renderQaMiniSummary(r)]),
+                  el("td", { style: "white-space:nowrap" }, [
+                    renderStateChip(r.status),
+                    el("div", {
+                      className: "tiny",
+                      style: "margin-top:3px",
+                      text: locationLabel(r, canInspect && Boolean(r.lerobot)),
+                    }),
+                  ]),
+                ]);
+              })
+            ),
+          ]),
+        ]);
+
+      const redrawRows = (resetLimits = false) => {
+        if (resetLimits) {
+          galleryLimit = GALLERY_PAGE;
+          tableLimit = TABLE_PAGE;
+          compactLimit = COMPACT_PAGE;
+        }
         const curTask = getCurrentTask();
         const catTaskKey = curTask ? curTask.catalog_task || curTask.id : null;
         const q = searchQuery.trim().toLowerCase();
@@ -891,149 +1146,39 @@ export function renderDataCatalogPage() {
         }
 
         if (state.dataViewMode === "gallery") {
+          // Gallery only for sets with a picture; the rest go to a compact table (P0-7).
+          const withImg = filtered.filter((r) => rowImage(r));
+          const noImg = filtered.filter((r) => !rowImage(r));
           setChildren(
             listHolder,
-            el(
-              "div",
-              { className: "ep-card-grid" },
-              filtered.map((r) => {
-                const thumb = Array.isArray(r.thumbs) ? safeThumbUrl(r.thumbs[0]) : null;
-                const tax = canonicalDatasetTaxonomy(r);
-                return el(
-                  "a",
-                  {
-                    className: "ep-visual-card",
-                    href: `#/data/${encodeURIComponent(r.id)}`,
-                  },
-                  [
-                    thumb
-                      ? el("img", { src: thumb, alt: tax.cleanTitle, loading: "lazy" })
-                      : el("div", { className: "thumb" }, [
-                          el("span", { text: (r.group || "D").slice(0, 3).toUpperCase() }),
-                        ]),
-                    el("div", { className: "ep-visual-body" }, [
-                      el("div", { className: "tag-row" }, [
-                        el("span", { className: "tax-badge", text: tax.code }),
-                        el("span", { className: cls("short-hash", "mono"), title: r.id, text: tax.shortId }),
-                      ]),
-                      el("div", { className: "ep-visual-title", text: tax.cleanTitle }),
-                      el("div", { className: "tag-row" }, [
-                        el("span", {
-                          className: cls("mini-tag", "mono"),
-                          text:
-                            r.episodes != null
-                              ? `${formatNumber(r.episodes)} ep`
-                              : t("state.na"),
-                        }),
-                        r.fps
-                          ? el("span", { className: cls("mini-tag", "mono"), text: `${r.fps} fps` })
-                          : null,
-                        renderStateChip(r.status),
-                      ]),
-                    ]),
-                  ]
-                );
-              })
-            )
+            withImg.length > 0
+              ? el("div", { className: "ep-card-grid" }, withImg.slice(0, galleryLimit).map(renderGalleryCard))
+              : null,
+            renderMoreButton(withImg.length - galleryLimit, () => {
+              galleryLimit += GALLERY_PAGE;
+              redrawRows();
+            }),
+            noImg.length > 0
+              ? el("div", { className: cls("sect", "data-noimg-head") }, [
+                  el("h2", { text: t("data.noImageTitle", { count: formatNumber(noImg.length) }) }),
+                ])
+              : null,
+            noImg.length > 0 ? renderRowsTable(noImg.slice(0, compactLimit), true) : null,
+            renderMoreButton(noImg.length - compactLimit, () => {
+              compactLimit += COMPACT_PAGE;
+              redrawRows();
+            })
           );
           return;
         }
 
         setChildren(
           listHolder,
-          el("div", { className: cls("card", "table-wrap") }, [
-            el("table", { className: "table" }, [
-              el("thead", {}, [
-                el("tr", {}, [
-                  el("th", { text: t("data.colDataset") }),
-                  el("th", { text: t("data.colFormatSchema") }),
-                  el("th", { className: "num", text: t("data.colVolume") }),
-                  el("th", { text: t("data.colQaSummary") }),
-                  el("th", { text: t("common.status") }),
-                ]),
-              ]),
-              el(
-                "tbody",
-                {},
-                filtered.map((r) => {
-                  const thumb = Array.isArray(r.thumbs) ? safeThumbUrl(r.thumbs[0]) : null;
-                  const canInspect = isInspectableOnLaptop(r);
-                  const tax = canonicalDatasetTaxonomy(r);
-                  return el("tr", {}, [
-                    el("td", {}, [
-                      el("div", { className: "ds" }, [
-                        thumb
-                          ? el("img", {
-                              className: "ds-thumb-mini",
-                              src: thumb,
-                              alt: r.id,
-                              loading: "lazy",
-                            })
-                          : el("div", {
-                              className: "tile",
-                              text: String(r.group || "D")[0].toUpperCase(),
-                            }),
-                        el("div", { className: "row-body" }, [
-                          el(
-                            "a",
-                            {
-                              className: "link",
-                              href: `#/data/${encodeURIComponent(r.id)}`,
-                            },
-                            [tax.cleanTitle]
-                          ),
-                          el("div", { className: "tag-row", style: "margin-top:3px" }, [
-                            el("span", { className: "tax-badge", text: tax.code }),
-                            el("span", {
-                              className: cls("short-hash", "mono"),
-                              title: r.id,
-                              text: tax.shortId,
-                            }),
-                          ]),
-                        ]),
-                      ]),
-                    ]),
-                    el("td", {}, [
-                      el("div", {
-                        className: "mono",
-                        style: "font-size:12px;max-width:190px;overflow-wrap:anywhere",
-                        text: r.format || r.data_type || t("state.na"),
-                      }),
-                      r.fps
-                        ? el("span", { className: cls("tiny", "mono"), text: `${r.fps} fps` })
-                        : null,
-                    ]),
-                    el("td", { className: "num", style: "white-space:nowrap" }, [
-                      el("b", {
-                        className: "mono",
-                        text:
-                          r.episodes != null
-                            ? `${formatNumber(r.episodes)} ep`
-                            : t("state.na"),
-                      }),
-                      r.hours != null
-                        ? el("div", {
-                            className: cls("tiny", "mono"),
-                            text: t("tasks.unitHours", {
-                              val: formatNumber(r.hours, { maximumFractionDigits: 2 }),
-                            }),
-                          })
-                        : null,
-                    ]),
-                    el("td", {}, [renderQaMiniSummary(r)]),
-                    el("td", { style: "white-space:nowrap" }, [
-                      renderStateChip(r.status),
-                      el("div", {
-                        className: "tiny",
-                        style: "margin-top:3px",
-                        text: locationLabel(r, canInspect && Boolean(r.lerobot)),
-                      }),
-                    ]),
-                  ]);
-                })
-              ),
-            ]),
-          ])
+          renderRowsTable(filtered.slice(0, tableLimit), false),
+          renderMoreButton(filtered.length - tableLimit, () => {
+            tableLimit += TABLE_PAGE;
+            redrawRows();
+          })
         );
       };
 
@@ -1063,19 +1208,22 @@ export function renderDataCatalogPage() {
           el("input", {
             type: "search",
             className: cls("field", "search"),
+            "aria-label": t("data.filterSearchLabel"),
             placeholder: t("data.searchPlaceholder"),
             onInput: (ev) => {
               searchQuery = ev.target.value;
-              redrawRows();
+              redrawRows(true);
             },
           }),
           el(
             "select",
             {
               className: "field",
+              "aria-label": t("data.filterStatusLabel"),
+              title: t("data.filterStatusLabel"),
               onChange: (ev) => {
                 availFilter = ev.target.value;
-                redrawRows();
+                redrawRows(true);
               },
             },
             [
@@ -1103,9 +1251,11 @@ export function renderDataCatalogPage() {
             "select",
             {
               className: "field",
+              "aria-label": t("data.filterGroupLabel"),
+              title: t("data.filterGroupLabel"),
               onChange: (ev) => {
                 groupFilter = ev.target.value;
-                redrawRows();
+                redrawRows(true);
               },
             },
             [
@@ -1122,9 +1272,11 @@ export function renderDataCatalogPage() {
             "select",
             {
               className: "field",
+              "aria-label": t("data.filterScopeLabel"),
+              title: t("data.filterScopeLabel"),
               onChange: (ev) => {
                 scopeOnlyTask = ev.target.value === "task";
-                redrawRows();
+                redrawRows(true);
               },
             },
             [
@@ -1136,11 +1288,13 @@ export function renderDataCatalogPage() {
             "button",
             {
               type: "button",
-              className: "btn",
+              className: cls("btn", "btn-icon-text"),
               onClick: () =>
                 setDataViewMode(state.dataViewMode === "list" ? "gallery" : "list"),
             },
-            [state.dataViewMode === "list" ? t("data.viewGallery") : t("data.viewList")]
+            state.dataViewMode === "list"
+              ? [icon("tasks"), t("data.viewGallery")]
+              : [icon("menu"), t("data.viewList")]
           ),
         ]),
 
@@ -1399,7 +1553,7 @@ function renderMethodStructuredCard(methodData, titleText) {
           kvPairs.map(([k, v]) =>
             el("div", { className: "meta-box" }, [
               el("span", { className: "mono", text: k }),
-              el("b", { className: "mono", style: "font-size:12px;overflow-wrap:anywhere", text: String(v) }),
+              el("b", { className: "mono", style: "font-size:12px;overflow-wrap:anywhere", text: scrubPath(String(v)) }),
             ])
           )
         )
@@ -1418,7 +1572,7 @@ function renderMethodStructuredCard(methodData, titleText) {
       el("pre", {
         className: cls("log-box", "mono"),
         style: "margin-top:8px",
-        text: JSON.stringify(methodData, null, 2),
+        text: scrubPath(JSON.stringify(methodData, null, 2)),
       }),
     ]),
   ]);
@@ -1574,7 +1728,7 @@ export function renderDatasetDetailPage(ctx) {
                         ep.hands != null
                           ? el("span", {
                               className: cls("mini-tag", "mono"),
-                              text: `hands ${formatPercent(ep.hands)}`,
+                              text: t("ego.handsChip", { pct: formatPercent(ep.hands) }),
                             })
                           : null,
                         ep.qa ? renderStateChip(ep.qa) : null,
@@ -1657,7 +1811,7 @@ export function renderDatasetDetailPage(ctx) {
                   el("b", {
                     className: "mono",
                     style: "font-size:12px;overflow-wrap:anywhere",
-                    text: String(v),
+                    text: scrubPath(String(v)),
                   }),
                 ])
               )
@@ -1681,7 +1835,7 @@ export function renderDatasetDetailPage(ctx) {
                         el("b", { text: loc.where || "-" }),
                         el("p", {
                           className: cls("muted", "mono"),
-                          text: loc.path || loc.raw || "",
+                          text: scrubPath(loc.path || loc.raw || ""),
                         }),
                       ]),
                       renderStateChip(loc.exists ? "ok" : "missing"),
@@ -1825,7 +1979,7 @@ export function renderDatasetDetailPage(ctx) {
                         ep.hands != null
                           ? el("span", {
                               className: cls("mini-tag", "mono"),
-                              text: `hands ${formatPercent(ep.hands)}`,
+                              text: t("ego.handsChip", { pct: formatPercent(ep.hands) }),
                             })
                           : null,
                         ep.pose
@@ -2393,6 +2547,17 @@ export function renderEpisodeDetailPage(ctx) {
             const mnAll = flat.length ? Math.min(...flat) : null;
             const mxAll = flat.length ? Math.max(...flat) : null;
             const shortChips = names.slice(0, 4).map((n) => n.replace(/_joint$/, ""));
+            // Plot the eight channels that move most and show the three that move most, so the
+            // chart never opens on one flat line at 0 (design audit P2-8).
+            const spanOf = (sIdx) => {
+              const arr = (vals[sIdx] || []).filter((v) => typeof v === "number");
+              return arr.length ? Math.max(...arr) - Math.min(...arr) : 0;
+            };
+            const plotIdx = names
+              .map((_, sIdx) => [sIdx, spanOf(sIdx)])
+              .sort((a, b) => b[1] - a[1] || a[0] - b[0])
+              .slice(0, 8)
+              .map(([sIdx]) => sIdx);
             if (names.length > 4) shortChips.push(`+${names.length - 4}`);
 
             channelSummaryRows.push({
@@ -2415,21 +2580,32 @@ export function renderEpisodeDetailPage(ctx) {
                   tooltip: { trigger: "axis" },
                   legend: {
                     type: "scroll", top: 0,
-                    selected: Object.fromEntries(names.slice(0, 8).map((name, index) => [name, index === 0])),
+                    selected: Object.fromEntries(plotIdx.map((sIdx, rank) => [names[sIdx], rank < 3])),
                     textStyle: { color: soft, fontSize: 12 },
                   },
-                  xAxis: { type: "category", data: ts, axisLabel: { color: soft } },
+                  xAxis: {
+                    type: "category",
+                    data: ts,
+                    axisLabel: {
+                      color: soft,
+                      formatter: (v) => formatNumber(Number(v), { maximumFractionDigits: 1 }),
+                    },
+                  },
                   yAxis: {
                     type: "value",
-                    axisLabel: { color: soft },
+                    axisLabel: {
+                      color: soft,
+                      formatter: (v) => formatNumber(v, { maximumFractionDigits: 2 }),
+                    },
                     splitLine: { lineStyle: { color: line } },
                   },
-                  series: names.slice(0, 8).map((nm, sIdx) => ({
-                    name: nm,
+                  series: plotIdx.map((sIdx, rank) => ({
+                    name: names[sIdx],
                     type: "line",
                     showSymbol: false,
                     data: vals[sIdx] || [],
-                    lineStyle: { width: 1.5, color: colors[sIdx % colors.length] },
+                    itemStyle: { color: colors[rank % colors.length] },
+                    lineStyle: { width: 1.5, color: colors[rank % colors.length] },
                   })),
                 }),
                 onChartClick: ({ dataIndex }) => {
@@ -2537,13 +2713,22 @@ export function renderEpisodeDetailPage(ctx) {
                     ["seed", envEp.sample && envEp.sample.seed],
                     ["table_gap", envEp.sample && envEp.sample.table_gap],
                     ["light_scale", envEp.sample && envEp.sample.light_scale],
-                    ["success", envEp.report ? String(Boolean(envEp.report.success)) : null],
+                    [
+                      "success",
+                      envEp.report ? t(envEp.report.success ? "ep.env.successYes" : "ep.env.successNo") : null,
+                    ],
                   ]
                     .filter(([, v]) => v != null)
                     .map(([k, v]) =>
                       el("div", { className: "meta-box" }, [
-                        el("span", { className: "mono", text: k }),
-                        el("b", { className: "mono", text: String(v) }),
+                        el("span", { title: k, text: t(`ep.env.${k}`) }),
+                        el("b", {
+                          className: "mono",
+                          text:
+                            typeof v === "number" && k !== "seed"
+                              ? formatNumber(v, { maximumFractionDigits: 3 })
+                              : String(v),
+                        }),
                       ])
                     )
                 ),
@@ -2793,7 +2978,7 @@ export function renderEgoflowPage() {
                       e.hands != null
                         ? el("span", {
                             className: cls("mini-tag", "mono"),
-                            text: `hands ${formatPercent(e.hands)}`,
+                            text: t("ego.handsChip", { pct: formatPercent(e.hands) }),
                           })
                         : null,
                       e.qa ? renderStateChip(e.qa) : null,
@@ -3019,10 +3204,17 @@ export function renderEgoflowPage() {
         exportedEps.length > 0
           ? el("div", {}, [
               el("div", { className: "sect" }, [el("h2", { text: t("ego.galleryTitle") })]),
+              exportedEps.some((e) => e.qa === "flag")
+                ? el("p", { className: cls("tiny", "ego-flag-legend") }, [
+                    renderStateChip("flag"),
+                    el("span", { text: t("ego.flagLegend") }),
+                  ])
+                : null,
               el("div", { className: "toolbar" }, [
                 el("input", {
                   type: "search",
                   className: cls("field", "search"),
+                  "aria-label": t("ds.searchEpPlaceholder"),
                   placeholder: t("ds.searchEpPlaceholder"),
                   onInput: (ev) => {
                     qSearch = ev.target.value;
@@ -3033,6 +3225,7 @@ export function renderEgoflowPage() {
                   "select",
                   {
                     className: "field",
+                    "aria-label": t("ego.filterSourceLabel"),
                     onChange: (ev) => {
                       srcFilter = ev.target.value;
                       redrawGallery();
@@ -3047,6 +3240,7 @@ export function renderEgoflowPage() {
                   "select",
                   {
                     className: "field",
+                    "aria-label": t("ds.filterQaAll"),
                     onChange: (ev) => {
                       qaFilter = ev.target.value;
                       redrawGallery();
@@ -3086,7 +3280,8 @@ export function renderSimLibraryPage() {
   const wrap = el("div", {});
   wrap.appendChild(renderLoadingView(t("sim.title")));
 
-  const scope = state.taskId;
+  // Browse state per task and round: rounds grant different sim keys (cut vs rollouts).
+  const scope = `${state.taskId}:${state.roundId || ""}`;
   const saved = simBrowseByTask.get(scope) || {};
   let activeMode = saved.activeMode || null;
   let page = saved.page || 1;
@@ -3097,7 +3292,7 @@ export function renderSimLibraryPage() {
   let rLvFilter = saved.rLvFilter || "all";
   let rOutFilter = saved.rOutFilter || "all";
   let rSeedQuery = saved.rSeedQuery || "";
-  const pageSize = 24;
+  const pageSize = typeof window !== "undefined" && window.innerWidth < 600 ? 8 : 24;
 
   const load = async () => {
     try {
@@ -3107,18 +3302,18 @@ export function renderSimLibraryPage() {
       ]);
       const sim = scopeSimForTask(rawSim);
       const scopedStory = rawStory ? scopeStoryForTask(rawStory) : {};
-      const jig =
-        !sim.simLockedByScope && hasIndexAccess("story.jig") && scopedStory.jig
-          ? scopedStory.jig
-          : null;
+      // The rollout viewer needs only `story.jig`; the cut tab needs `sim`. A round may
+      // grant either one, both or neither (design audit P0-2).
+      const jig = hasIndexAccess("story.jig") && scopedStory.jig ? scopedStory.jig : null;
       const rollouts = jig && Array.isArray(jig.rollouts) ? jig.rollouts : [];
-      const stepNames = jig && Array.isArray(jig.steps) ? jig.steps : [];
+      const stepNames = jig && Array.isArray(jig.steps) ? jig.steps : taskStageIds();
+      const hasCut = !sim.simLockedByScope;
 
       const episodes = Array.isArray(sim.episodes) ? sim.episodes : [];
       const mediaEpisodes = episodes.filter((e) => Boolean(e.video || e.poster));
       const teleop = Array.isArray(sim.teleop) ? sim.teleop : [];
 
-      if (!activeMode) {
+      if (!activeMode || (activeMode === "rollouts" && rollouts.length === 0) || (activeMode === "cut" && !hasCut)) {
         activeMode = rollouts.length > 0 ? "rollouts" : "cut";
       }
       if (!mediaFilter) {
@@ -3246,7 +3441,11 @@ export function renderSimLibraryPage() {
                             text: `#${r.repeat ?? 0}`,
                           }),
                           el("span", { className: "grow" }),
-                          renderStateChip(r.success ? "pass" : "failed"),
+                          // W1: a successful rollout reads "thành công", not "đạt".
+                          el("span", {
+                            className: cls("chip", !r.success && "danger"),
+                            text: t(r.success ? "exp.rolloutSuccess" : "exp.rolloutFail"),
+                          }),
                         ]
                       ),
                       el("div", { className: "tag-row" }, [
@@ -3260,27 +3459,28 @@ export function renderSimLibraryPage() {
                         }),
                         r.failure
                           ? el("span", {
-                              className: cls("chip", "danger", "mono"),
-                              text: r.failure,
+                              className: cls("chip", "danger"),
+                              title: r.failure,
+                              text: failureLabel(r.failure),
                             })
                           : null,
                       ]),
                       el("div", { className: "tag-row" }, [
                         el("span", {
                           className: cls("mini-tag", "mono"),
-                          text: `Δxy:${r.dist_cm != null ? `${formatNumber(r.dist_cm, { maximumFractionDigits: 1 })}cm` : "-"}`,
+                          text: `Δxy ${r.dist_cm != null ? `${formatNumber(r.dist_cm, { maximumFractionDigits: 1 })} cm` : "-"}`,
                         }),
                         el("span", {
                           className: cls("mini-tag", "mono"),
-                          text: `Δyaw:${r.yaw_deg != null ? `${formatNumber(r.yaw_deg, { maximumFractionDigits: 1 })}°` : "-"}`,
+                          text: `Δyaw ${r.yaw_deg != null ? `${formatNumber(r.yaw_deg, { maximumFractionDigits: 1 })}°` : "-"}`,
                         }),
                         el("span", {
                           className: cls("mini-tag", "mono"),
-                          text: `t:${r.sim_s != null ? `${formatNumber(r.sim_s, { maximumFractionDigits: 1 })}s` : "-"}`,
+                          text: `t ${r.sim_s != null ? `${formatNumber(r.sim_s, { maximumFractionDigits: 1 })} s` : "-"}`,
                         }),
                         el("span", {
                           className: cls("mini-tag", "mono"),
-                          text: `z:${r.tray_z != null ? `${formatNumber(r.tray_z, { maximumFractionDigits: 2 })}m` : "-"}`,
+                          text: `z ${r.tray_z != null ? `${formatNumber(r.tray_z, { maximumFractionDigits: 2 })} m` : "-"}`,
                         }),
                       ]),
                       el("div", {}, [
@@ -3296,15 +3496,15 @@ export function renderSimLibraryPage() {
                             const ok = stepsArr[idx] === true;
                             const failed = stepsArr[idx] === false;
                             const lt = latchArr[idx];
-                            const sName = stepNames[idx] || `S${idx + 1}`;
+                            const sName = stepNames[idx] ? stageLabel(stepNames[idx]) : String(idx + 1);
                             return el(
                               "div",
                               {
                                 className: cls("latch-cell", ok && "pass", failed && "fail"),
-                                title: `${sName}: ${lt != null ? `${lt}s` : "-"}`,
+                                title: `${idx + 1}. ${sName}: ${lt != null ? `${formatNumber(lt, { maximumFractionDigits: 2 })} s` : "-"}`,
                               },
                               [
-                                el("div", { className: "mono", text: `S${idx + 1}` }),
+                                el("div", { className: "mono", text: String(idx + 1) }),
                                 el("div", {
                                   className: "mono",
                                   text:
@@ -3372,7 +3572,7 @@ export function renderSimLibraryPage() {
               {
                 label: t("common.source"),
                 value: latestRun ? latestRun.eval_id : t("state.na"),
-                sub: latestRun ? latestRun.source || "" : "",
+                sub: latestRun ? scrubPath(latestRun.source || "") : "",
               },
             ]),
             el("div", { className: "toolbar", style: "margin-top:12px" }, [
@@ -3380,6 +3580,7 @@ export function renderSimLibraryPage() {
                 "select",
                 {
                   className: "field",
+                  "aria-label": t("sim.filterLevelAll"),
                   onChange: (ev) => {
                     rPage = 1;
                     rLvFilter = ev.target.value;
@@ -3401,6 +3602,7 @@ export function renderSimLibraryPage() {
                 "select",
                 {
                   className: "field",
+                  "aria-label": t("exp.filterOutcomeAll"),
                   onChange: (ev) => {
                     rPage = 1;
                     rOutFilter = ev.target.value;
@@ -3427,7 +3629,7 @@ export function renderSimLibraryPage() {
                     el("option", {
                       value: code,
                       selected: rOutFilter === code,
-                      text: `${code} (${formatNumber(cnt)})`,
+                      text: `${failureLabel(code)} (${formatNumber(cnt)})`,
                     })
                   ),
                 ]
@@ -3436,6 +3638,7 @@ export function renderSimLibraryPage() {
                 type: "search",
                 className: "field",
                 value: rSeedQuery,
+                "aria-label": t("exp.searchSeedPlaceholder"),
                 placeholder: t("exp.searchSeedPlaceholder"),
                 onInput: (ev) => {
                   rPage = 1;
@@ -3444,6 +3647,7 @@ export function renderSimLibraryPage() {
                 },
               }),
             ]),
+            renderStepLegend(stepNames),
             gridHolder
           );
           redrawRollouts();
@@ -3556,7 +3760,7 @@ export function renderSimLibraryPage() {
             {
               label: t("common.source"),
               value: sim.sha8 || t("state.na"),
-              sub: sim.source || "",
+              sub: scrubPath(sim.source || ""),
             },
             {
               label: t("data.colEpisodes"),
@@ -3576,6 +3780,7 @@ export function renderSimLibraryPage() {
                       "select",
                       {
                         className: "field",
+                        "aria-label": t("exp.mediaFilterLabel"),
                         onChange: (ev) => {
                           page = 1;
                           mediaFilter = ev.target.value;
@@ -3600,6 +3805,7 @@ export function renderSimLibraryPage() {
                   "select",
                   {
                     className: "field",
+                    "aria-label": t("sim.filterLevelAll"),
                     onChange: (ev) => {
                       page = 1;
                       lvFilter = ev.target.value;
@@ -3621,6 +3827,7 @@ export function renderSimLibraryPage() {
                   "select",
                   {
                     className: "field",
+                    "aria-label": t("sim.filterClusterAll"),
                     onChange: (ev) => {
                       page = 1;
                       clusterFilter = ev.target.value;
@@ -3649,7 +3856,7 @@ export function renderSimLibraryPage() {
       };
 
       const renderTabsBar = () => {
-        if (sim.simLockedByScope || rollouts.length === 0) return null;
+        if (!hasCut || rollouts.length === 0) return null;
         return el("div", { className: "tabs", role: "tablist", style: "margin-bottom:12px" }, [
           el(
             "button",
@@ -3690,7 +3897,7 @@ export function renderSimLibraryPage() {
       const tabsSlot = el("div", {});
       const redrawAll = () => {
         setChildren(tabsSlot, renderTabsBar());
-        if (!sim.simLockedByScope) redrawMode();
+        if (hasCut || rollouts.length > 0) redrawMode();
       };
 
       setChildren(
@@ -3700,9 +3907,12 @@ export function renderSimLibraryPage() {
           title: t("sim.title"),
         }),
         tabsSlot,
-        sim.simLockedByScope
-          ? el("div", { className: "empty", text: t("sim.teleopOnlyNotice") })
-          : modeHolder,
+        hasCut || rollouts.length > 0
+          ? modeHolder
+          : renderRoundEmpty({
+              keys: ["sim", "story.jig"],
+              text: roundsWithIndex(["sim", "story.jig"]).length > 0 ? null : t("sim.teleopOnlyNotice"),
+            }),
         teleop.length > 0
           ? el("section", { className: "card" }, [
               el("h2", { text: t("sim.teleopSection") }),
@@ -3748,7 +3958,8 @@ export function renderSimDetailPage(ctx) {
     const x = pose.x != null ? formatNumber(pose.x, { maximumFractionDigits: 2 }) : "-";
     const y = pose.y != null ? formatNumber(pose.y, { maximumFractionDigits: 2 }) : "-";
     const yaw = pose.yaw != null ? formatNumber(pose.yaw, { maximumFractionDigits: 2 }) : "-";
-    return `x=${x}, y=${y}, yaw=${yaw}`;
+    // " · " between parts: vi numbers already use a comma as the decimal mark (A19).
+    return `x ${x} · y ${y} · yaw ${yaw}`;
   };
 
   const load = async () => {
@@ -3786,6 +3997,7 @@ export function renderSimDetailPage(ctx) {
       const prevEp = curIdx > 0 ? navPool[curIdx - 1] : null;
       const nextEp = curIdx >= 0 && curIdx < navPool.length - 1 ? navPool[curIdx + 1] : null;
       const epSteps = Array.isArray(ep.steps) ? ep.steps : [];
+      const stageIds = taskStageIds();
 
       setChildren(
         wrap,
@@ -3822,7 +4034,7 @@ export function renderSimDetailPage(ctx) {
             : el("div", { className: "empty", text: t("error.mediaMissing") }),
           el("details", { className: "studio-details" }, [
             el("summary", { text: t("common.source") }),
-            el("code", { text: `${sim.source || "-"} (${sim.sha8 || "-"})` }),
+            el("code", { text: `${scrubPath(sim.source || "-")} (${sim.sha8 || "-"})` }),
           ]),
         ]),
         el("section", { className: "card" }, [
@@ -3847,18 +4059,20 @@ export function renderSimDetailPage(ctx) {
           ]),
           epSteps.length > 0
             ? el(
-                "div",
-                { className: "latch-strip", style: "margin-top:10px" },
-                epSteps.map((ok, idx) =>
-                  el(
-                    "div",
-                    { className: cls("latch-cell", ok ? "pass" : "fail") },
+                "ol",
+                { className: "sim-step-list", "aria-label": t("exp.simStepsTitle") },
+                epSteps.map((ok, idx) => {
+                  const sid = stageIds[idx];
+                  return el(
+                    "li",
+                    { className: cls("latch-cell", ok ? "pass" : "fail"), title: sid || null },
                     [
-                      el("div", { className: "mono", text: `S${idx + 1}` }),
-                      el("div", { className: "mono", text: ok ? "✓" : "✕" }),
+                      el("span", { className: "mono", text: `${idx + 1}` }),
+                      el("span", { text: sid ? stageLabel(sid) : t("state.na") }),
+                      el("span", { "aria-hidden": "true", text: ok ? "✓" : "✕" }),
                     ]
-                  )
-                )
+                  );
+                })
               )
             : null,
         ])
