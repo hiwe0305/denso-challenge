@@ -90,11 +90,14 @@ function persistSessions() {
         id: tr.id,
         kind: tr.kind,
         question: tr.question,
-        thinking: (tr.thinking || "").slice(0, 2000),
+        traceRound: tr.traceRound || null,
+        traceForced: Array.isArray(tr.traceForced) ? tr.traceForced : [],
         answer: tr.answer || "",
         steps: (tr.steps || []).map((st) => ({
           callId: st.callId,
           name: st.name,
+          label: st.label || null,
+          rows: st.rows ?? null,
           args: st.args,
           ms: st.ms,
           ok: st.ok,
@@ -1043,7 +1046,6 @@ export async function runSharedTurn(rawQuestion, opts = {}) {
         id: makeId("turn"),
         kind: "slash",
         question,
-        thinking: "",
         answer: res.answer || cleanToolModelSummary(res.model),
         steps: [
           {
@@ -1084,7 +1086,8 @@ export async function runSharedTurn(rawQuestion, opts = {}) {
     kind: "agent",
     question,
     mode: sess.mode || "ask",
-    thinking: "",
+    traceRound: null,
+    traceForced: [],
     rawStream: "",
     answer: "",
     steps: [],
@@ -1129,6 +1132,8 @@ export async function runSharedTurn(rawQuestion, opts = {}) {
   const handleEvent = (evName, dataObj) => {
     if (evName === "trace_start") {
       if (dataObj.conversation_id) sess.conversationId = dataObj.conversation_id;
+      turnObj.traceRound = dataObj.round || null;
+      turnObj.traceForced = Array.isArray(dataObj.tools_forced) ? dataObj.tools_forced : [];
       turnObj.phase = "scope";
       emitChatStore("stream");
       renderSidePanelTurns();
@@ -1136,13 +1141,7 @@ export async function runSharedTurn(rawQuestion, opts = {}) {
     }
 
     if (evName === "thinking" || evName === "reasoning") {
-      // a locked (demo) console never keeps or shows the model's reasoning
-      if (dataObj.text && !state.locked) {
-        turnObj.thinking += dataObj.text;
-        turnObj.phase = "synth";
-        emitChatStore("stream");
-        renderSidePanelTurns();
-      }
+      // the model's own reasoning is never shown: the trace box lists the steps taken instead
       return;
     }
 
@@ -1151,6 +1150,8 @@ export async function runSharedTurn(rawQuestion, opts = {}) {
       turnObj.steps.push({
         callId: dataObj.call_id,
         name: dataObj.name,
+        label: dataObj.label || null,
+        rows: null,
         args: dataObj.args || {},
         ms: null,
         ok: true,
@@ -1169,6 +1170,8 @@ export async function runSharedTurn(rawQuestion, opts = {}) {
       if (st) {
         st.ms = dataObj.ms ?? 0;
         st.ok = Boolean(dataObj.ok);
+        st.rows = Number.isFinite(dataObj.rows) ? dataObj.rows : null;
+        if (dataObj.label) st.label = dataObj.label;
         st.ui = dataObj.ui || null;
         st.artifactId = artId;
       }
@@ -1194,10 +1197,8 @@ export async function runSharedTurn(rawQuestion, opts = {}) {
       turnObj.phase = "synth";
       if (dataObj.text) {
         turnObj.rawStream += dataObj.text;
+        // a <think> block in the text is dropped, never shown
         const parsed = splitThinkAndAnswer(turnObj.rawStream);
-        if (parsed.thinking && !state.locked) {
-          turnObj.thinking = parsed.thinking;
-        }
         turnObj.answer = parsed.answer;
         emitChatStore("stream");
         renderSidePanelTurns();
@@ -1649,6 +1650,57 @@ function updateSlashMenu() {
   els.slashMenu._matches = matches;
 }
 
+const vien = (vi, en) => (state.lang === "en" ? en : vi);
+
+// "Quá trình suy luận": the steps the console took for the turn (round, each lookup with its
+// rows and time, the number check), never the model's own reasoning, prompt or tool text
+export function renderTraceBox(tr, isRunning) {
+  const steps = tr.steps || [];
+  if (steps.length === 0 && !tr.traceRound) return null;
+  const head = [];
+  if (tr.traceRound) head.push(el("li", { className: "trace-line", text: vien(`Vòng: ${tr.traceRound}`, `Round: ${tr.traceRound}`) }));
+  const stepNodes = steps.map((st) => {
+    const meta = [];
+    if (Number.isFinite(st.rows)) meta.push(vien(`${st.rows} dòng`, `${st.rows} rows`));
+    meta.push(st.ms === null ? "…" : `${st.ms} ms`);
+    return el(
+      "details",
+      { className: "agent-step", open: Boolean(st.ui && ["bar", "line", "thumbs", "confirm"].includes(st.ui.type)) },
+      [
+        el("summary", {}, [
+          el("span", {
+            className: cls("step-status-icon", st.ms === null && "running", st.ms !== null && !st.ok && "err"),
+            text: st.ms === null ? "⚙" : st.ok ? "✓" : "!",
+          }),
+          el("b", { text: st.label || toolLabel(st.name), title: state.locked ? null : st.name }),
+          el("span", { className: cls("step-args-preview", "mono"), text: formatArgsChip(st.args) }),
+          el("span", { className: cls("step-ms", "mono"), text: meta.join(" · ") }),
+        ]),
+        st.ui ? el("div", { className: "agent-step-body" }, [renderToolUi(st.ui)]) : null,
+      ]
+    );
+  });
+  const tail = [];
+  if (!isRunning && tr.kind !== "slash") {
+    const n = tr.groundedCount || 0;
+    const bad = (tr.unverified || []).length;
+    tail.push(
+      el("li", {
+        className: "trace-line",
+        text: vien(`Đối chiếu số: ${n} khớp, ${bad} chưa khớp`, `Number check: ${n} matched, ${bad} not matched`),
+      })
+    );
+  }
+  const summaryText = `💭 ${t("chat.reasoningTitle")} · ${vien(`${steps.length} bước`, `${steps.length} steps`)}`;
+  const hasChart = steps.some((st) => st.ui && ["bar", "line", "thumbs", "confirm"].includes(st.ui.type));
+  return el("details", { className: "reasoning-box", open: Boolean(isRunning) || hasChart }, [
+    el("summary", { text: summaryText }),
+    head.length ? el("ul", { className: "trace-lines" }, head) : null,
+    stepNodes.length ? el("div", { className: "agent-steps" }, stepNodes) : null,
+    tail.length ? el("ul", { className: "trace-lines" }, tail) : null,
+  ]);
+}
+
 function renderSideTurnNode(tr) {
   const frag = el("div", { className: "stack-sm" });
   frag.appendChild(el("div", { className: "user-turn", text: tr.question }));
@@ -1675,49 +1727,7 @@ function renderSideTurnNode(tr) {
             text: tr.msTotal ? `${(tr.msTotal / 1000).toFixed(2)} s` : "",
           }),
     ]),
-    tr.thinking && !state.locked
-      ? el("details", { className: "reasoning-box", open: isRunning && !tr.answer }, [
-          el("summary", { text: `💭 ${t("chat.reasoningTitle")}` }),
-          el("div", { className: cls("reasoning-body", "mono"), text: tr.thinking }),
-        ])
-      : null,
-    (tr.steps || []).length > 0
-      ? el(
-          "div",
-          { className: "agent-steps" },
-          tr.steps.map((st) =>
-            el(
-              "details",
-              {
-                className: "agent-step",
-                open: Boolean(st.ui && ["bar", "line", "thumbs", "confirm"].includes(st.ui.type)),
-              },
-              [
-                el("summary", {}, [
-                  el("span", {
-                    className: cls(
-                      "step-status-icon",
-                      st.ms === null && "running",
-                      st.ms !== null && !st.ok && "err"
-                    ),
-                    text: st.ms === null ? "⚙" : st.ok ? "✓" : "!",
-                  }),
-                  el("b", { text: toolLabel(st.name), title: state.locked ? null : st.name }),
-                  el("span", {
-                    className: cls("step-args-preview", "mono"),
-                    text: formatArgsChip(st.args),
-                  }),
-                  el("span", {
-                    className: cls("step-ms", "mono"),
-                    text: st.ms === null ? "…" : `${st.ms} ms`,
-                  }),
-                ]),
-                st.ui ? el("div", { className: "agent-step-body" }, [renderToolUi(st.ui)]) : null,
-              ]
-            )
-          )
-        )
-      : null,
+    renderTraceBox(tr, isRunning),
     tr.answer || isRunning ? mdZone : null,
     isRunning ? null : renderSourceChips(tr.sources),
     tr.error ? el("div", { className: "missing-item", text: tr.error }) : null,

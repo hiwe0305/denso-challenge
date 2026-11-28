@@ -48,6 +48,44 @@ ToolFn = Callable[[dict[str, Any], dict[str, Any]], Result]
 MAX_OFFERED = 7  # plus open_page
 ANALYSIS_TOOLS = ["round_report", "round_diagnosis", "pair_comparisons"]
 
+# The step names the reasoning trace shows (vi, en); web/chat.js TOOL_LABELS holds the same pairs
+TOOL_LABELS: dict[str, tuple[str, str]] = {
+    "round_report": ("Báo cáo vòng", "Round report"),
+    "round_diagnosis": ("Chẩn đoán vòng", "Round diagnosis"),
+    "rounds_side_by_side": ("Các vòng cạnh nhau", "Rounds side by side"),
+    "pair_comparisons": ("Phép so sánh cặp", "Paired comparisons"),
+    "failure_table": ("Bảng lỗi", "Failure table"),
+    "train_progress": ("Tiến độ train", "Training progress"),
+    "project_status": ("Diễn tiến dự án", "Project status"),
+    "ego_summary": ("Video egocentric", "Egocentric video"),
+    "catalog_search": ("Tìm bộ dữ liệu", "Dataset search"),
+    "dataset_stats": ("Thống kê bộ dữ liệu", "Dataset statistics"),
+    "episode_list": ("Danh sách episode", "Episode list"),
+    "episode_get": ("Chi tiết episode", "Episode details"),
+    "qa_summary": ("Kết quả QA", "QA summary"),
+    "run_list": ("Danh sách run", "Run list"),
+    "run_metrics": ("Đường loss của run", "Run curve"),
+    "run_compare": ("So đường của các run", "Run curves compared"),
+    "log_tail": ("Log", "Log"),
+    "eval_summary": ("Kết quả thi trước", "Earlier eval"),
+    "eval_failures": ("Lỗi khi thi", "Eval failures"),
+    "loop_proposals": ("Đề xuất của vòng lặp", "Loop proposals"),
+    "ledger_query": ("Sổ chi phí", "Cost ledger"),
+    "job_list": ("Danh sách job", "Job list"),
+    "job_get": ("Chi tiết job", "Job details"),
+    "findings": ("Phát hiện QA", "QA findings"),
+    "lineage": ("Nguồn gốc dữ liệu", "Data lineage"),
+    "open_page": ("Mở trang", "Open page"),
+    "propose_job": ("Đề xuất job", "Job proposal"),
+}
+
+
+def tool_label(name: str, lang: str = "vi") -> str:
+    """The readable name of a tool for the trace; the raw name when none is set."""
+    pair = TOOL_LABELS.get(name)
+    return (pair[1] if lang == "en" else pair[0]) if pair else name
+
+
 # Tools a hosted model never gets: they read jobs, logs, findings and the egocentric pipeline,
 # which name the team's own videos (internal data), and they have no public-only filter
 # (CLAUDE.md: internal data never goes to a hosted API)

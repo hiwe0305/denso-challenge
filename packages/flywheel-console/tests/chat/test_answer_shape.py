@@ -213,11 +213,38 @@ def test_a_claude_model_on_a_gateway_runs_without_thinking(monkeypatch: pytest.M
     assert providers.reasoning_body(providers.Provider("gw", "openai", "https://api.xah.io/v1", "gpt-5.5", True)) is None
 
 
-def test_the_panel_names_tools_plainly_and_hides_reasoning_when_locked() -> None:
+def test_the_panel_names_tools_plainly_and_shows_the_step_trace() -> None:
+    import re
     from pathlib import Path
 
     js = (Path(llm.__file__).parent.parent / "web" / "chat.js").read_text(encoding="utf-8")
-    assert "export function toolLabel" in js and 'round_report: ["Báo cáo vòng", "Round report"]' in js
-    assert 'failure_table: ["Bảng lỗi"' in js and 'train_progress: ["Tiến độ train"' in js and 'project_status: ["Diễn tiến dự án"' in js
+    assert "export function toolLabel" in js and "export function renderTraceBox" in js
     assert 'el("b", { className: "mono", text: st.name })' not in js
-    assert "tr.thinking && !state.locked" in js and "dataObj.text && !state.locked" in js
+    # the web map and the server map name every tool the same way
+    pairs = dict((n, (vi, en)) for n, vi, en in re.findall(r'^\s+(\w+): \["([^"]*)", "([^"]*)"\],', js, re.M))
+    assert pairs == registry.TOOL_LABELS
+    assert set(registry.TOOLS) <= set(registry.TOOL_LABELS)
+    # "Quá trình suy luận" is shown on a locked console too, and never holds the model's thinking
+    assert "!state.locked" not in js.split("export function renderTraceBox")[1].split("\nfunction ")[0]
+    assert "tr.thinking" not in js and "turnObj.thinking" not in js
+
+
+def test_the_trace_carries_labels_rows_and_ms_and_no_model_thinking(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
+    _two_rounds(idx)
+    _hosted(monkeypatch)
+
+    def gen(msgs: Any, schemas: Any, deadline: float, *a: Any) -> Any:
+        yield "think", "SECRET PLAN: call round_report then answer"
+        yield "tok", "Run M: 136/180."
+        yield "end", ("Run M: 136/180.", [], 1, 1)
+
+    monkeypatch.setattr(llm, "generate", gen)
+    evs = list(llm.events(_body("Run nào tốt nhất, vì sao?", "r1")))
+    assert not [e for e, _ in evs if e in ("thinking", "reasoning")]
+    assert "SECRET PLAN" not in repr(evs)
+    start = next(d for e, d in evs if e == "tool_start")
+    res = next(d for e, d in evs if e == "tool_result")
+    assert start["label"] == res["label"] == "Báo cáo vòng"
+    assert isinstance(res["rows"], int) and res["rows"] > 0 and isinstance(res["ms"], int)
+    # no event carries the system prompt or the tools' instructions
+    assert llm.SYSTEM[:60] not in repr(evs)

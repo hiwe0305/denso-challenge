@@ -171,6 +171,11 @@ def lang_of(q: str) -> str:
     return "Vietnamese" if VI.search(q) else "English"
 
 
+def rows_of(model_text: str) -> int:
+    """How many data rows a tool returned: its non-empty lines, for the reasoning trace."""
+    return sum(1 for ln in str(model_text or "").splitlines() if ln.strip())
+
+
 # ------------------------------------------------------------------ number grounding
 def ground(answer: str, evidence_texts: list[str]) -> list[dict[str, Any]]:
     """[{text, grounded}] for every numeral of the answer, matched against the turn's evidence."""
@@ -737,7 +742,9 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
         live.clear()
         for kind, val in _call_gen(m_list, sch):
             if kind == "think":
-                yield "thinking", {"text": val}
+                # the model's own reasoning is never sent on: the trace shows the steps the code
+                # took (tool, rows, ms), not hidden thinking (Hiếu, 28/11/2026)
+                tr["think_chars"] = int(tr.get("think_chars") or 0) + len(val or "")
             elif kind == "tok":
                 t = val if md else val.replace("**", "")
                 live.append(t)
@@ -818,7 +825,8 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
                         args = {}
                 key = (name, json.dumps(args, sort_keys=True))
                 cid = "call_%d_%d" % (rnd, i)
-                yield "tool_start", {"call_id": cid, "name": name, "args": args}
+                step_label = registry.tool_label(name, tool_ctx["lang"])
+                yield "tool_start", {"call_id": cid, "name": name, "label": step_label, "args": args}
                 k0 = time.time()
                 if name not in names and name not in prefetch:
                     res = fail(f"Tool '{name}' is not offered on this page.")
@@ -840,7 +848,10 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
                         **({"round": res_round} if res_round else {}), **({"by_code": True} if by_code else {}),
                     }
                 )  # fmt: skip
-                ev: dict[str, Any] = {"call_id": cid, "name": name, "ms": ms, "ok": res["ok"], "ui": res["ui"], "model_chars": len(res["model"])}
+                ev: dict[str, Any] = {
+                    "call_id": cid, "name": name, "label": step_label, "ms": ms, "ok": res["ok"], "ui": res["ui"],
+                    "model_chars": len(res["model"]), "rows": rows_of(res["model"]),
+                }  # fmt: skip
                 if res_round:
                     ev["round"] = res_round
                 if res.get("navigate"):
