@@ -42,13 +42,26 @@ try {
 </script>"""
 
 
+MODULES_PAGE = """<!doctype html><meta charset="utf-8"><body><pre id="out">pending</pre>
+<script type="module">
+const out = document.getElementById("out");
+const names = %(names)s;
+const bad = [];
+for (const name of names) {
+  try { await import("/" + name); } catch (e) { bad.push(name + ": " + e); }
+}
+out.textContent = JSON.stringify({ bad });
+</script>"""
+
+
 class _Handler(http.server.SimpleHTTPRequestHandler):
     lang = "vi"
+    page = PAGE
 
     def do_GET(self) -> None:  # noqa: N802 (http.server API)
         if self.path.startswith("/__ladder.html") or self.path.startswith("/__fixture.json"):
             html = self.path.startswith("/__ladder.html")
-            body = (PAGE % {"lang": self.lang}).encode() if html else FIXTURE.read_bytes()
+            body = self.page.encode() if html else FIXTURE.read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", "text/html" if html else "application/json")
             self.send_header("Content-Length", str(len(body)))
@@ -61,8 +74,9 @@ class _Handler(http.server.SimpleHTTPRequestHandler):
         pass
 
 
-def _render(lang: str) -> dict:
-    handler = type("H", (_Handler,), {"lang": lang})
+def _render(lang: str, page: str | None = None) -> dict:
+    page = page if page is not None else PAGE % {"lang": lang}
+    handler = type("H", (_Handler,), {"lang": lang, "page": page})
     server = http.server.ThreadingHTTPServer(
         ("127.0.0.1", 0), functools.partial(handler, directory=str(WEB))
     )
@@ -97,3 +111,11 @@ def test_ladder_cells_are_filled_from_the_real_block(lang: str, na: str, pct: st
     assert got["rows"][0][-1] == f"47/60 · {pct}"  # M, success at repeat 0
     assert got["rows"][-1][-1].startswith("55/60 · ")  # M, rotation <= 10 of reached B
     assert "42–47/60" in got["notes"][-1]
+
+
+@pytest.mark.skipif(CHROME is None, reason="no headless Chrome")
+def test_every_page_module_loads() -> None:
+    """A syntax error or a missing import in any page module breaks its route; load them all."""
+    names = sorted(p.name for p in WEB.glob("pages_*.js")) + ["core.js", "chat.js"]
+    got = _render("vi", MODULES_PAGE % {"names": json.dumps(names)})
+    assert got["bad"] == [], got["bad"]

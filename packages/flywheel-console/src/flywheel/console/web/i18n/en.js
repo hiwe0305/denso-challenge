@@ -1185,7 +1185,7 @@ export default {
   "home.timelineLatest": "Latest: {round} · run {run}",
   "home.timelineLatestTag": "latest",
   "base.noControls": "{round} has no control arms. Open a round that has them:",
-  "analysis.reasoning": "Reasoning steps ({count})",
+  "analysis.reasoning": "Reasoning · {count} steps",
   "analysis.stepRows": "{n} rows",
   "analysis.stepRow": "{n} row",
   "analysis.stepFailed": "not retrieved",
@@ -1206,4 +1206,5 @@ export default {
   "exp.ladderNoteRepeats": "Repeats of M: {lo}–{hi}/{n}.",
   "exp.ladderChartTitle": "Success and relaxed by threshold",
   "exp.ladderChartSub": "Rollouts out of {n}, one bar per run",
+  "analysis.reasoningChecked": "Reasoning · {count} steps · {checked} numbers checked",
 };

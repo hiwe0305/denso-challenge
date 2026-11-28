@@ -299,11 +299,19 @@ def test_reasoning_block_shows_steps_and_never_the_thinking() -> None:
     """'Quá trình suy luận' under each chat answer (Hiếu 28/11): saved steps only, open while
     the answer streams."""
     src = (WEB / "pages_chat.js").read_text(encoding="utf-8")
+    assert src.startswith("import") and src.count("const renderReasoning") == 1
     block = src[src.index("const renderReasoning") : src.index("const renderStudioTurn")]
     assert "tr.steps" in block and "chatToolLabel(st.name)" in block and "stepRows(st.ui)" in block
-    assert "choice === undefined ? isRunning : choice" in block
+    assert "choice.running === isRunning ? choice.open : isRunning" in block
+    assert "tr.groundedCount" in block and "analysis.reasoningChecked" in block
+    turn = src[src.index("const renderStudioTurn") :]
+    # at the top of the answer, above the answer text, like a thinking block
+    top = turn.index("renderReasoning(tr, isRunning")
+    assert top < turn.index("tr.answer || isRunning ? mdZone")
+    assert "(tr.steps || []).length > 0 ? renderReasoning" in turn  # no steps, no block
+    code = "\n".join(ln for ln in block.splitlines() if not ln.lstrip().startswith("//"))
     for needle in ("tr.thinking", "system", "/api/chat/traces"):
-        assert needle not in block, needle
+        assert needle not in code, needle
     assert 'reason !== "theme"' in src and "ResizeObserver" in src and "resizeChatCharts" in src
 
 
