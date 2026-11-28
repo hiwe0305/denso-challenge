@@ -2011,7 +2011,9 @@
     },
     "n_fail": 14,
     "diagnosis": "KỸ NĂNG YẾU 5/5",
+    "diagnosis_en": "WEAK SKILL 5/5",
     "intervention": "sinh quanh lỗi",
+    "intervention_en": "generate around the failures",
     "gets_data": true,
     "source": [
      "docs/he/tray.md §20.2",
@@ -2028,7 +2030,9 @@
     },
     "n_fail": 12,
     "diagnosis": "KỸ NĂNG YẾU 4/5",
+    "diagnosis_en": "WEAK SKILL 4/5",
     "intervention": "sinh quanh lỗi",
+    "intervention_en": "generate around the failures",
     "gets_data": true,
     "source": [
      "docs/he/tray.md §20.2",
@@ -2041,11 +2045,13 @@
    {
     "id": "H1",
     "claim": "chuỗi bước gãy ở approach_a",
+    "claim_en": "the step chain breaks at approach_a",
     "clusters": [
      "c6",
      "c7"
     ],
     "verdict": "CHƯA RÕ (ngưỡng bộ chấm)",
+    "verdict_en": "UNCLEAR (scorer threshold)",
     "ticket": "DA-37",
     "source": "docs/he/tray.md §20.11",
     "quote": "**H1: chuỗi bước gãy ở `approach_a`.** CHƯA RÕ (ngưỡng bộ chấm), phiếu cho DA-37."
@@ -2053,11 +2059,13 @@
    {
     "id": "H2",
     "claim": "hết giờ ở approach_a",
+    "claim_en": "timeout at approach_a",
     "clusters": [
      "c3",
      "c8"
     ],
     "verdict": "lỗi của policy (quyết định R8)",
+    "verdict_en": "policy failure (decision R8)",
     "ticket": null,
     "source": "docs/he/tray.md §20.9",
     "quote": "- R8: c3, c8 đọc là lỗi của policy, đi bước 5–8 cùng c1, c2."

@@ -270,21 +270,23 @@ cited:
   doc: docs/he/tray.md
   section: '20.16'
   quote: 'Lỗi của planner: 8 `L-ONE-HAND`, 3 `L-PLACE-POSE`, 4 `L-TRAY-TILT`, 13 hết giờ.'
+# `*_en`: English renderings of the Vietnamese strings for chat in English (lang = en); same
+# meaning, no new numbers. The quote stays the Vietnamese source.
 - key: round.clusters.data
   value:
-  - {id: c1, stage: place, n: 14, diagnosis: KỸ NĂNG YẾU 5/5, intervention: sinh quanh lỗi, failures: 10}
-  - {id: c2, stage: place, n: 12, diagnosis: KỸ NĂNG YẾU 4/5, intervention: sinh quanh lỗi, failures: 10}
-  - {id: c3, stage: approach_a, n: 4, diagnosis: theo lỗi, intervention: sinh quanh lỗi, failures: 2}
-  - {id: c8, stage: approach_a, n: 2, diagnosis: theo lỗi, intervention: sinh quanh lỗi, failures: 1}
+  - {id: c1, stage: place, n: 14, diagnosis: KỸ NĂNG YẾU 5/5, intervention: sinh quanh lỗi, diagnosis_en: WEAK SKILL 5/5, intervention_en: generate around the failures, failures: 10}
+  - {id: c2, stage: place, n: 12, diagnosis: KỸ NĂNG YẾU 4/5, intervention: sinh quanh lỗi, diagnosis_en: WEAK SKILL 4/5, intervention_en: generate around the failures, failures: 10}
+  - {id: c3, stage: approach_a, n: 4, diagnosis: theo lỗi, intervention: sinh quanh lỗi, diagnosis_en: per failure, intervention_en: generate around the failures, failures: 2}
+  - {id: c8, stage: approach_a, n: 2, diagnosis: theo lỗi, intervention: sinh quanh lỗi, diagnosis_en: per failure, intervention_en: generate around the failures, failures: 1}
   doc: docs/he/tray.md
   section: '20.13'
   quote: '| Chẩn đoán | KỸ NĂNG YẾU (5/5) | KỸ NĂNG YẾU (4/5) |'
 - key: round.clusters.tickets
   value:
-  - {id: c4, stage: '—', diagnosis: thiếu tín hiệu đo, intervention: phiếu DA-38}
-  - {id: c5, stage: '—', diagnosis: thiếu tín hiệu đo, intervention: phiếu DA-38}
-  - {id: c6, stage: approach_a, diagnosis: ngưỡng bộ chấm, intervention: phiếu DA-37}
-  - {id: c7, stage: approach_a, diagnosis: ngưỡng bộ chấm, intervention: phiếu DA-37}
+  - {id: c4, stage: '—', diagnosis: thiếu tín hiệu đo, intervention: phiếu DA-38, diagnosis_en: missing measurement signal, intervention_en: ticket DA-38}
+  - {id: c5, stage: '—', diagnosis: thiếu tín hiệu đo, intervention: phiếu DA-38, diagnosis_en: missing measurement signal, intervention_en: ticket DA-38}
+  - {id: c6, stage: approach_a, diagnosis: ngưỡng bộ chấm, intervention: phiếu DA-37, diagnosis_en: scorer threshold, intervention_en: ticket DA-37}
+  - {id: c7, stage: approach_a, diagnosis: ngưỡng bộ chấm, intervention: phiếu DA-37, diagnosis_en: scorer threshold, intervention_en: ticket DA-37}
   doc: docs/he/tray.md
   section: '20.11'
   quote: c4, c5, c6, c7 và lượt `L-PART-DROP` thành phiếu, không tiêu ngân sách dữ liệu
@@ -600,17 +602,17 @@ cited:
   section: '20.2'
   quote: '| c8 | `approach_a` | `L-TIMEOUT` | 2 | 2 | Kiểm H2 |'
 - key: diag.step4.H1
-  value: {id: H1, claim: chuỗi bước gãy ở approach_a, clusters: [c6, c7], verdict: CHƯA RÕ (ngưỡng bộ chấm), ticket: DA-37}
+  value: {id: H1, claim: chuỗi bước gãy ở approach_a, clusters: [c6, c7], verdict: CHƯA RÕ (ngưỡng bộ chấm), ticket: DA-37, claim_en: the step chain breaks at approach_a, verdict_en: UNCLEAR (scorer threshold)}
   doc: docs/he/tray.md
   section: '20.11'
   quote: '**H1: chuỗi bước gãy ở `approach_a`.** CHƯA RÕ (ngưỡng bộ chấm), phiếu cho DA-37.'
 - key: diag.step4.H2
-  value: {id: H2, claim: hết giờ ở approach_a, clusters: [c3, c8], verdict: lỗi của policy (quyết định R8), ticket: null}
+  value: {id: H2, claim: hết giờ ở approach_a, clusters: [c3, c8], verdict: lỗi của policy (quyết định R8), ticket: null, claim_en: timeout at approach_a, verdict_en: policy failure (decision R8)}
   doc: docs/he/tray.md
   section: '20.9'
   quote: '- R8: c3, c8 đọc là lỗi của policy, đi bước 5–8 cùng c1, c2.'
 - key: diag.step4.H3
-  value: {id: H3, claim: nghiêng lúc hạ và buông, clusters: [c4, c5], verdict: CHƯA RÕ (thiếu tín hiệu), ticket: DA-38}
+  value: {id: H3, claim: nghiêng lúc hạ và buông, clusters: [c4, c5], verdict: CHƯA RÕ (thiếu tín hiệu), ticket: DA-38, claim_en: tilt while lowering and releasing, verdict_en: UNCLEAR (missing signal)}
   doc: docs/he/tray.md
   section: '20.11'
   quote: '**H3: nghiêng lúc hạ và buông.** CHƯA RÕ (thiếu tín hiệu, spec 6.4 mục 1), phiếu cho DA-38.'

@@ -11,12 +11,13 @@ from __future__ import annotations
 import copy
 import io
 import json
+import re
 import tarfile
 from pathlib import Path
 from typing import Any
 
 from conftest import write_mp4
-from flywheel.console.index import cited, hidden, jig, sim, story, tasks
+from flywheel.console.index import catalog, cited, hidden, jig, sim, story, tasks
 from flywheel.console.paths import ConsolePaths
 
 REPO = Path(__file__).resolve().parents[4]
@@ -218,6 +219,14 @@ def test_diag_block_is_cited() -> None:
     h = {x["id"]: x for x in d["step4"]}
     assert (h["H1"]["ticket"], h["H2"]["ticket"], h["H3"]["ticket"]) == ("DA-37", None, "DA-38")
     assert h["H2"]["clusters"] == ["c3", "c8"]
+    # English twins: present, ASCII, and no number the Vietnamese words lack
+    pairs = [(c[f], c[f"{f}_en"]) for c in by.values() for f in ("diagnosis", "intervention")]
+    pairs += [(x[f], x[f"{f}_en"]) for x in h.values() for f in ("claim", "verdict")]
+    for vi, en in pairs:
+        assert en and en.isascii(), (vi, en)
+        assert set(re.findall(r"\d+", en)) <= set(re.findall(r"\d+", vi)), (vi, en)
+    assert by["c1"]["diagnosis_en"] == "WEAK SKILL 5/5"
+    assert h["H1"]["verdict_en"] == "UNCLEAR (scorer threshold)"
     g = d["gen_qa_cost"]
     assert (g["host"], g["cu"], g["selected"], g["train_serve_cu"]) == ("rtx3060", 0, 181, 109.22)
     assert g["generation"] == {"attempts": 290, "recorded": 262, "hours": 1.16}
@@ -262,3 +271,23 @@ def test_sim_builds_a_block_for_the_jig_round(fw: ConsolePaths, tmp_path: Path) 
     assert [e["video"] for e in j["episodes"]] == [f"204ff448/ep_{i:06d}.mp4" for i in range(3)]
     # the top level stays round 1's (its cut is absent here: empty)
     assert d["round"] == "tray-r1" and d["episodes"] == []
+
+
+def test_catalog_doc_filters_a_stale_catalog_and_recounts_totals() -> None:
+    h = hidden.Hidden(frozenset({"N"}), ("da50-*",), (), frozenset({"DA-50"}))
+    rows = [
+        {"id": "a", "story": "DA-34", "group": "s1", "episodes": 10, "hours": 1.0,
+         "status": "active", "unique": True, "children": ["b"]},
+        {"id": "b", "story": "DA-50", "group": "s1", "episodes": 5, "hours": 0.5,
+         "status": "active", "unique": True, "parents": ["a"]},
+        {"id": "c", "story": "DA-34", "notes": "analysis/da50-clean", "group": "s1",
+         "episodes": 3, "hours": 0.2, "status": "active", "unique": True},
+    ]  # fmt: skip
+    doc = {"rows": rows, "edges": [["a", "b"]], "totals": {"stale": True}, "cards": 3}
+    assert hidden.catalog_hidden_ids(doc, h) == {"b", "c"}
+    out = hidden.catalog_doc(doc, h)
+    assert [r["id"] for r in out["rows"]] == ["a"] and out["rows"][0]["children"] == []
+    assert out["edges"] == [] and out["cards"] == 3
+    assert out["totals"] == catalog.totals(out["rows"]) and "stale" not in out["totals"]
+    assert hidden.catalog_doc(doc, hidden.Hidden()) is doc
+    assert hidden.catalog_hidden_ids({"rows": rows[:1]}, h) == frozenset()

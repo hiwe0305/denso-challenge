@@ -124,7 +124,9 @@ def diag_block(paths: ConsolePaths) -> dict[str, Any]:
     ticket its clusters became, if any. ``gen_qa_cost``: the targeted generation and QA on
     rtx3060 (0 CU, tray.md 20.16) beside the round's train and serve CU (20.18). Every part
     carries its ``source``; a part whose cited keys are missing is left empty. Nothing here is
-    computed beyond sums of cited values."""
+    computed beyond sums of cited values. ``diagnosis``, ``intervention``, ``claim`` and
+    ``verdict`` are the Vietnamese words of the doc; each has an English twin ``*_en`` (seed),
+    which chat reads when it answers in English."""
     by = {c.key: c for c in load(paths)}
     data = {x["id"]: x for x in (by["round.clusters.data"].value if "round.clusters.data" in by
                                  else [])}  # fmt: skip
@@ -147,7 +149,9 @@ def diag_block(paths: ConsolePaths) -> dict[str, Any]:
                 "key": {"step": v["step"], "label": v["label"], "level": v["level"]},
                 "n_fail": v["n_fail"],
                 "diagnosis": dx.get("diagnosis"),
+                "diagnosis_en": dx.get("diagnosis_en"),
                 "intervention": dx.get("intervention"),
+                "intervention_en": dx.get("intervention_en"),
                 "gets_data": cid in data,
                 "source": src,
                 "quote": c.quote,
@@ -157,8 +161,10 @@ def diag_block(paths: ConsolePaths) -> dict[str, Any]:
         {
             "id": by[k].value["id"],
             "claim": by[k].value["claim"],
+            "claim_en": by[k].value.get("claim_en"),
             "clusters": list(by[k].value.get("clusters") or []),
             "verdict": by[k].value["verdict"],
+            "verdict_en": by[k].value.get("verdict_en"),
             "ticket": by[k].value.get("ticket"),
             "source": _src(by[k]),
             "quote": by[k].quote,

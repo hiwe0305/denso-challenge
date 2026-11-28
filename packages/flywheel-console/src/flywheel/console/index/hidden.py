@@ -201,6 +201,34 @@ def catalog_rows(
     return kept, edges
 
 
+def catalog_hidden_ids(doc: Any, h: Hidden) -> frozenset[str]:
+    """Ids of the rows of a catalog document (``data/catalog.json``, ``story.ds``) that belong to
+    a hidden run (``catalog_row``). The server refuses ``/data/ds/<id>/...`` for these ids and
+    drops them from ``tasks[].catalog_rows``, whose trimmed rows lack the fields to judge."""
+    if not h or not isinstance(doc, dict) or not isinstance(doc.get("rows"), list):
+        return frozenset()
+    return frozenset(str(r.get("id")) for r in doc["rows"] if catalog_row(r, h))
+
+
+def catalog_doc(doc: Any, h: Hidden) -> Any:
+    """A catalog document (``data/catalog.json`` or ``story.ds``) without the rows of hidden runs
+    (``catalog_rows``), for an index built before the rows were dropped; ``totals``, when
+    present, is computed again from the kept rows (``catalog.totals``). Unchanged when no row
+    is hidden."""
+    if not catalog_hidden_ids(doc, h):
+        return doc
+    from flywheel.console.index import catalog  # catalog imports this module
+
+    edges = doc.get("edges") if isinstance(doc.get("edges"), list) else []
+    rows, edges = catalog_rows(doc["rows"], edges, h)
+    out = {**doc, "rows": rows}
+    if "edges" in doc:
+        out["edges"] = edges
+    if "totals" in doc:
+        out["totals"] = catalog.totals(rows)
+    return out
+
+
 # ------------------------------------------------------------------ tasks.json
 def tasks_doc(doc: Any, h: Hidden) -> Any:
     """``tasks.json`` without the hidden runs: dropped from each round's ``runs``, roles naming
@@ -370,9 +398,10 @@ def ledger(rows: Any, h: Hidden) -> Any:
 def story(doc: Any, h: Hidden) -> Any:
     """``story.json`` without the hidden runs, for both shapes of its ``jig`` block (the one of
     ``jig.py``, and the older one whose ``jig.runs`` are eval rows keyed ``run`` while the
-    top-level ``runs`` hold the jig train entries). The ledger is passed through: an index built
-    since 28/11/2026 already merges hidden stories into one "other" row (``story._ledger``), and
-    ``ledger`` does the same for an older document. Unchanged when no run is hidden."""
+    top-level ``runs`` hold the jig train entries). The ledger goes through ``ledger``: the rows
+    of hidden stories merge into one "other" row with the same numbers, as an index built since
+    28/11/2026 already writes it (``story._ledger``), so a stale index names no hidden story
+    either. Unchanged when no run is hidden."""
     if not h or not isinstance(doc, dict):
         return doc
     out = dict(doc)
@@ -380,6 +409,8 @@ def story(doc: Any, h: Hidden) -> Any:
         out["runs"] = _rows(out["runs"], h, "branch", "run")
     if "colab_sessions" in out:
         out["colab_sessions"] = off_sessions(out["colab_sessions"], h, "session")
+    if "ledger" in out:
+        out["ledger"] = ledger(out["ledger"], h)
     pair = out.get("pair")
     if isinstance(pair, dict) and pair.get("runs"):
         runs = _rows(pair.get("runs"), h, "run")
