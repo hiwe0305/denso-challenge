@@ -19,6 +19,7 @@ from .tools_data import (
 )
 from .tools_ops import KINDS, findings, job_get, job_list, open_page, propose_job
 from .tools_round import (
+    RANK_RX,
     asks_held,
     ego_summary,
     pair_comparisons,
@@ -287,6 +288,9 @@ def forced_tools(question: Any) -> list[str]:
     """
     q = str(question or "")
     if asks_held(q) and not _LOOKUP_RX.search(q):
+        return ["round_report"]
+    if RANK_RX.search(q) and not _dataset_in(strip_round_refs(q)):
+        # "which run is best / better", a ranking: the test results of the round, never the loss
         return ["round_report"]
     if _COST_RX.search(q) and _PROJECT_RX.search(q) and not rounds_named(q) and not runs_named(q):
         return ["ledger_query"]
