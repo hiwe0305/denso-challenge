@@ -55,31 +55,44 @@ SYSTEM = (
     "You are the analysis assistant of the Flywheel Console, a robot-learning data flywheel dashboard. "
     "For any question about datasets, episodes, QA, runs, eval, rounds, loop, jobs, findings or cost, call a tool first and never answer from memory. "
     "Pass IDs exactly as the user wrote them. Do not explain before calling a tool, and never write your plan or the name of a tool in the answer. "
-    "For a lookup question (how many, which, list, show) about one dataset, run or job, answer in the user's language in at most 60 words, plain text, no tables. "
-    "For a question about the results of a round, whether a mark is met, where the robot fails, the cost of the round, why, or what to do next, call round_report; "
-    "for failure groups and system checks call round_diagnosis; for the confidence intervals of the paired comparisons call pair_comparisons; for egocentric or human-video clips as a whole call ego_summary. "
-    "Their result is already written in the user's language: open with its DIRECT ANSWER sentence, reuse its sentences word for word instead of rewording figures, and follow its HOW TO ANSWER line. Keep it short, about 150 to 200 words, plain text; do not count words.  Never copy the upper-case headings of the tool result. "
-    "Name the round once at the start and the run next to each number; every number then belongs to that round unless you name another. Never give a number of one round for another round. "
-    "Compare with a control only when the tool says the conditions are the same; otherwise put the numbers side by side and say why they cannot be compared. "
-    "Say which interval is the bootstrap CI the rules read and which is descriptive only. Keep measured and estimated cost apart. Keep each verdict (met or not met) next to the number it reads, one per level: never one verdict after two levels. When the tool places numbers side by side (different scene, eval set or scorer), never write that one is better or up by an amount. Never rank runs or models by training loss and never name one 'best': give the highest number of successful test runs and whether the intervals tell them apart. Leave out of any ranking a run whose test result is not presented. Name runs by their labels (C_70, M), never by session ids. Say what has not been checked. "
-    "For a result that is not presented, write only the sentence the tool gives; never confirm or deny a figure the user offers for it. "
-    "Cite only numbers that appear in the tool results. End an answer about a round with one short line naming the source the tool result gives (Nguồn: … / Source: …). "
+    "Tool results are data rows ('SECTION | key=value | ...', a header row first); the first section after the header is the one the question asks about. "
+    "Write the answer yourself, in the user's language, from those rows; never copy keys, section names or the header row. "
+    "Flags are yes/no. 'missing=' names a part the index does not have: say it is not available yet and never fill it in. "
+    "WEAK rows are weak points, OPTION and NEXT rows are the next steps the documents give, LIMITS rows are limits of the reading, SIDE_BY_SIDE rows sit side by side and are never ranked. "
+    # the answer contract (audit 28/11/2026, 05-danh-gia-chat-2811.md section 4, approved)
+    "ANSWER SHAPE. (1) The first line answers exactly the newest question in at most two sentences, with the key fact in **bold**. "
+    "(2) Then a markdown table when three or more numbers are compared, or when the user asks for a table, statistics or a comparison (bảng, thống kê, so sánh, table); otherwise at most four bullets. "
+    "(3) One line starting 'Lưu ý:' (Vietnamese) or 'Note:' (English) only when a limit changes the reading, such as a different scene or scorer, preliminary numbers or no control run. "
+    "(4) Next steps only when the question asks what to do, as one bold 'Việc nên làm:' / 'Next step:' line taken from the OPTION or NEXT rows; never offer a ticket or intervention the rows mark closed or handled. "
+    "(5) No source line: the interface shows the sources. No rule numbers (luật 1, rule 2) and no internal ids (failure codes such as L-PLACE-POSE, job or session ids, cluster ids unless the user asks about clusters). "
+    "(6) Short: about 120 words, at most 200. "
+    "Answer only the newest question: earlier questions of the conversation are already answered, so never answer or repeat them. "
+    "A follow-up such as 'chi tiết hơn', 'thành bảng', 'vì sao', 'more detail', 'as a table' or 'why' applies to the topic of the previous question; for 'thành bảng' / 'as a table' give the same facts as a table. "
+    "READING. Name the round once at the start and the run next to each number; every number belongs to that round unless you name another. Never give a number of one round for another round. "
+    "When the rows say comparable=no (different scene, eval set or scorer), put the numbers side by side and never write that one is better or up by an amount. "
+    "When intervals overlap, give the highest count and say the runs cannot be told apart. Never call a run 'tốt nhất' / 'best'; 'cao nhất' / 'highest' with its number is fine. "
+    "Keep each verdict (met or not met) next to the number it reads, one per level: never one verdict after two levels. "
+    "Never rank runs or models by training loss and never judge a run from its loss ('rất tốt', 'good'); when training numbers are given, say that training loss is not a measure of the result. "
+    "Leave out of any ranking a run whose test result is not presented, and do not mention it unless asked. For a result that is not presented write only the sentence the tool gives; never confirm or deny a figure the user offers for it. "
+    "Name runs by their labels (C_70, M), never by session ids. Keep measured and estimated cost apart. Say what has not been checked when it changes the reading. "
+    "Cite only numbers that appear in the tool results. "
+    "If asked how you reason, say in one or two sentences that you read the console's index through lookups and use only their numbers. "
     "Never claim to change a QA status, start a job, train a model or read holdout data. "
     "If the question is not about this console's data, say so in one short sentence and call no tool."
 )
 
 DEEP = (
     " Mode: DEEP ANALYSIS. round_report for the selected round is already read. Call round_diagnosis or pair_comparisons only when they add to the answer. "
-    "Then write about 400 words in the user's language, in five parts with short bold headings: {parts}. "
-    "Numbers: the direct answer and the readings against the rules. Controls: what each number is compared with and whether the conditions are the same. "
-    "Limits: seeds, simulation, what has not been checked. Next steps: the options of the tool result, as proposals. Sources: the documents the tool results name. "
+    "Then write about 400 words in the user's language, in four parts with short bold headings: {parts}. "
+    "Numbers: the direct answer and the readings against the marks. Controls: what each number is compared with and whether the conditions are the same. "
+    "Limits: seeds, simulation, what has not been checked. Next steps: the next_steps rows, as proposals. No source part: the interface shows the sources. "
     "Cite only verified tool numbers."
 )
-DEEP_PARTS = {"Vietnamese": "Số liệu / Đối chứng / Giới hạn / Việc nên làm / Nguồn",
-              "English": "Numbers / Controls / Limits / Next steps / Sources"}  # fmt: skip
+DEEP_PARTS = {"Vietnamese": "Số liệu / Đối chứng / Giới hạn / Việc nên làm",
+              "English": "Numbers / Controls / Limits / Next steps"}  # fmt: skip
 
 FORCE_ANSWER = (
-    "Stop looking things up. Write the answer now in {lang}, plain text, briefly, "
+    "Stop looking things up. Write the answer to the newest question now in {lang}, in the answer shape, "
     "using only the tool results above. If they do not answer the question, say what is missing."
 )
 
@@ -312,6 +325,61 @@ def get_trace(turn_id: str, hide: Collection[str] = ()) -> dict[str, Any] | None
     return None
 
 
+# ------------------------------------------------------------------ follow-ups and identity
+# a short follow-up that has no topic of its own: it applies to the question before it (audit 28/11/2026)
+FOLLOW_RX = re.compile(r"chi tiết hơn|cụ thể hơn|rõ hơn|thành bảng|dạng bảng|bằng bảng|lập bảng|kẻ bảng|trình bày.{0,20}bảng|\bbảng\b|vì sao|tại sao|"
+                       r"giải thích|nói thêm|thêm nữa|more detail|in detail|elaborate|as a table|in a table|make (it )?a table|\btable\b|\bwhy\b|explain", re.I)  # fmt: skip
+FOLLOW_MAX_CHARS = 90  # longer than this, a question names its own topic
+# who answers: the console's assistant; the model and the gateway are not named (decision Q3, 28/11/2026)
+IDENTITY_RX = re.compile(r"bạn là ai|bạn là (model|mô hình|ai|gì|con)|(model|mô hình) (nào|gì)|phiên bản (claude|gpt|model|mô hình|nào|bao nhiêu)|"
+                         r"bạn (còn )?(có thể|làm được) (làm )?(gì|những gì)|who are you|what are you|which (model|version)|what (model|version)|"
+                         r"are you (claude|gpt|an? (ai|llm|model))|what can you do", re.I)  # fmt: skip
+IDENTITY = (
+    "**Tôi là Trợ lý phân tích của Flywheel Console.** Tôi đọc chỉ mục của Console qua các tra cứu và chỉ dùng số có trong đó.\n\n"
+    "- Kết quả từng vòng và từng run, xếp cạnh nhau khi khác cảnh hay bộ chấm.\n"
+    "- Bảng lỗi theo run, tiến độ train theo phase, chi phí CU thực đo và ước tính.\n"
+    "- Bộ dữ liệu và QA, diễn tiến dự án và việc tiếp theo đã ghi trong tài liệu.\n"
+    "- Tôi không train, không chạy job và không đọc holdout.\n\n"
+    "Tên model đang trả lời xem ở trang cấu hình.",
+    "**I am the analysis assistant of the Flywheel Console.** I read the console's index through lookups and use only the numbers in it.\n\n"
+    "- Results of each round and run, set side by side when the scene or scorer differs.\n"
+    "- Failure tables per run, training progress per phase, measured and estimated CU cost.\n"
+    "- Datasets and QA, the project's progress and the next steps the documents give.\n"
+    "- I do not train, start jobs or read holdout data.\n\n"
+    "The name of the model answering is on the settings page.",
+)  # fmt: skip
+
+
+def is_follow_up(q: Any) -> bool:
+    """True for a short follow-up with no topic of its own ("Trình bày thành bảng cho tôi đi")."""
+    s = str(q or "").strip()
+    return 0 < len(s) <= FOLLOW_MAX_CHARS and bool(FOLLOW_RX.search(s)) and not IDENTITY_RX.search(s)
+
+
+def _strip_pin(q: str) -> str:
+    return re.sub(r"^\[Pinned context:[^\]]*\]\s*", "", q).strip()
+
+
+def asks_identity(q: Any) -> bool:
+    """True for "who / which model / what version are you", and "what can you do"."""
+    return bool(IDENTITY_RX.search(_strip_pin(str(q or ""))))
+
+
+def topic_question(body: dict[str, Any]) -> str:
+    """The question the turn routes on: the newest one, or for a follow-up the last question with a
+    topic before it plus the follow-up ("Thống kê các loại lỗi … — Trình bày thành bảng")."""
+    users = [str(m.get("content") or "").strip() for m in body.get("messages", []) if m.get("role") == "user" and str(m.get("content") or "").strip()]
+    if not users:
+        return ""
+    q = users[-1]
+    if not is_follow_up(_strip_pin(q)):
+        return q
+    for earlier in reversed(users[:-1]):
+        if not is_follow_up(_strip_pin(earlier)) and not asks_identity(earlier):
+            return f"{earlier} — {q}"
+    return q
+
+
 # ------------------------------------------------------------------ the turn
 def build_messages(
     body: dict[str, Any], context: dict[str, Any]
@@ -347,16 +415,15 @@ def build_messages(
             "actions or navigation links while strictly respecting all safety guardrails."
         )
     msgs: list[dict[str, Any]] = [{"role": "system", "content": sys_prompt + " " + ctxline}]
-    prev = hist[:-1]
-    users = [i for i, m in enumerate(prev) if m["role"] == "user"]
-    keep_from = users[-4] if len(users) >= 4 else 0
-    for i, m in enumerate(prev):
-        if m["role"] == "assistant" and (i < keep_from or HOSTED.get()):
-            # older answers reduced to the question; a hosted model gets no earlier answer at
-            # all, since a local model may have written it from rows that are not public
-            continue
-        msgs.append({"role": m["role"], "content": str(m["content"])[:600]})
-    msgs.append({"role": "user", "content": str(q)[:1500]})
+    # earlier questions are answered already: the model gets the newest question only, so it never
+    # answers them again (audit 28/11/2026, cause 4). A follow-up gets the question it follows; no
+    # earlier answer is sent, since its facts come back from this turn's own lookups
+    topic = topic_question(body)
+    if topic and topic != str(q).strip():
+        earlier = topic[: -len(str(q).strip())].rstrip(" —")
+        msgs.append({"role": "user", "content": "(Earlier question, already answered; do not answer it again: " + earlier[:600] + ")\n\n" + str(q)[:1500]})
+    else:
+        msgs.append({"role": "user", "content": str(q)[:1500]})
     return msgs, str(q)
 
 
@@ -496,7 +563,7 @@ def events(body: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
 # an answer that is the model's own plan instead of an answer (seen 28/11/2026, Fable 5:
 # "... This is a 'why' type question — call round_report.")
 _INTERNAL = re.compile(
-    r"\b(round_report|round_diagnosis|pair_comparisons|ego_summary|run_list|eval_summary|loop_proposals|ledger_query)\b|"
+    r"\b(round_report|round_diagnosis|pair_comparisons|ego_summary|run_list|eval_summary|loop_proposals|ledger_query|failure_table|train_progress|project_status)\b|"
     r"^\s*(the question|the user|user) (is|asks|wants|:)|\bthis is an? ['\"]?\w+['\"]?[ -]type question\b|"
     r"\b(i'?ll|i will|let me|need to|should|so) (call|check the tool|look up)\b",
     re.I,
@@ -514,6 +581,9 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
     conv = body.get("conversation_id") or f"c-{os.urandom(4).hex()}"
     turn = "t-{}-{}".format(datetime.now().strftime("%Y%m%d-%H%M%S"), os.urandom(2).hex())
     msgs, question = build_messages(body, context)
+    # the question the lookups are chosen by: the newest one, or for a follow-up ("thành bảng",
+    # "vì sao") the question it follows; the trace keeps the user's own words
+    rq = topic_question(body) or question
     # which runs are held or hidden comes from the seed; unknown means no figures and no tool
     try:
         hidden_runs()
@@ -524,15 +594,19 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
     # the round of the turn: one the question names, else the one chosen in the top bar; every
     # tool reads it and every number of the answer is checked against it (A2, A4)
     try:
-        turn_round = tools_round.round_named(question, context.get("round")) or ""
+        turn_round = tools_round.round_named(rq, context.get("round")) or ""
+        # best / latest / what next, with no round or run named: the latest presented result (run M),
+        # whatever round the top bar shows (Hiếu, 28/11/2026)
+        if seed_ok and registry.asks_latest(rq):
+            turn_round = registry.latest_round(context.get("task")) or turn_round
     except Exception:
         turn_round = str(context.get("round") or "")
     if turn_round:
         context["round"] = turn_round
     mode = str(body.get("mode") or "ask").strip().lower()
     deep = mode == "investigate"
-    names = registry.offered_names(context.get("route"), question) if seed_ok else []
-    forced_all = registry.forced_tools(question) if seed_ok else []
+    names = registry.offered_names(context.get("route"), rq) if seed_ok else []
+    forced_all = registry.forced_tools(rq) if seed_ok else []
     forced = forced_all[0] if forced_all else None
     if deep and seed_ok:
         # deep analysis always starts from the round's facts; the model may then look further,
@@ -548,6 +622,7 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
     tr: dict[str, Any] = {
         "turn_id": turn, "conversation_id": conv, "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
         "model": prov.model, "provider": prov.name, "hosted": prov.hosted, "question": question,
+        **({"topic": rq} if rq != question else {}),
         "context": context, "round": turn_round or None, "mode": mode, "tools_offered": names,
         "tools_forced": list(prefetch), "nodes": [],
         "answer": "", "tokens_in": 0, "tokens_out": 0,
@@ -579,6 +654,16 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
         yield finish("done", {"turn_id": turn, "ms_total": int((time.time() - t0) * 1000), "tokens_in": 0, "tokens_out": 0,
                               "numbers": [], "unverified": [], "guard": why, "round": turn_round or None})  # fmt: skip
         return
+    # 1a. who answers / what it can do: a fixed answer that names no model or gateway (decision
+    # Q3) and dumps no data
+    if asks_identity(question):
+        msg = IDENTITY[0 if lang_of(question) == "Vietnamese" else 1]
+        tr["guard"] = "identity"
+        tr["answer"] = msg
+        yield "token", {"text": msg}
+        yield finish("done", {"turn_id": turn, "ms_total": int((time.time() - t0) * 1000), "tokens_in": 0, "tokens_out": 0,
+                              "numbers": [], "unverified": [], "guard": "identity", "round": turn_round or None, "sources": []})  # fmt: skip
+        return
     # 1b. the seed cannot say which runs are held or hidden: a fixed answer, no model, no tool
     if not seed_ok:
         msg = UNREADABLE[0 if lang_of(question) == "Vietnamese" else 1]
@@ -591,7 +676,7 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
         return
     # 1c. a run or story that is not presented (run N, DA-50): a scoped, true sentence that neither
     # confirms nor denies it; no model, no tool (same rule as W5)
-    if tools_round.asks_hidden(question):
+    if tools_round.asks_hidden(rq):
         msg = tools_round.NOT_PRESENTED[0 if lang_of(question) == "Vietnamese" else 1]
         tr["guard"] = "hidden"
         tr["answer"] = msg
@@ -616,7 +701,7 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
     max_rounds = DEEP_ROUNDS if deep else MAX_ROUNDS
     max_predict = DEEP_PREDICT if deep else NUM_PREDICT
     turn_cap = (DEEP_CAP_HOSTED_S if prov.hosted else DEEP_CAP_S) if deep else TURN_CAP_S
-    keep_md = mode in ("investigate", "operate")
+    keep_md = True  # the answer contract asks for bold, tables and lists; the web renders them safely
     deadline = t0 + turn_cap
     # evidence the numbers are checked against: the question, the page context, and the tool
     # results of the turn's round; a result tagged with another round counts apart (A2)
@@ -629,7 +714,8 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
     tool_rounds = 0
     retried = False
     pending_calls: list[dict[str, Any]] = [{"name": n, "arguments": {}} for n in prefetch]
-    tool_ctx = {**context, "lang": "vi" if lang == "Vietnamese" else "en", "question": question, "deep": mode == "investigate"}
+    tool_ctx = {**context, "lang": "vi" if lang == "Vietnamese" else "en", "question": rq, "deep": mode == "investigate"}
+    sources: list[str] = []  # the tools' doc refs, shown as chips under the answer
 
     def _call_gen(m_list: list[dict[str, Any]], sch: list[dict[str, Any]] | None) -> Iterator[tuple[str, Any]]:
         if time.time() > deadline:
@@ -672,8 +758,6 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
                 out[:] = ["", [], 0, 0]
                 yield from _gen(msgs, offered, keep_md)
                 content, tcalls, tin, tout = out
-                if not keep_md:
-                    content = content.replace("**", "")
                 if offered is None:
                     tcalls = []  # no tool is offered now: a call written as text is not run
                 if not tcalls and looks_internal(content) and not retried:
@@ -759,6 +843,9 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
                     ev["navigate"] = res["navigate"]
                 yield "tool_result", ev
                 msgs.append({"role": "tool", "tool_name": name, "content": res["model"]})
+                for src in res.get("sources") or []:
+                    if isinstance(src, str) and src.strip() and src.strip() not in sources:
+                        sources.append(src.strip())
                 if res.get("answer"):
                     fixed = str(res["answer"])  # the tool's own answer, shown as it stands
             if fixed:
@@ -766,7 +853,7 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
                 yield "token", {"text": fixed}
                 break
             msgs[-1]["content"] += (
-                f"\n[Answer the user now in {lang}, briefly. Use only numbers shown above. "
+                f"\n[Answer the newest question now in {lang}, in the answer shape. Use only numbers shown above. "
                 "Name the round once and the run next to each number. Do not call more tools unless a different lookup is clearly needed.]"
             )
         if not answer_parts and tool_rounds:
@@ -806,13 +893,14 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
     mismatch = [t for t in unverified if t in elsewhere]
     tr["numbers"] = numbers
     tr["unverified"] = unverified
+    tr["sources"] = sources
     if mismatch:
         tr["round_mismatch"] = mismatch
     if not answer:
         tr["error"] = "empty answer"
     yield finish("done", {"turn_id": turn, "ms_total": int((time.time() - t0) * 1000), "tokens_in": tr["tokens_in"], "tokens_out": tr["tokens_out"],
                           "numbers": numbers, "unverified": unverified, "round": turn_round or None, "round_mismatch": mismatch,
-                          "no_narration": (not answer) or None})  # fmt: skip
+                          "sources": sources, "no_narration": (not answer) or None})  # fmt: skip
 
 
 def sse(event: str, data: dict[str, Any]) -> bytes:
