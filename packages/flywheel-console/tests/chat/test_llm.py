@@ -92,7 +92,7 @@ def test_parse_markup_calls() -> None:
 def test_bench_items_and_scoring(idx: ConsolePaths) -> None:
     items = bench.load_items()
     ids = {i["id"] for i in items}
-    assert len(items) == 72 and "b48" in ids and "b49" in ids and "a12" in ids and "s11" in ids
+    assert len(items) == 74 and "b48" in ids and "b49" in ids and "a12" in ids and "s11" in ids
     assert any("vì sao 68 lần sinh S1 thất bại" in i["question"] for i in items)
     cross = next(i for i in items if i["id"] == "b49")
     ev: list[tuple[str, dict[str, Any]]] = [
