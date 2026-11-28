@@ -398,8 +398,10 @@ def merged(
     A card overrides the seed row with its ``id``, or the row whose ``card:`` names it (that
     row keeps its seed id). A card without a row adds one. Seed rows without a card are kept
     as they are. ``strict`` raises ``CardError`` on a bad card; otherwise bad cards are
-    skipped. Edges are the seed edges plus ``[parent, id]`` for each card parent that is a
-    row of the merged catalog."""
+    skipped. Seed edges whose two ends are not rows or runs of this build are left out. A card
+    row named in the seed's ``titles`` map gets that title plus `` (n)``, its
+    episode count. Edges are the seed edges plus ``[parent, id]`` for each card parent that is
+    a row of the merged catalog."""
     doc = seed_doc(paths)
     fw = paths.fw_root
     seed_rows = [r for r in doc["rows"] if isinstance(r, dict)]
@@ -407,7 +409,7 @@ def merged(
     rows: list[dict[str, Any]] = [{**r, **CARD_FIELDS} for r in seed_rows]
     found = load_cards(fw) if strict else load_cards_lenient(fw)
     if not found:
-        return rows, edges
+        return rows, _known_edges(edges, rows, doc)
     by_id = {str(r["id"]): k for k, r in enumerate(seed_rows)}
     by_link = {str(r["card"]): k for k, r in enumerate(seed_rows) if r.get("card")}
     taken: set[int] = set()
@@ -428,6 +430,13 @@ def merged(
             taken.add(k)
             rows[k] = _card_row(c, seed_rows[k], fw)
             link[c.id] = rows[k]["id"]
+    raw_titles = doc.get("titles")
+    titles: dict[str, Any] = raw_titles if isinstance(raw_titles, dict) else {}
+    for r in rows:
+        name = titles.get(r["id"])
+        if r["card"] is not None and isinstance(name, str) and name:
+            eps = r.get("episodes")
+            r["title"] = f"{name} ({eps})" if eps is not None else name
     ids = {str(r["id"]) for r in rows}
     seen = {tuple(e) for e in edges}
     for r in rows:
@@ -438,4 +447,14 @@ def merged(
             if p in ids and (p, r["id"]) not in seen:
                 seen.add((p, r["id"]))
                 edges.append([p, r["id"]])
-    return rows, edges
+    return rows, _known_edges(edges, rows, doc)
+
+
+def _known_edges(
+    edges: list[list[str]], rows: list[dict[str, Any]], doc: dict[str, Any]
+) -> list[list[str]]:
+    """Edges whose two ends are a row or a run of this build: a seed edge to a card row whose
+    card is not on this machine (e.g. ``tray_s1_bfbdcbcf719e`` -> ``M``) is left out."""
+    ids = {str(r["id"]) for r in rows}
+    ids |= {str(r["id"]) for r in doc.get("runs") or [] if isinstance(r, dict) and "id" in r}
+    return [e for e in edges if len(e) == 2 and e[0] in ids and e[1] in ids]

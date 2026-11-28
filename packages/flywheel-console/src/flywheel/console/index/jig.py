@@ -482,8 +482,104 @@ def _repeats(
     ]  # fmt: skip
 
 
+LADDER_CM = ("5", "7.5", "10", "15", "20")  # place_error.RELAXED_M, in cm
+LADDER_YAW_DEG = 10.0
+LADDER_RULE = (
+    "place_error.py tolerance_curve: success, or L-PLACE-POSE with dist ≤ t and yaw ≤ 10° "
+    "(reach_b not required)"
+)
+
+
+def _pct(xs: list[float], p: float) -> float | None:
+    """``sorted[round(p * (n - 1))]``, 2 decimals."""
+    if not xs:
+        return None
+    s = sorted(xs)
+    return round(s[round(p * (len(s) - 1))], 2)
+
+
+def _ladder_run(run: str, round_id: str, scene: str, scorer: str,
+                rows: list[dict[str, Any]]) -> dict[str, Any]:  # fmt: skip
+    """Counts of one run's 60 rollouts. ``rows``: ``{success, failure, reach_b, dist_cm,
+    yaw_deg}``. ``relaxed`` follows ``place_error.tolerance_curve``; ``dev`` takes the rollouts
+    that reached table B and have a distance."""
+
+    def relaxed(r: dict[str, Any], cm: float) -> bool:
+        if r["success"]:
+            return True
+        d, y = r.get("dist_cm"), r.get("yaw_deg")
+        return (r.get("failure") == "L-PLACE-POSE" and d is not None and y is not None
+                and d <= cm and y <= LADDER_YAW_DEG)  # fmt: skip
+
+    dev = [r for r in rows if r.get("reach_b") and r.get("dist_cm") is not None]
+    dists = [float(r["dist_cm"]) for r in dev]
+    yaws = [float(r["yaw_deg"]) for r in dev if r.get("yaw_deg") is not None]
+    return {
+        "run": run,
+        "round": round_id,
+        "scene": scene,
+        "scorer": scorer,
+        "success": sum(bool(r["success"]) for r in rows),
+        "relaxed": {t: sum(relaxed(r, float(t)) for r in rows) for t in LADDER_CM},
+        "reach_b": sum(bool(r.get("reach_b")) for r in rows),
+        "dev": {
+            "n": len(dev),
+            "dist_cm": {"p50": _pct(dists, 0.5), "p90": _pct(dists, 0.9)},
+            "yaw_deg": {"p50": _pct(yaws, 0.5), "p90": _pct(yaws, 0.9)},
+            "yaw_le_10": sum(y <= LADDER_YAW_DEG for y in yaws),
+        },
+    }
+
+
+def ladder60(
+    fw: Path, block: dict[str, Any], rnd: Round, pair_rnd: Round, earlier: list[str]
+) -> dict[str, Any] | None:
+    """Relaxed-tolerance ladder of the 60-rollout comparison (Hiếu, 28/11/2026): every run
+    counted by the rule of ``place_error.py`` (``LADDER_RULE``), so both rounds count the same
+    way. Round 1 reads ``<eval_dir>/place-error-<run>.json`` ``rows``; the jig baseline reads
+    repeat 0 of ``block["rollouts"]`` (``reach_b`` = the first five scorer steps passed).
+    Counts only; the pages format the shares. The 180-rollout ladder is not this one."""
+    runs: list[dict[str, Any]] = []
+    sources: list[str] = []
+    for run in earlier:
+        f = f"{pair_rnd.eval_dir}/place-error-{run}.json"
+        rows = _dict(fw / f).get("rows")
+        if not isinstance(rows, list) or not rows:
+            return None
+        norm = [
+            {"success": bool(r.get("success")), "failure": r.get("failure"),
+             "reach_b": bool(r.get("reach_b")),
+             "dist_cm": None if r.get("distance_m") is None else float(r["distance_m"]) * 100,
+             "yaw_deg": r.get("yaw_error_deg")}
+            for r in rows if isinstance(r, dict)
+        ]  # fmt: skip
+        runs.append(_ladder_run(run, pair_rnd.id, "không đồ gá", "bản 1", norm))
+        sources.append(f"fwdata/{f} rows")
+    mine = [
+        r for r in block.get("rollouts") or []
+        if isinstance(r, dict) and r.get("run") == rnd.baseline and r.get("repeat") == 0
+    ]  # fmt: skip
+    if not mine:
+        return None
+    norm = [
+        {"success": bool(r.get("success")), "failure": r.get("failure"),
+         "reach_b": all((r.get("steps") or [False])[:5]) and len(r.get("steps") or []) >= 5,
+         "dist_cm": r.get("dist_cm"), "yaw_deg": r.get("yaw_deg")}
+        for r in mine
+    ]  # fmt: skip
+    scorer = f"bản {rnd.scorer_version}" if rnd.scorer_version else None
+    runs.append(_ladder_run(rnd.baseline, rnd.id, rnd.scene or "", scorer or "", norm))
+    sources.append("story.jig.rollouts (repeat 0; reach_b = steps[:5] all passed)")
+    return {"rule": LADDER_RULE, "n": len(mine), "thresholds_cm": list(LADDER_CM),
+            "runs": runs, "sources": sources}  # fmt: skip
+
+
 def compare60(
-    block: dict[str, Any], rnd: Round | None, pair: dict[str, Any], pair_rnd: Round | None
+    block: dict[str, Any],
+    rnd: Round | None,
+    pair: dict[str, Any],
+    pair_rnd: Round | None,
+    fw: Path | None = None,
 ) -> dict[str, Any] | None:
     """Repeat 0 of the jig round's baseline beside the earlier round's runs, same size.
 
@@ -515,6 +611,12 @@ def compare60(
     if not earlier or any(e["n"] != r0["n"] for e in earlier):
         return None
     folder = (row.get("source") or "").removesuffix("/scores.jsonl")
+    ladder = ladder60(fw, block, rnd, pair_rnd, [str(e["run"]) for e in earlier]) if fw else None
+    if ladder is not None:
+        succ = [r["successes"] for r in reps]
+        ladder["repeats_range"] = [min(succ), max(succ)]
+        order = ("rule", "n", "thresholds_cm", "repeats_range", "runs", "sources")
+        ladder = {k: ladder[k] for k in order}
     return {
         "run": run,
         "repeat": 0,
@@ -529,6 +631,7 @@ def compare60(
         "earlier_scorer": pair.get("scorer_version"),
         "earlier_source": pair.get("source"),
         "earlier_doc": pair_rnd.raw.get("doc"),
+        "ladder": ladder,
     }
 
 

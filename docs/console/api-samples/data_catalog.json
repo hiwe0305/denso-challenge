@@ -90,6 +90,66 @@
    "lerobot": null,
    "ego_viewer": null,
    "unique": true
+  },
+  {
+   "id": "M",
+   "name": "tray.cut.jig2.l12.p8.20261125",
+   "title": "Tập train run M · 4 phần, lọc ≤ 3 cm, ≤ 5° (1037)",
+   "kind": "subset-cut",
+   "group": "s1",
+   "data_type": "synthetic S1",
+   "task": "tray",
+   "episodes": 1037,
+   "frames": 948639,
+   "hours": 5.27,
+   "fps": 50,
+   "format": "LeRobot v2.1 (Psi0 layout, state 32, action 36, 50 fps, head camera 360x640)",
+   "licence": "unknown",
+   "data_class": "public",
+   "locations": [
+    {
+     "where": "laptop",
+     "path": "fwdata/da48/cuts/M.tar",
+     "raw": "laptop:fwdata/da48/cuts/M.tar",
+     "exists": false
+    }
+   ],
+   "size": "5.5 GB tar",
+   "status": "current",
+   "notes": "",
+   "qa": "1037 kept, 143 dropped",
+   "qa_counts": null,
+   "view": "remote",
+   "laptop_dir": null,
+   "parents": [
+    "tray_s1_bfbdcbcf719e",
+    "tray_s1_8631ace9b1b3",
+    "tray_s1place_a1797e480160",
+    "tray_s1place_56e6d006d8d1"
+   ],
+   "children": [
+    "run-da-48-m"
+   ],
+   "thumbs": [],
+   "aliases": [
+    "M",
+    "tray.cut.jig2.l12.p8.20261125",
+    "da48.M"
+   ],
+   "lerobot": null,
+   "ego_viewer": null,
+   "scene": {
+    "env_id": "simple/G1WholebodyTrayTransferJigTeleop-v0",
+    "visuals_revision": "4763fbfaa4f8e97658e68b57d01b4c86659e08b5+zone1+jig2",
+    "jig": "jig2",
+    "level": "mixed",
+    "carry_goal_jitter_cm": null
+   },
+   "superseded_by": [],
+   "story": "DA-48",
+   "replay_qa": null,
+   "card": "fwdata/datasets/_cards/da48.M.yaml",
+   "unique": false
   }
  ],
  "edges": [
@@ -100,6 +160,10 @@
   [
    "egodex-test",
    "egodex-da30-probe"
+  ],
+  [
+   "M",
+   "run-da-48-m"
   ]
  ],
  "runs": [
@@ -113,6 +177,12 @@
    "id": "run-da-34-b-all-b-70",
    "name": "RUN DA-34 B_ALL / B_70",
    "title": "Run · DA-34 B_ALL / B_70",
+   "ext": false
+  },
+  {
+   "id": "run-da-48-m",
+   "name": "RUN DA-48 M (jig2, 100000 steps)",
+   "title": "Run · DA-48 M (jig2, 100 000 bước)",
    "ext": false
   }
  ],

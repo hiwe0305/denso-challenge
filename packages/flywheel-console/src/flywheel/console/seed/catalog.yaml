@@ -1401,6 +1401,42 @@ rows:
   parents:
   - s2-prod-1105
   aliases: []
+- id: M
+  card: da48.M
+  name: M (#M:351de072bd94)
+  title: Tập train run M · 4 phần, lọc ≤ 3 cm, ≤ 5° (1037)
+  kind: subset-cut
+  data_type: synthetic S1
+  task: tray
+  episodes: 1037
+  frames: 948639
+  hours: 5.27
+  fps: 50
+  format: LeRobot v2.1 (+M.tar), stats of the merged set
+  licence: unknown
+  data_class: public
+  size: 5.5 GB tar
+  status: current
+  notes: 'DA-48: four parts, place error <= 3 cm and <= 5 deg kept (143 of 1180 dropped)'
+  qa: kept 1037 / dropped 143
+  locations:
+  - laptop:fwdata/da48/cuts/M.tar
+  parents:
+  - tray_s1_bfbdcbcf719e
+  - tray_s1_8631ace9b1b3
+  - tray_s1place_a1797e480160
+  - tray_s1place_56e6d006d8d1
+  aliases:
+  - M
+titles:
+  # readable titles of card rows that have no seed row (Hiếu, 28/11/2026); the row's episode
+  # count is added as " (n)". Names follow docs/he/tray-jig.md §1 and the DA-41, DA-46 stories.
+  tray_s1_bfbdcbcf719e: Episode đầy đủ · jig2 · mức 1
+  tray_s1_8631ace9b1b3: Episode đầy đủ · jig2 · mức 2
+  tray_s1_b71a17f250f1: Episode đầy đủ · jig2, lệch đích CARRY ±10 cm · mức 1
+  tray_s1_45031800e357: Episode đầy đủ · jig2, lệch đích CARRY ±10 cm · mức 2
+  tray_s1place_a1797e480160: Bản cắt đoạn đặt · mức 1
+  tray_s1place_56e6d006d8d1: Bản cắt đoạn đặt · mức 2
 edges:
 - - egodex-test
   - egodex-da30
@@ -1506,6 +1542,16 @@ edges:
   - run-da-34-c-70-b-70
 - - tray_s1_f9433b028c52
   - ext-hf-hiwe0305-denso-hackrathon-g1-pick
+- - tray_s1_bfbdcbcf719e
+  - M
+- - tray_s1_8631ace9b1b3
+  - M
+- - tray_s1place_a1797e480160
+  - M
+- - tray_s1place_56e6d006d8d1
+  - M
+- - M
+  - run-da-48-m
 runs:
 - id: run-da-30-da30-tray-ego-b-stage1-vlm
   name: RUN DA-30 da30-tray-ego-b (stage1 VLM)
@@ -1543,3 +1589,7 @@ runs:
   name: HF hiwe0305/denso-hackrathon-g1-pick-and-place
   title: HF · hiwe0305/denso-hackrathon-g1-pick-and-place
   ext: true
+- id: run-da-48-m
+  name: RUN DA-48 M (jig2, 100000 steps)
+  title: Run · DA-48 M (jig2, 100 000 bước)
+  ext: false

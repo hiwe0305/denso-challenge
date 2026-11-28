@@ -19,9 +19,9 @@ def _build(tmp_path: Path) -> tuple[dict[str, int], dict]:
     return counts, json.loads((tmp_path / "out" / "catalog.json").read_text(encoding="utf-8"))
 
 
-def test_catalog_has_62_rows_and_edges(tmp_path: Path) -> None:
+def test_catalog_has_63_rows_and_edges(tmp_path: Path) -> None:
     counts, doc = _build(tmp_path)
-    assert counts["rows"] == len(doc["rows"]) == 62
+    assert counts["rows"] == len(doc["rows"]) == 63  # 62 + M (28/11/2026)
     ids = {r["id"] for r in doc["rows"]} | {r["id"] for r in doc["runs"]}
     assert doc["edges"] and counts["edges"] == len(doc["edges"])
     assert all(a in ids and b in ids for a, b in doc["edges"])

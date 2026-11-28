@@ -373,6 +373,11 @@ def _jig(j: dict[str, Any], h: Hidden) -> dict[str, Any]:
         j["compare60"] = None
     elif isinstance(c60, dict) and isinstance(c60.get("earlier"), list):
         j["compare60"] = {**c60, "earlier": _rows(c60["earlier"], h, "run")}
+        lad = c60.get("ladder")
+        if isinstance(lad, dict) and isinstance(lad.get("runs"), list):
+            sources = [s for s in lad.get("sources") or [] if not h.mentions(str(s))]
+            j["compare60"]["ladder"] = {**lad, "runs": _rows(lad["runs"], h, "run"),
+                                        "sources": sources}  # fmt: skip
     return j
 
 
