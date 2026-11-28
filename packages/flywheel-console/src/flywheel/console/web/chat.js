@@ -462,6 +462,43 @@ function buildTable(lines, startIdx) {
   return { node: el("div", { className: "md-table-wrap" }, [table]), next };
 }
 
+// A readable name for each chat lookup; the raw tool name stays in the trace and diagnostics.
+const TOOL_LABELS = {
+  round_report: ["Báo cáo vòng", "Round report"],
+  round_diagnosis: ["Chẩn đoán vòng", "Round diagnosis"],
+  rounds_side_by_side: ["Các vòng cạnh nhau", "Rounds side by side"],
+  pair_comparisons: ["Phép so sánh cặp", "Paired comparisons"],
+  failure_table: ["Bảng lỗi", "Failure table"],
+  train_progress: ["Tiến độ train", "Training progress"],
+  project_status: ["Diễn tiến dự án", "Project status"],
+  ego_summary: ["Video egocentric", "Egocentric video"],
+  catalog_search: ["Tìm bộ dữ liệu", "Dataset search"],
+  dataset_stats: ["Thống kê bộ dữ liệu", "Dataset statistics"],
+  episode_list: ["Danh sách episode", "Episode list"],
+  episode_get: ["Chi tiết episode", "Episode details"],
+  qa_summary: ["Kết quả QA", "QA summary"],
+  run_list: ["Danh sách run", "Run list"],
+  run_metrics: ["Đường loss của run", "Run curve"],
+  run_compare: ["So đường của các run", "Run curves compared"],
+  log_tail: ["Log", "Log"],
+  eval_summary: ["Kết quả thi trước", "Earlier eval"],
+  eval_failures: ["Lỗi khi thi", "Eval failures"],
+  loop_proposals: ["Đề xuất của vòng lặp", "Loop proposals"],
+  ledger_query: ["Sổ chi phí", "Cost ledger"],
+  job_list: ["Danh sách job", "Job list"],
+  job_get: ["Chi tiết job", "Job details"],
+  findings: ["Phát hiện QA", "QA findings"],
+  lineage: ["Nguồn gốc dữ liệu", "Data lineage"],
+  open_page: ["Mở trang", "Open page"],
+  propose_job: ["Đề xuất job", "Job proposal"],
+};
+
+export function toolLabel(name) {
+  const pair = TOOL_LABELS[String(name || "")];
+  if (!pair) return String(name || "");
+  return state.lang === "en" ? pair[1] : pair[0];
+}
+
 // Source chips under an answer; `sources` is done.sources (array of strings).
 export function renderSourceChips(sources) {
   const list = (Array.isArray(sources) ? sources : []).filter((x) => typeof x === "string" && x.trim());
@@ -1099,7 +1136,8 @@ export async function runSharedTurn(rawQuestion, opts = {}) {
     }
 
     if (evName === "thinking" || evName === "reasoning") {
-      if (dataObj.text) {
+      // a locked (demo) console never keeps or shows the model's reasoning
+      if (dataObj.text && !state.locked) {
         turnObj.thinking += dataObj.text;
         turnObj.phase = "synth";
         emitChatStore("stream");
@@ -1157,7 +1195,7 @@ export async function runSharedTurn(rawQuestion, opts = {}) {
       if (dataObj.text) {
         turnObj.rawStream += dataObj.text;
         const parsed = splitThinkAndAnswer(turnObj.rawStream);
-        if (parsed.thinking) {
+        if (parsed.thinking && !state.locked) {
           turnObj.thinking = parsed.thinking;
         }
         turnObj.answer = parsed.answer;
@@ -1637,7 +1675,7 @@ function renderSideTurnNode(tr) {
             text: tr.msTotal ? `${(tr.msTotal / 1000).toFixed(2)} s` : "",
           }),
     ]),
-    tr.thinking
+    tr.thinking && !state.locked
       ? el("details", { className: "reasoning-box", open: isRunning && !tr.answer }, [
           el("summary", { text: `💭 ${t("chat.reasoningTitle")}` }),
           el("div", { className: cls("reasoning-body", "mono"), text: tr.thinking }),
@@ -1664,7 +1702,7 @@ function renderSideTurnNode(tr) {
                     ),
                     text: st.ms === null ? "⚙" : st.ok ? "✓" : "!",
                   }),
-                  el("b", { className: "mono", text: st.name }),
+                  el("b", { text: toolLabel(st.name), title: state.locked ? null : st.name }),
                   el("span", {
                     className: cls("step-args-preview", "mono"),
                     text: formatArgsChip(st.args),
