@@ -98,6 +98,8 @@ def test_the_prompt_allows_charts_only_with_the_numbers_beside_them() -> None:
     assert "at least four values" in llm.SYSTEM and "At most 12 x labels, 6 series and 2 charts" in llm.SYSTEM
     assert "always keep the table, or a line with the key numbers" in llm.SYSTEM
     assert "no code, no HTML" in llm.SYSTEM
+    # tray-jig.md section 2 rule 4: rounds are only set side by side, never ranked in one chart
+    assert "One chart holds the runs of one round only" in llm.SYSTEM
 
 
 def test_deep_analysis_has_five_parts_and_the_tray_jig_reading_rules() -> None:
