@@ -30,7 +30,20 @@ from typing import Any
 from flywheel.console.index import hidden
 from flywheel.console.paths import active
 
-from .common import HOSTED, Result, catalog, cols, fail, jload, result, story, table, totals
+from .common import (
+    HOSTED,
+    Result,
+    catalog,
+    cols,
+    fail,
+    hidden_runs,
+    jload,
+    result,
+    story,
+    table,
+    totals,
+    withheld_runs,
+)
 
 ROLE = {
     "baseline": ("bản gốc", "the baseline"),
@@ -57,7 +70,7 @@ STAGE_NAMES_EN = ("data", "checks", "training", "test and scoring", "diagnosis",
 COUNT_VI = {2: "hai", 3: "ba", 4: "bốn", 5: "năm", 6: "sáu"}
 # step-4 verdicts as the index writes them (English), in Vietnamese words of tray.md §20.11
 RESULT_VI = {"unclear (scorer threshold)": "CHƯA RÕ (ngưỡng bộ chấm)", "unclear (missing signal)": "CHƯA RÕ (thiếu tín hiệu)",
-             "policy failure": "lỗi của policy", "pass": "đạt"}
+             "policy failure": "lỗi của policy", "pass": "qua"}
 
 # W5 (Hiếu 28/11/2026): the one sentence for every place a result is not presented
 WITHHELD = ("Kết quả thi lại của lượt này không trình bày ở bản demo.",
@@ -87,8 +100,11 @@ _ROUND1_RX = re.compile(r"vòng 1|vòng này|round 1|this round|tray-r1|\bmới\
 
 
 def held_runs() -> list[str]:
-    """Run ids whose test result some round of the manifest does not present."""
-    return [str(x) for r in manifest().get("rounds") or [] for x in r.get("withhold_eval") or []]
+    """Run ids whose test result some round does not present: ``withhold_eval`` of the seed (raises
+    ``ManifestUnreadable`` when it cannot be read), plus any the index lists."""
+    seed = withheld_runs()
+    index = {str(x) for r in manifest().get("rounds") or [] for x in r.get("withhold_eval") or []}
+    return sorted(seed | index)
 
 
 def _held_names() -> list[str]:
@@ -152,7 +168,7 @@ def _with_extra(plan: dict[str, tuple[str | None, list[str]]], focus: str, extra
 def manifest() -> dict[str, Any]:
     d = jload(active().index / "tasks.json", {})
     d = d if isinstance(d, dict) else {}
-    shown = hidden.tasks_doc(d, hidden.load(active()))  # withhold_runs, even in a stale index
+    shown = hidden.tasks_doc(d, hidden_runs())  # withhold_runs of the seed, even in a stale index
     d = shown if isinstance(shown, dict) else d
     if not HOSTED.get():
         return d
@@ -423,16 +439,57 @@ def _jig_block(rnd: dict[str, Any]) -> dict[str, Any] | None:
     return j
 
 
-def _verdict(say: Say, lower: Any, thr: Any, what: str) -> str:
-    """Reading rules 1-3 of tray-jig.md §2: a mark is met only when the CI lower bound reaches it."""
-    t = say.pct(thr).replace(",0", "").replace(".0", "")
-    if not isinstance(lower, (int, float)):
+def _reading(ev: dict[str, Any], scope: str, level: Any = None) -> dict[str, Any]:
+    """The index's reading of one rule (``evals[].readings``: rule 1 whole_task, rule 2 per level,
+    rule 3 place); {} when the index has none."""
+    for r in ev.get("readings") or []:
+        if isinstance(r, dict) and r.get("scope") == scope and (level is None or str(r.get("level")) == str(level)):
+            return r
+    return {}
+
+
+def _verdict(say: Say, reading: dict[str, Any], thr: Any, what: str) -> str:
+    """Reading rules 1-3 of tray-jig.md §2 as the index wrote them (``readings[].verdict``: "met",
+    "not_met", or None with ``why``). The chat never computes a verdict itself, so it cannot
+    disagree with the pages (the index reads "at or above" the mark, after rounding)."""
+    t = say.pct(reading.get("threshold", thr)).replace(",0", "").replace(".0", "")
+    v = reading.get("verdict")
+    if v not in ("met", "not_met"):
+        if reading.get("why") == "blocked":
+            return say(f"chưa đọc theo mốc {t} % vì tập eval chưa khớp luật đọc", f"not read against the {t}% mark: the eval set does not match the reading rules")
+        if not reading:
+            return say(f"index chưa ghi kết quả đọc theo mốc {t} %", f"the index has no reading against the {t}% mark")
         return say(f"chưa có CI nên chưa đọc theo mốc {t} %", f"no CI yet, so not read against the {t}% mark")
-    strict = what == "place"  # rule 3: "above 50 %" needs the lower bound strictly above
-    met = lower > thr if strict else lower >= thr
-    if what == "place":
-        return say(f"trên mốc {t} %", f"above the {t}% mark") if met else say(f"chưa trên mốc {t} %", f"not above the {t}% mark")
+    met = v == "met"
     return say(f"đạt mốc {t} %", f"meets the {t}% mark") if met else say(f"chưa đạt mốc {t} %", f"below the {t}% mark")
+
+
+KIND_WORD = {"measured": ("thực đo", "measured"), "estimated": ("ước tính", "estimated")}
+PART_WORD = {"train": ("train", "training"), "eval": ("eval", "evaluation")}
+
+
+def _jig_cost(say: Say, c: dict[str, Any]) -> str:
+    """``story.jig.cost`` (PR #258): each part with its CU, its ``measure_kind`` and its ledger
+    story, then the total; a part without ``measure_kind`` is said as unlabelled."""
+    def cu(x: Any) -> str:  # 56,15 and 6,8 as the doc writes them, never 6,80
+        t = say.num(x, 2)
+        return t.rstrip("0").rstrip(",.") if ("," in t or "." in t) else t
+
+    parts = []
+    kinds = set()
+    for key, v in c.items():
+        if not isinstance(v, dict) or v.get("cu") is None:
+            continue
+        kind = v.get("measure_kind")
+        kinds.add(kind)
+        kw = KIND_WORD.get(str(kind), (say("chưa ghi thực đo hay ước tính", "not marked measured or estimated"),) * 2)[0 if say.vi else 1]
+        pw = PART_WORD.get(str(key), (str(key), str(key)))[0 if say.vi else 1]
+        story_id = f", {v['story']}" if v.get("story") else ""
+        parts.append(f"{pw} {cu(v['cu'])} CU ({kw}{story_id})")
+    total = cu(c["total_cu"])
+    tk = KIND_WORD.get(str(next(iter(kinds))), ("", ""))[0 if say.vi else 1] if len(kinds) == 1 else ""
+    head = say(f"Chi phí của vòng: {total} CU" + (f" {tk}" if tk else ""), f"Cost of the round: {total} CU" + (f" {tk}" if tk else ""))
+    return head + (say(", gồm ", ", made of ") + say(" và ", " and ").join(parts) if parts else "") + "."
 
 
 def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str, extra: list[str] | None = None) -> Result:
@@ -454,23 +511,20 @@ def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str,
     lv = ev.get("levels") or {}
     F: dict[str, str] = {}
     src = j.get("doc") or rnd.get("doc") or ""
-    lo = (h.get("ci") or [None])[0]
-    F["headline"] = say(f"Run {run}: cả task {say.pct(h.get('p'))} % ({k}/{n} lượt thành công), CI {say.ci(h.get('ci'))}: {_verdict(say, lo, rules.get('whole_task', 0.8), 'task')} (đọc ở cận dưới của CI, luật 1).",
-                        f"Run {run}: whole task {say.pct(h.get('p'))}% ({k}/{n} successful runs), CI {say.ci(h.get('ci'))}: {_verdict(say, lo, rules.get('whole_task', 0.8), 'task')} (read at the CI lower bound, rule 1).")  # fmt: skip
+    F["headline"] = say(f"Run {run}: cả task {say.pct(h.get('p'))} % ({k}/{n} lượt thành công), CI {say.ci(h.get('ci'))}: {_verdict(say, _reading(ev, 'whole_task'), rules.get('whole_task', 0.8), 'task')} (đọc ở cận dưới của CI, luật 1).",
+                        f"Run {run}: whole task {say.pct(h.get('p'))}% ({k}/{n} successful runs), CI {say.ci(h.get('ci'))}: {_verdict(say, _reading(ev, 'whole_task'), rules.get('whole_task', 0.8), 'task')} (read at the CI lower bound, rule 1).")  # fmt: skip
     lvl_txt = []
     for key in sorted(lv):
         x = lv[key] or {}
-        llo = (x.get("ci") or [None])[0]
-        lvl_txt.append(say(f"mức {key}: {say.pct(x.get('p'))} % ({x.get('successes')}/{x.get('n')}), CI {say.ci(x.get('ci'))}, {_verdict(say, llo, rules.get('per_level', 0.7), 'level')}",
-                           f"level {key}: {say.pct(x.get('p'))}% ({x.get('successes')}/{x.get('n')}), CI {say.ci(x.get('ci'))}, {_verdict(say, llo, rules.get('per_level', 0.7), 'level')}"))  # fmt: skip
+        lvl_txt.append(say(f"mức {key}: {say.pct(x.get('p'))} % ({x.get('successes')}/{x.get('n')}), CI {say.ci(x.get('ci'))}, {_verdict(say, _reading(ev, 'level', key), rules.get('per_level', 0.7), 'level')}",
+                           f"level {key}: {say.pct(x.get('p'))}% ({x.get('successes')}/{x.get('n')}), CI {say.ci(x.get('ci'))}, {_verdict(say, _reading(ev, 'level', key), rules.get('per_level', 0.7), 'level')}"))  # fmt: skip
     if lvl_txt:
         F["levels"] = say("Từng mức (luật 2): ", "Per level (rule 2): ") + "; ".join(lvl_txt) + "."
     pl = ev.get("place") or {}
     if pl.get("n"):
-        plo = (pl.get("ci") or [None])[0]
         ci_txt = say(f", CI {say.ci(pl['ci'])}", f", CI {say.ci(pl['ci'])}") if pl.get("ci") else ""
-        F["place"] = say(f"Bước đặt (luật 3): {say.pct(pl.get('p'))} % ({pl.get('successes')}/{pl.get('n')} lượt qua bước đặt){ci_txt}, {_verdict(say, plo, rules.get('place', 0.5), 'place')}.",
-                         f"Placing step (rule 3): {say.pct(pl.get('p'))}% ({pl.get('successes')}/{pl.get('n')} runs pass the placing step){ci_txt}, {_verdict(say, plo, rules.get('place', 0.5), 'place')}.")  # fmt: skip
+        F["place"] = say(f"Bước đặt (luật 3): {say.pct(pl.get('p'))} % ({pl.get('successes')}/{pl.get('n')} lượt qua bước đặt){ci_txt}, {_verdict(say, _reading(ev, 'place'), rules.get('place', 0.5), 'place')}.",
+                         f"Placing step (rule 3): {say.pct(pl.get('p'))}% ({pl.get('successes')}/{pl.get('n')} runs pass the placing step){ci_txt}, {_verdict(say, _reading(ev, 'place'), rules.get('place', 0.5), 'place')}.")  # fmt: skip
     if h.get("wilson"):
         F["wilson"] = say(f"Khoảng Wilson 95 % ({say.ci(h['wilson'])}) chỉ để mô tả; CI để đọc luật là bootstrap theo điều kiện.",
                           f"The Wilson 95% interval ({say.ci(h['wilson'])}) is descriptive only; the CI used by the rules is a bootstrap over conditions.")  # fmt: skip
@@ -517,8 +571,7 @@ def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str,
     F["untested"] = say("Chưa xem video các lượt hỏng; mọi lý do nêu cho lỗi lúc này là phỏng đoán.", "The failed runs have not been reviewed on video; any reason given for a failure now is a guess.")
     F["cost"] = say("Index chưa có chi phí theo CU của vòng này; xem trang Chi phí.", "The index has no CU cost for this round yet; see the Cost page.")
     if isinstance(j.get("cost"), dict) and j["cost"].get("total_cu") is not None:
-        c = j["cost"]
-        F["cost"] = say(f"Chi phí của vòng: {say.num(c['total_cu'], 2)} CU {c.get('kind', '')}.".replace("  ", " "), f"Cost of the round: {say.num(c['total_cu'], 2)} CU {c.get('kind', '')}.".replace("  ", " "))
+        F["cost"] = _jig_cost(say, j["cost"])
     F["source"] = say(f"Nguồn: {src}; index story.jig.", f"Source: {src}; index story.jig.")
     opts: list[str] = []
     if weak and len(lv) > 1:
@@ -558,11 +611,11 @@ def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str,
     lines.append(_how(say, focus))
     lines.append(say("QUY TẮC: không gắn số của vòng tray-r1 (DA-34) cho vòng này; không viết 'tốt hơn' hay 'tăng' so với DA-34.",
                      "RULE: never give the numbers of round tray-r1 (DA-34) for this round; never write 'better' or 'up' against DA-34."))  # fmt: skip
-    rows = [{"run": run, "scope": say("cả task", "whole task"), "successes": f"{k}/{n}", "ci": say.ci(h.get("ci")), "reading": _verdict(say, lo, rules.get("whole_task", 0.8), "task")}]
+    rows = [{"run": run, "scope": say("cả task", "whole task"), "successes": f"{k}/{n}", "ci": say.ci(h.get("ci")), "reading": _verdict(say, _reading(ev, "whole_task"), rules.get("whole_task", 0.8), "task")}]
     for key in sorted(lv):
         x = lv[key] or {}
         rows.append({"run": run, "scope": say(f"mức {key}", f"level {key}"), "successes": f"{x.get('successes')}/{x.get('n')}", "ci": say.ci(x.get("ci")),
-                     "reading": _verdict(say, (x.get("ci") or [None])[0], rules.get("per_level", 0.7), "level")})  # fmt: skip
+                     "reading": _verdict(say, _reading(ev, "level", key), rules.get("per_level", 0.7), "level")})  # fmt: skip
     ui = table(say.name(rnd.get("title")), cols("run", "scope", "successes", "ci", "reading"), rows, link="#/eval")
     return result(ui, "\n".join(lines))
 
@@ -780,12 +833,20 @@ def _pair_round_id() -> str:
     return next((str(r["id"]) for r in _rounds() if "story.pair" in (r.get("index") or []) or "story.round" in (r.get("index") or [])), "")
 
 
-def _check_fields(c: dict[str, Any]) -> dict[str, Any]:
+def _loc(c: dict[str, Any], key: str, en: bool) -> Any:
+    """``c[key]``, or its English ``c[key + "_en"]`` (seed values the index session adds) when the
+    answer is in English; the Vietnamese value when the English one is missing."""
+    if en and c.get(f"{key}_en") not in (None, ""):
+        return c[f"{key}_en"]
+    return c.get(key)
+
+
+def _check_fields(c: dict[str, Any], en: bool = False) -> dict[str, Any]:
     """A step-4 check as {id, clusters, result, ticket, goes_to}. Accepts story.diag.step4 (``verdict``,
     PR #258, docs/console/api-contract.md §2.2) and the demo.diagnose shape (``value``)."""
     v: dict[str, Any] = c["value"] if isinstance(c.get("value"), dict) else {}
-    res = c.get("verdict", c.get("result", v.get("result")))
-    return {"id": c.get("id"), "clusters": c.get("clusters", v.get("clusters")), "result": res, "claim": c.get("claim"),
+    res = _loc(c, "verdict", en) if c.get("verdict") is not None else c.get("result", v.get("result"))
+    return {"id": c.get("id"), "clusters": c.get("clusters", v.get("clusters")), "result": res, "claim": _loc(c, "claim", en),
             "ticket": c.get("ticket", v.get("ticket")), "goes_to": c.get("goes_to", v.get("goes_to")), "source": _src(c.get("source"))}  # fmt: skip
 
 
@@ -793,14 +854,14 @@ def _src(v: Any) -> str:
     return ", ".join(str(x) for x in v) if isinstance(v, list) else str(v or "")
 
 
-def _cluster_fields(c: dict[str, Any], to_data: set[str]) -> dict[str, Any]:
+def _cluster_fields(c: dict[str, Any], to_data: set[str], en: bool = False) -> dict[str, Any]:
     """A failure group as {id, stage, label, level, n, diagnosis, takes, intervention}; accepts
     story.diag.clusters (``key``, ``n_fail``, ``gets_data``) and story.round.clusters."""
     k: dict[str, Any] = c["key"] if isinstance(c.get("key"), dict) else {}
     takes = c.get("gets_data", c.get("to_data"))
     return {"id": c.get("id"), "stage": c.get("stage", k.get("step")), "label": c.get("label", k.get("label")),
-            "level": c.get("level", k.get("level")), "n": c.get("n", c.get("n_fail")), "diagnosis": c.get("diagnosis"),
-            "takes": (c.get("id") in to_data) if takes is None else bool(takes), "intervention": c.get("intervention")}  # fmt: skip
+            "level": c.get("level", k.get("level")), "n": c.get("n", c.get("n_fail")), "diagnosis": _loc(c, "diagnosis", en),
+            "takes": (c.get("id") in to_data) if takes is None else bool(takes), "intervention": _loc(c, "intervention", en)}  # fmt: skip
 
 
 def _gen_qa(gq: Any) -> dict[str, Any] | None:
@@ -854,7 +915,7 @@ def round_diagnosis(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
             lines.append(say(f"Cụm lỗi của bản gốc ({len(clusters)} cụm):", f"Failure groups of the baseline ({len(clusters)} groups):"))
             # a cluster's ticket lives on the step-4 check that covers it (story.diag shape)
             ticket_of = {str(x): c["ticket"] for c in map(_check_fields, checks) if c.get("ticket") for x in (c["clusters"] if isinstance(c["clusters"], list) else [])}
-            for c in (_cluster_fields(x, to_data) for x in clusters):
+            for c in (_cluster_fields(x, to_data, not say.vi) for x in clusters):
                 takes = c["takes"]
                 if not takes and not c.get("intervention") and ticket_of.get(str(c.get("id"))):
                     c["intervention"] = say(f"phiếu {ticket_of[str(c.get('id'))]}", f"ticket {ticket_of[str(c.get('id'))]}")
@@ -867,7 +928,7 @@ def round_diagnosis(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
             lines.append(say("Index chưa có cụm lỗi của vòng này.", "The index has no failure groups for this round."))
         if checks:
             lines.append(say("Bước 4, kiểm hệ thống trước mọi dữ liệu:", "Step 4, system checks before any data:"))
-            for c in map(_check_fields, checks):
+            for c in (_check_fields(x, not say.vi) for x in checks):
                 cl_ = c["clusters"]
                 cl_t = ", ".join(cl_) if isinstance(cl_, list) else say("mọi cụm", "all groups") if cl_ == "all" else str(cl_ or "")
                 if c.get("claim"):

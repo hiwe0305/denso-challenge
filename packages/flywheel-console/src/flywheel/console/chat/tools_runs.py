@@ -6,12 +6,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from flywheel.console.index import hidden
 from flywheel.console.paths import active
 
 from .common import (
     Result,
     cols,
     fail,
+    hidden_runs,
     jload,
     jsonl,
     norm,
@@ -506,31 +508,92 @@ def _ledger_rows() -> list[dict[str, Any]]:
     return rows
 
 
+_LEDGER_KEYS = ("est_cu", "mea_cu", "est_usd", "mea_usd")
+OTHER = "other"  # index/hidden.py OTHER_STORY (PR #258): the merged row of hidden stories
+OTHER_VI = "Thí nghiệm khác (không trình bày)"
+OTHER_EN = "Other experiments (not presented)"
+
+
+def _story_ledger() -> list[dict[str, Any]] | None:
+    """``story.ledger`` as ``{story, label, est_cu, mea_cu, est_usd, mea_usd}`` rows (PR #258), the
+    rows of hidden stories (DA-50) merged into one ``story: "other"`` row by ``hidden.ledger``.
+
+    The older ``[story, est_usd, mea_usd]`` rows pass only through ``hidden.ledger``, which merges
+    the hidden stories of that shape too; without it (a console before PR #258) they cannot be
+    cleaned, so None: no per-story cost rather than a hidden story's id."""
+    st = story().get("ledger") or []
+    if not isinstance(st, list):
+        return []
+    merge = getattr(hidden, "ledger", None)
+    if merge is not None:
+        st = merge(st, hidden_runs())
+    out: list[dict[str, Any]] = []
+    for r in st:
+        if isinstance(r, dict) and r.get("story"):
+            out.append(r)
+        elif isinstance(r, list) and r:
+            if merge is None:
+                return None
+            est = r[1] if len(r) > 1 else None
+            mea = r[2] if len(r) > 2 else None
+            out.append({"story": r[0], "label": None, "est_cu": None, "mea_cu": None,
+                        "est_usd": est, "mea_usd": mea})  # fmt: skip
+    return out
+
+
 def ledger_query(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     g = str(args.get("group_by") or "story").lower()
     mk = str(args.get("measure_kind") or "").lower()
     since = str(args.get("since") or "")
     if g == "story":
-        st = story().get("ledger", [])
+        st = _story_ledger()
+        if st is None:
+            return fail(
+                "The index ledger is in the older [story, est_usd, mea_usd] shape, which this "
+                "console cannot clean of the stories that are not presented. Rebuild the index "
+                "(fw console index); no per-story cost is given until then."
+            )
+        en = str(ctx.get("lang") or "vi") == "en"
         rows: list[dict[str, Any]] = []
-        for name, est, meas in st:
-            if not (est or meas):
-                continue
-            if mk in ("", "estimated"):
-                rows.append({"story": name, "measure_kind": "estimated", "usd": est})
-            if mk in ("", "measured"):
-                rows.append({"story": name, "measure_kind": "measured", "usd": meas})
-        te = round(sum(r[1] for r in st), 2)
-        tm = round(sum(r[2] for r in st), 2)
+        tot = dict.fromkeys(_LEDGER_KEYS, 0.0)
+        for r in st:
+            if r.get("story") == OTHER:
+                name = OTHER_EN if en else str(r.get("label") or OTHER_VI)
+            else:
+                name = str(r.get("story"))
+            for lk in _LEDGER_KEYS:
+                v = r.get(lk)
+                if isinstance(v, (int, float)) and not isinstance(v, bool):
+                    tot[lk] += v
+            for kind, side in (("estimated", "est"), ("measured", "mea")):
+                cu, usd = r.get(f"{side}_cu"), r.get(f"{side}_usd")
+                if mk not in ("", kind) or (not cu and not usd):
+                    continue
+                rows.append({"story": name, "measure_kind": kind, "cu": cu, "usd": usd})
         ui = table(
-            "Ledger by story (USD)", cols("story", "measure_kind", "usd"), rows, link="#/jobs"
+            "Ledger by story (CU, USD)",
+            cols("story", "measure_kind", "cu", "usd"),
+            rows,
+            link="#/jobs",
         )
+        other = ""
+        if any(r.get("story") == OTHER for r in st):
+            other = (
+                f"'{OTHER_EN if en else OTHER_VI}' is one row for experiments that are not "
+                "presented: give it by that name only, never a story id or a run. "
+            )
+        head = (
+            "\nledger by story: CU first (USD beside it), estimated and measured are separate rows "
+            "and never added together. "
+        )
+        totals_txt = "total estimated={} CU ({} USD), total measured={} CU ({} USD).".format(
+            round(tot["est_cu"], 2), round(tot["est_usd"], 2),
+            round(tot["mea_cu"], 2), round(tot["mea_usd"], 2),
+        )  # fmt: skip
         return result(
             ui,
-            LEDGER_SCOPE
-            + "\nledger by story, estimate and measured are separate rows. total estimated={} USD, total measured={} USD.\n{}".format(  # noqa: E501
-                te, tm, rows_text(rows, ["story", "measure_kind", "usd"], 24)
-            ),
+            LEDGER_SCOPE + head + other + totals_txt + "\n"
+            + rows_text(rows, ["story", "measure_kind", "cu", "usd"], 40),
         )
     led = _ledger_rows()
     if since:
