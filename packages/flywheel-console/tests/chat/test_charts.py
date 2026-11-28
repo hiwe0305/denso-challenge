@@ -140,3 +140,10 @@ def test_the_web_draws_chart_blocks_by_the_same_rules() -> None:
     fn = js.split("export function renderChartSpec")[1].split("\nexport function ")[0]
     assert "JSON.stringify" not in fn and "innerHTML" not in fn and "chartTable(parsed.obj)" in fn
     assert 'if (lang === "chart")' in js and "!closed && isStreaming" in js
+
+
+def test_a_near_miss_threshold_is_a_value_the_check_can_read() -> None:
+    src = (Path(llm.__file__).parent / "tools_round.py").read_text(encoding="utf-8")
+    assert 'within_cm=say.num(t), rollouts=v) for t, v in more]' in src and 'f"within_{say.num(t)}_cm"' not in src
+    row = "NEAR_MISS | run=M | standard_cm=5,0 | n=180 | within_cm=7,5 | rollouts=145"
+    assert all(n["grounded"] for n in llm.ground("145/180 lượt nằm trong 7,5 cm, dung sai 5,0 cm", [row]))
