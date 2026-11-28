@@ -813,7 +813,9 @@ def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str,
     tol = next((t for t in sorted(rel, key=float) if rel[t] == k), None)
     more = [(t, v) for t, v in sorted(rel.items(), key=lambda kv: float(kv[0])) if tol and float(t) > float(tol)][:2]
     if tol and more:
-        F["near"] = [_row("NEAR_MISS", run=run, standard_cm=say.num(tol), n=n, **{f"within_{say.num(t)}_cm": v for t, v in more})]
+        # one row per wider threshold, the threshold as a value: a number inside a key name
+        # ("within_7,5_cm") is not evidence the answer's numbers can be checked against
+        F["near"] = [_row("NEAR_MISS", run=run, standard_cm=say.num(tol), n=n, within_cm=say.num(t), rollouts=v) for t, v in more]
     reps = [r for r in out_m.get("repeats") or [] if r.get("n")]
     if reps:
         F["repeats"] = [_row("REPEATS", run=run, n_each=reps[0].get("n"), successes=", ".join(str(r.get("successes")) for r in reps))]
