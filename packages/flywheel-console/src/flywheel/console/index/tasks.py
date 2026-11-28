@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from flywheel.console.index import catalog, cited, hidden
+from flywheel.console.index import catalog, cited, hidden, timeline
 from flywheel.console.paths import ConsolePaths
 
 FILE = "tasks.yaml"
@@ -304,6 +304,10 @@ def _task(t: Any, i: int) -> Task:
         raise ManifestError(f"{where}.stages: duplicate stage id in {ids}")
     _text(t, "success", where)
     _process(_need(t, "process", where, dict), f"{where}.process")
+    rounds = tuple(_need(t, "rounds", where, list))
+    default = t.get("default_round")
+    if default is not None and default not in rounds:
+        raise ManifestError(f"{where}.default_round: '{default}' is not one of its rounds")
     for j, e in enumerate(_need(t, "evals", where, list)):
         _need(e, "id", f"{where}.evals[{j}]")
         _need(e, "fw", f"{where}.evals[{j}]")
@@ -312,7 +316,7 @@ def _task(t: Any, i: int) -> Task:
         id=tid,
         catalog_task=t["catalog_task"],
         stages=stages,
-        rounds=tuple(_need(t, "rounds", where, list)),
+        rounds=rounds,
         index=tuple(_need(t, "index", where, list)),
         teleop_zip=t.get("teleop_zip"),
         raw=t,
@@ -507,6 +511,42 @@ def _clusters(paths: ConsolePaths, spec: Any) -> dict[str, Any]:
     }
 
 
+def _link(m: Manifest, here: Round, there: Round, story: dict[str, Any],
+          shown: dict[str, dict[str, Any]]) -> dict[str, Any]:  # fmt: skip
+    """The neighbour round ``there`` seen from ``here``: its baseline and presented result."""
+    res = shown.get(there.id) or {}
+    link: dict[str, Any] = {
+        "round": there.id,
+        "run": res.get("run", there.baseline),
+        "successes": res.get("successes"),
+        "n": res.get("n"),
+        "scene_differs": here.scene != there.scene,
+        "scorer_differs": here.scorer_version != there.scorer_version,
+    }
+    ladder = (story.get("demo") or {}).get("ladder") or {}
+    row = (ladder.get("runs") or {}).get(link["run"]) if m.story_round() is there else None
+    if isinstance(row, dict):  # round 1's baseline: reached table B, and placed (= success)
+        link["carried"] = row.get("on_table_b")
+        link["placed"] = row.get("success")
+    return link
+
+
+def _links(m: Manifest, story: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """``rounds[].links = {prev, next}`` along each task's round order (time order); the
+    numbers come from ``story.json`` in the same index (``timeline.presented``), never the
+    seed."""
+    shown = timeline.presented(m, story.get("pair") or {}, story.get("jig") or {})
+    out: dict[str, dict[str, Any]] = {}
+    for t in m.tasks:
+        order = [m.round(rid) for rid in t.rounds]
+        for i, r in enumerate(order):
+            out[r.id] = {
+                "prev": _link(m, r, order[i - 1], story, shown) if i > 0 else None,
+                "next": _link(m, r, order[i + 1], story, shown) if i + 1 < len(order) else None,
+            }
+    return out
+
+
 def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
     """Write ``out/tasks.json`` (manifest + resolved task facts); return counts."""
     m = load(paths)
@@ -524,11 +564,13 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         raw["evals"] = _evals(paths.fw_root, list(raw.get("evals") or []))
         raw["clusters"] = _clusters(paths, raw.get("clusters"))
         tasks.append(raw)
+    links = _links(m, _dict(out / "story.json"))
     rounds = []
     for r in m.rounds:
         raw = dict(r.raw)
         pairs = zip(r.raw["runs"], r.runs, strict=True)
         raw["runs"] = [{**x, "role": run.role} for x, run in pairs]
+        raw["links"] = links.get(r.id, {"prev": None, "next": None})
         rounds.append(raw)
     # a run in withhold_runs never reaches the browser (hidden.tasks_doc)
     doc = hidden.tasks_doc(

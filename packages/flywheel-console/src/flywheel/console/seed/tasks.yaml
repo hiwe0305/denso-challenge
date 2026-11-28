@@ -35,13 +35,16 @@ tasks:
       vi: khay trong ô đích trên bàn B, lệch tối đa target_pos_tol và target_yaw_tol_deg
       en: tray inside the target zone on table B, within target_pos_tol and target_yaw_tol_deg
       source: configs/eval/scorer/tray.yaml thresholds (giả định, chưa hiệu chỉnh)
-    # the pages open on the first round: tray-r1, then tray-jig-r1 (decision Q2 of Hiếu,
-    # 28/11/2026, audit 00 · Tổng hợp; was newest first under story DA-53)
+    # rounds in time order (tray-r1, then tray-jig-r1); the pages open on default_round,
+    # the round of the latest presented result, run M (decision of Hiếu, 28/11/2026 evening,
+    # audit 05 · Đánh giá chat mục 6; replaces Q2 of the same morning, which opened tray-r1)
     rounds: [tray-r1, tray-jig-r1]
+    default_round: tray-jig-r1
     # story.json keys that belong to this task (besides the keys of its rounds)
     index: [story.sources, story.heat, story.reasons, story.qa_sample, story.h1m, story.ledger,
             story.colab_balance, story.colab_sessions, story.ds, story.loop_chain,
-            story.loop_detail]
+            story.loop_detail, story.timeline, story.latest, story.next_steps,
+            story.failure_table]
     evals: []
     clusters: []
     process:
@@ -215,6 +218,7 @@ rounds:
     rollouts: c70r1-rollouts.jsonl   # per-trial rows of the round's model (in eval_dir)
     log_run: C_70                    # whose VM log tail the training page shows
     rule_tag: r                      # stage1-<tag>-<variant>-vs-<baseline>.json of the round's rule
+    scorer_version: 1                # scored before DA-42's version 2 (docs/g0/tray/scorer-v2.md §1)
     runs:                            # display order (grid, ladder, tables)
       - {id: C_ALL, train_set: ALL, session: c-all}
       - {id: C_70, train_set: S70, session: c-70}
