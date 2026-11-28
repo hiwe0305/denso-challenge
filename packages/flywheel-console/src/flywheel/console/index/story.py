@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import csv
 import json
-import math
 import re
 import statistics
 from collections import Counter, defaultdict
@@ -15,7 +14,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from flywheel.console.index import cited, demo, tasks
+from flywheel.console.index import cited, demo, jig, tasks
 from flywheel.console.paths import ConsolePaths
 
 _SERIES_CAP = 400
@@ -88,17 +87,6 @@ def _stat_max_plus_one(stats_doc: dict[str, Any], key: str) -> int | None:
     if isinstance(mx, (int, float)):
         return int(mx) + 1
     return None
-
-
-def _wilson_ci(succ: int, n: int, z: float = 1.959964) -> list[float]:
-    if n <= 0:
-        return [0.0, 0.0]
-    p = succ / n
-    z2 = z * z
-    denom = 1.0 + z2 / n
-    center = (p + z2 / (2.0 * n)) / denom
-    half = (z / denom) * math.sqrt((p * (1.0 - p) / n) + (z2 / (4.0 * n * n)))
-    return [round(max(0.0, center - half), 4), round(min(1.0, center + half), 4)]
 
 
 def _phase_seconds(report: dict[str, Any]) -> dict[str, float]:
@@ -222,8 +210,9 @@ def round_runs(fw: Path, rnd: tasks.Round) -> tuple[list[dict[str, Any]], list[P
 
     Same entry as ``_parse_metrics_dir`` with ``branch`` = the run id of the manifest (``M``,
     not the folder name ``jig-m``), plus ``scene`` (the round's) and what ``<job>/fetched.json``
-    says about the local copy: ``fetched_final`` (its ``final``) and ``fetched_step`` (its
-    ``progress.step``), both None without the file. A run whose ``metrics.jsonl`` is absent or
+    says about the local copy: ``fetched_final`` (its ``final``), ``fetched_train`` (the VM's
+    training state when it was pulled, e.g. "done" or "running") and ``fetched_step`` (its
+    ``progress.step``), all None without the file. A run whose ``metrics.jsonl`` is absent or
     empty is left out. Runs come in manifest order.
     """
     runs: list[dict[str, Any]] = []
@@ -239,9 +228,10 @@ def round_runs(fw: Path, rnd: tasks.Round) -> tuple[list[dict[str, Any]], list[P
         fetched = _dict(job / "fetched.json")
         progress = fetched.get("progress")
         step = progress.get("step") if isinstance(progress, dict) else None
-        final = fetched.get("final")
+        final, train = fetched.get("final"), fetched.get("train")
         entry["scene"] = rnd.scene
         entry["fetched_final"] = final if isinstance(final, bool) else None
+        entry["fetched_train"] = train if isinstance(train, str) else None
         whole = isinstance(step, int) and not isinstance(step, bool)
         entry["fetched_step"] = step if whole else None
         runs.append(entry)
@@ -456,316 +446,6 @@ def _follow(fw: Path, eval_dir: str, case: tuple[int, int] | None) -> dict[str, 
     }
 
 
-def _live_eval_watchers(fw: Path) -> list[dict[str, Any]]:
-    watchers: list[dict[str, Any]] = []
-    for wlog in sorted(fw.glob("colab/*eval*/watch.log")):
-        try:
-            text = wlog.read_text(errors="replace")
-            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-        except OSError:
-            continue
-        if not lines:
-            continue
-        last = lines[-1]
-        m = re.search(r"lanes=(\d+)\s+complete=(\d+)\s+rows=(\d+)", last)
-        serve_jsons = list(wlog.parent.glob("*serve*.json"))
-        sdoc = _dict(serve_jsons[0]) if serve_jsons else {}
-        watchers.append(
-            {
-                "folder": wlog.parent.name,
-                "session": sdoc.get("name") or wlog.parent.name,
-                "state": sdoc.get("state") or "running",
-                "gpu": sdoc.get("gpu") or "L4",
-                "lanes": int(m.group(1)) if m else None,
-                "complete": int(m.group(2)) if m else None,
-                "rows": int(m.group(3)) if m else None,
-            }
-        )
-    return watchers
-
-
-def _agentqa_assemblies(fw: Path) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
-    for af in sorted(fw.glob("agentqa/cases/jig-*/assembly.json")):
-        asm = _dict(af)
-        run_doc = _dict(af.parent / "run.json")
-        if not asm:
-            continue
-        clusters_out: list[dict[str, Any]] = []
-        for item in asm.get("clusters") or []:
-            if not isinstance(item, dict):
-                continue
-            cl = item.get("cluster") or {}
-            hyps = [h for h in (item.get("hypotheses") or []) if isinstance(h, dict)]
-            top = hyps[0] if hyps else {}
-            clusters_out.append(
-                {
-                    "cluster_id": cl.get("cluster_id"),
-                    "run": cl.get("run"),
-                    "step": cl.get("step"),
-                    "label": cl.get("label"),
-                    "level": cl.get("level"),
-                    "size": cl.get("size"),
-                    "hypothesis_id": top.get("hypothesis_id"),
-                    "rule_id": top.get("rule_id"),
-                    "title": top.get("title"),
-                    "diagnosis": top.get("diagnosis"),
-                    "group": top.get("group"),
-                    "support_count": len(top.get("support") or []),
-                }
-            )
-        not_judged = [
-            {"what": nj.get("what"), "reason": nj.get("reason")}
-            for nj in (asm.get("not_judged") or [])
-            if isinstance(nj, dict) and nj.get("fact_id")
-        ]
-        out.append(
-            {
-                "case_id": af.parent.name,
-                "run_id": asm.get("run_id") or run_doc.get("run_id"),
-                "status": asm.get("status") or run_doc.get("status"),
-                "started_at": run_doc.get("started_at"),
-                "source": f"fwdata/{af.relative_to(fw)}",
-                "clusters": clusters_out,
-                "not_judged": not_judged[:8],
-            }
-        )
-    out.sort(
-        key=lambda x: (1 if x.get("status") == "complete" else 0, str(x.get("started_at") or ""))
-    )
-    return out
-
-
-def _jig(fw: Path, step_ids: tuple[str, ...], sessions: list[dict[str, Any]]) -> dict[str, Any]:
-    """Latest jig2 training/eval outcomes, rollout physics, and next-round status under fwdata."""
-    eval_runs: list[dict[str, Any]] = []
-    all_rollouts: list[dict[str, Any]] = []
-    all_conditions: list[dict[str, Any]] = []
-
-    for sf in sorted(fw.glob("tray/outcomes/jig-*/scores.jsonl")):
-        srows = _jl(sf)
-        if not srows:
-            continue
-        orows = _jl(sf.parent / "outcomes.jsonl")
-        n = len(srows)
-        succ = sum(1 for r in srows if r.get("success") is True)
-        ep0 = str(srows[0].get("episode_id") or "")
-        run_id = ep0.split("/", 1)[0] if "/" in ep0 else sf.parent.name
-        by_lvl: dict[str, dict[str, Any]] = {}
-        lvl_step_hits: dict[str, list[int]] = {}
-        fails: Counter[str] = Counter()
-        lvl_fails: dict[str, Counter[str]] = defaultdict(Counter)
-        step_hits: list[int] = [0] * len(step_ids)
-        scorer_ver = str(srows[0].get("scorer_version") or "")
-        cond_groups: dict[tuple[int, int], list[dict[str, Any]]] = defaultdict(list)
-        relaxed_thresholds = (5.0, 7.5, 10.0, 15.0, 20.0)
-        relaxed_hits = {str(t): 0 for t in relaxed_thresholds}
-        reach_b_count = 0
-
-        for idx_row, sr in enumerate(srows):
-            orr = orows[idx_row] if idx_row < len(orows) else {}
-            lv_int = int(sr.get("level") or orr.get("level") or 0)
-            lv = str(lv_int or "?")
-            seed_val = int(orr.get("seed") or 0)
-            raw_rep = orr.get("repeat")
-            rep_val = int(raw_rep) if isinstance(raw_rep, (int, float, str)) else (idx_row % 3)
-            is_ok = sr.get("success") is True
-            fk = (
-                None if is_ok else str(sr.get("failure_kind") or sr.get("failure_class") or "OTHER")
-            )
-
-            slot = by_lvl.setdefault(lv, {"n": 0, "successes": 0})
-            slot["n"] += 1
-            if is_ok:
-                slot["successes"] += 1
-            elif fk:
-                fails[fk] += 1
-                lvl_fails[lv][fk] += 1
-
-            st_list = sr.get("step_status")
-            l_hits = lvl_step_hits.setdefault(lv, [0] * len(step_ids))
-            passed_bools: list[bool] = []
-            if isinstance(st_list, list):
-                for s_idx in range(min(len(step_ids), len(st_list))):
-                    ok_s = st_list[s_idx] == "pass"
-                    passed_bools.append(ok_s)
-                    if ok_s:
-                        step_hits[s_idx] += 1
-                        l_hits[s_idx] += 1
-
-            reach_b_idx = step_ids.index("reach_b") if "reach_b" in step_ids else 4
-            reached_b = reach_b_idx < len(passed_bools) and passed_bools[reach_b_idx]
-            if reached_b:
-                reach_b_count += 1
-
-            raw_fin = orr.get("final")
-            fin: dict[str, Any] = raw_fin if isinstance(raw_fin, dict) else {}
-            dist_m = fin.get("place_distance_m")
-            yaw_d = fin.get("place_yaw_error_deg")
-            tpos = fin.get("tray_pos_m")
-            dist_cm = round(float(dist_m) * 100.0, 2) if isinstance(dist_m, (int, float)) else None
-            yaw_deg = round(float(yaw_d), 2) if isinstance(yaw_d, (int, float)) else None
-            tray_z = (
-                round(float(tpos[2]), 4)
-                if isinstance(tpos, list) and len(tpos) >= 3 and isinstance(tpos[2], (int, float))
-                else None
-            )
-
-            if is_ok:
-                for thr in relaxed_thresholds:
-                    relaxed_hits[str(thr)] += 1
-            elif (
-                fk == "L-PLACE-POSE"
-                and reached_b
-                and dist_cm is not None
-                and yaw_deg is not None
-                and yaw_deg <= 10.0
-            ):
-                for thr in relaxed_thresholds:
-                    if dist_cm <= thr:
-                        relaxed_hits[str(thr)] += 1
-
-            raw_verdict = orr.get("verdict")
-            verdict_doc: dict[str, Any] = raw_verdict if isinstance(raw_verdict, dict) else {}
-            raw_latch = verdict_doc.get("step_latch_t")
-            latch_t = (
-                [round(float(x), 2) if isinstance(x, (int, float)) else None for x in raw_latch]
-                if isinstance(raw_latch, list)
-                else []
-            )
-            sim_s = (
-                round(float(orr["sim_time_s"]), 2)
-                if isinstance(orr.get("sim_time_s"), (int, float))
-                else None
-            )
-
-            rec = {
-                "i": idx_row,
-                "ep": str(sr.get("episode_id") or f"{run_id}/{idx_row}"),
-                "run": run_id,
-                "level": lv_int,
-                "seed": seed_val,
-                "repeat": rep_val,
-                "success": is_ok,
-                "failure": fk,
-                "sim_s": sim_s,
-                "dist_cm": dist_cm,
-                "yaw_deg": yaw_deg,
-                "tray_z": tray_z,
-                "steps": passed_bools,
-                "latch_t": latch_t,
-            }
-            all_rollouts.append(rec)
-            if seed_val:
-                cond_groups[(lv_int, seed_val)].append(rec)
-
-        for lv, slot in by_lvl.items():
-            ln = int(slot["n"])
-            lsucc = int(slot["successes"])
-            slot["p"] = round(lsucc / ln, 4) if ln else 0.0
-            slot["wilson"] = _wilson_ci(lsucc, ln)
-            slot["failures"] = dict(lvl_fails[lv].most_common())
-
-        repeat_dist: dict[str, list[int]] = {}
-        for (lv_int, seed_val), items in sorted(cond_groups.items()):
-            k_ok = sum(1 for x in items if x["success"])
-            bucket = repeat_dist.setdefault(str(lv_int), [0, 0, 0, 0])
-            if 0 <= k_ok <= 3:
-                bucket[3 - k_ok] += 1
-            dists = [x["dist_cm"] for x in items if x["dist_cm"] is not None]
-            yaws = [x["yaw_deg"] for x in items if x["yaw_deg"] is not None]
-            fail_c = Counter(x["failure"] for x in items if x["failure"])
-            all_conditions.append(
-                {
-                    "run": run_id,
-                    "level": lv_int,
-                    "seed": seed_val,
-                    "pass_k": k_ok,
-                    "n_rep": len(items),
-                    "dist_cm_mean": round(sum(dists) / len(dists), 2) if dists else None,
-                    "yaw_deg_mean": round(sum(yaws) / len(yaws), 2) if yaws else None,
-                    "top_failure": fail_c.most_common(1)[0][0] if fail_c else None,
-                    "trials": [
-                        {
-                            "repeat": x["repeat"],
-                            "success": x["success"],
-                            "dist_cm": x["dist_cm"],
-                            "yaw_deg": x["yaw_deg"],
-                            "sim_s": x["sim_s"],
-                            "failure": x["failure"],
-                        }
-                        for x in sorted(items, key=lambda z: z["repeat"])
-                    ],
-                }
-            )
-
-        step_pass = {step_ids[idx]: round(step_hits[idx] / n, 4) for idx in range(len(step_ids))}
-        levels_step_pass = {
-            lv: {
-                step_ids[idx]: round(l_hits[idx] / max(1, int(by_lvl[lv]["n"])), 4)
-                for idx in range(len(step_ids))
-            }
-            for lv, l_hits in sorted(lvl_step_hits.items())
-        }
-        eval_runs.append(
-            {
-                "run": run_id,
-                "eval_id": sf.parent.name,
-                "source": f"fwdata/{sf.relative_to(fw)}",
-                "scorer_version": scorer_ver,
-                "n": n,
-                "successes": succ,
-                "p": round(succ / n, 4),
-                "wilson": _wilson_ci(succ, n),
-                "levels": dict(sorted(by_lvl.items())),
-                "step_pass": step_pass,
-                "levels_step_pass": levels_step_pass,
-                "repeat_dist": repeat_dist,
-                "reach_b": reach_b_count,
-                "relaxed": relaxed_hits,
-                "failures": dict(fails.most_common()),
-            }
-        )
-
-    m_cut = _dict(fw / "da48" / "cuts" / "M.tar.json")
-    n_cut = _dict(fw / "tray" / "jig-n" / "N.tar.json")
-    n_exp = _dict(fw / "tray" / "jig-n" / "da50-ft-n-s0" / "expected-100000.json")
-    live_evals = _live_eval_watchers(fw)
-    assemblies = _agentqa_assemblies(fw)
-    active_colab = [s for s in sessions if s.get("state") == "running"]
-    if not eval_runs and not m_cut and not n_cut and not live_evals and not assemblies:
-        return {}
-    best = max(eval_runs, key=lambda r: _num(r.get("successes"))) if eval_runs else None
-    return {
-        "scene": "jig2",
-        "steps": list(step_ids),
-        "runs": eval_runs,
-        "best": best["run"] if best else None,
-        "rollouts": all_rollouts,
-        "conditions": all_conditions,
-        "live_evals": live_evals,
-        "agentqa": assemblies,
-        "n_ckpt_done": int(n_exp["ckpt_step"]) if isinstance(n_exp.get("ckpt_step"), int) else None,
-        "m_cut": {
-            "name": m_cut.get("name"),
-            "files": m_cut.get("files"),
-            "bytes": m_cut.get("bytes"),
-            "source": "fwdata/da48/cuts/M.tar.json",
-        }
-        if m_cut
-        else None,
-        "next_cut": {
-            "name": n_cut.get("name"),
-            "files": n_cut.get("files"),
-            "bytes": n_cut.get("bytes"),
-            "source": "fwdata/tray/jig-n/N.tar.json",
-        }
-        if n_cut
-        else None,
-        "active_sessions": active_colab,
-    }
-
-
 def _catalog(out: Path) -> dict[str, Any]:
     doc = _dict(out / "catalog.json")
     return doc or {"generated": "", "rows": [], "edges": [], "runs": []}
@@ -805,7 +485,13 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         demo_cited = {}
     eval_dir = rnd.eval_dir if rnd else None  # a story.pair round always names it (tasks.py)
     pair = _pair(fw, eval_dir, rnd.run_ids) if rnd and eval_dir else {}
-    jig = _jig(fw, tray_steps, sessions)
+    jrnd = manifest.jig_round()
+    if jrnd is not None:
+        jruns, jdirs = round_runs(fw, jrnd)
+        jtail, jphases = _train_log(jdirs, jrnd.log_run, [r["branch"] for r in jruns])
+    else:
+        jruns, jtail, jphases = [], [], {}
+    jig_block = jig.build(fw, jrnd, jruns, jtail, jphases, tray_steps, sessions)
     h1m = _h1m(fw)
     data: dict[str, Any] = {
         "runs": runs,
@@ -824,7 +510,7 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         "round": round_cited,
         "follow": _follow(fw, eval_dir, rnd.follow) if rnd and eval_dir else {},
         "demo": demo.build(fw, pair, round_cited, h1m, demo_cited, rnd),
-        "jig": jig,
+        "jig": jig_block,
     }
     out.mkdir(parents=True, exist_ok=True)
     (out / "story.json").write_text(
