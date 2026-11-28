@@ -187,3 +187,63 @@ def test_lock_mode_hides_no_navigation_shell() -> None:
     )
     for sel in forbidden:
         assert sel not in css, sel
+
+
+def _code(name: str) -> str:
+    """A web module without its comments."""
+    text = re.sub(r"/\*.*?\*/", "", (WEB / name).read_text(encoding="utf-8"), flags=re.S)
+    return "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("//"))
+
+
+def _function(name: str, fn: str) -> str:
+    """The source of ``export function fn`` in a web module, up to the next top-level function."""
+    text = _code(name)
+    start = text.index(f"function {fn}(")
+    nxt = re.search(r"\n(?:export )?function \w+\(", text[start + 1 :])
+    return text[start : start + 1 + nxt.start()] if nxt else text[start:]
+
+
+def test_jig_pages_have_no_threshold_literals() -> None:
+    """DA-53 2.4: the rule thresholds come from story.jig readings (seed/tasks.yaml), not JS."""
+    lit = re.compile(r"(?<![\w.])0\.[578](?!\d)")
+    for name in ("pages_story.js", "pages_ops.js", "core.js"):
+        hits = lit.findall(_code(name))
+        assert not hits, f"{name}: threshold literals {hits}"
+
+
+def test_train_page_reads_jig_runs_when_story_runs_is_out_of_scope() -> None:
+    src = _function("pages_story.js", "renderRunsPage")
+    assert 'hasIndexAccess("story.runs")' in src and 'hasIndexAccess("story.jig")' in src
+    assert "const src = topScope ? story : jigDoc;" in src
+    for key in ("src.runs", "src.train_log_tail", "src.vm_phases", "jigDoc.log_run"):
+        assert key in src, key
+    # the old campaign chips and the jig banner are gone
+    assert "campFilter" not in src and "runsJigBanner" not in src
+    assert 'fetched_final === false && matched.fetched_train !== "done"' in src
+
+
+def test_eval_page_renders_readings_from_the_jig_block() -> None:
+    src = _function("pages_story.js", "renderEvalPage")
+    assert "jig.evals" in src and "ev.readings" in src and "jig.outcomes" in src
+    for code in ('rd.verdict === "met"', 'rd.verdict === "not_met"', 'rd.why === "blocked"'):
+        assert code in src, code
+    assert 'status === "missing"' in src and "ev.command" in src
+    assert "jig.runs" not in src  # train entries, never eval rows
+    assert "paired" not in src
+
+
+def test_no_old_jig_keys_or_hidden_run_text_in_web() -> None:
+    """``jig.best`` and eval rows in ``jig.runs`` are gone (DA-53); run N is never presented."""
+    files = sorted(WEB.glob("*.js")) + sorted((WEB / "i18n").glob("*.js"))
+    for f in files:
+        text = f.read_text(encoding="utf-8")
+        assert not re.search(r"\bjig\w*\.best\b", text), f.name
+        for needle in ("N.tar", "run N", "da50", "jig-n", "next_cut", "n_ckpt_done"):
+            assert needle not in text, (f.name, needle)
+
+
+def test_withhold_filter_covers_the_jig_block() -> None:
+    src = _function("core.js", "filterWithheldStory")
+    assert "out.jig" in src
+    for key in ("evals", "outcomes", "rollouts", "conditions", "compare60", "featured"):
+        assert f"out.jig.{key}" in src or f"nextJig.{key}" in src, key

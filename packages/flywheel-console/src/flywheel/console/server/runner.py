@@ -1780,29 +1780,20 @@ def _eval_loop_text() -> tuple[str, str]:
         return "", ""
     frac = "{}/{}".format
     ev = "Tốt nhất {} {}".format(best["run"], frac(best.get("successes"), best.get("n")))
+    # the jig round's featured run (story.jig of index/jig.py): its results.json headline, only
+    # when the eval is "ready"; nothing about a run that is hidden or not yet evaluated
     jig = doc.get("jig")
     jig_dict: dict[str, Any] = jig if isinstance(jig, dict) else {}
-    jig_runs = jig_dict.get("runs")
-    jig_best_id = jig_dict.get("best")
-    jbest = (
-        next(
-            (r for r in jig_runs if isinstance(r, dict) and r.get("run") == jig_best_id),
-            None,
-        )
-        if isinstance(jig_runs, list)
-        else None
-    )
+    feat = jig_dict.get("featured")
+    jev = next(
+        (e for e in jig_dict.get("evals") or []
+         if isinstance(e, dict) and e.get("run") == feat and e.get("status") == "ready"),
+        None,
+    )  # fmt: skip
+    jhead = jev.get("headline") if jev else None
     jig_ev_suffix = (
-        " · Cảnh jig2: {} {}".format(
-            jbest["run"], frac(jbest.get("successes"), jbest.get("n"))
-        )
-        if isinstance(jbest, dict) and jbest.get("run") not in held
-        else ""
-    )
-    next_cut = jig_dict.get("next_cut")
-    jig_lp_suffix = (
-        f" · Cảnh jig2: đã đóng tập {next_cut['name']}.tar"
-        if isinstance(next_cut, dict) and next_cut.get("name")
+        " · Cảnh jig2: {} {}".format(feat, frac(jhead.get("successes"), jhead.get("n")))
+        if isinstance(jhead, dict) and feat not in held
         else ""
     )
     rnd = next((r for name, r in runs.items() if re.search(r"_R\d+$", name or "")), None)
@@ -1811,9 +1802,9 @@ def _eval_loop_text() -> tuple[str, str]:
         if held and sel:  # the round ran; its retest is not presented, which is not "waiting"
             return (
                 ev + jig_ev_suffix,
-                f"Đã chọn {sel} tập nhắm lỗi · kết quả thi lại không trình bày" + jig_lp_suffix,
+                f"Đã chọn {sel} tập nhắm lỗi · kết quả thi lại không trình bày",
             )
-        return ev + jig_ev_suffix, jig_lp_suffix.removeprefix(" · ")
+        return ev + jig_ev_suffix, ""
     ev += " · vòng {} {}".format(rnd["run"], frac(rnd.get("successes"), rnd.get("n")))
     ev += jig_ev_suffix
     outs = [
@@ -1821,7 +1812,7 @@ def _eval_loop_text() -> tuple[str, str]:
     ]
     chain = (doc.get("round") or {}).get("chain") or {}
     if not outs or not chain:
-        return ev, jig_lp_suffix.removeprefix(" · ")
+        return ev, ""
     stop = all(o == "F" for o in outs)
     lp = "Vòng {}: chọn {} tập → {} → {}".format(
         rnd["run"],
@@ -1829,7 +1820,7 @@ def _eval_loop_text() -> tuple[str, str]:
         frac(rnd.get("successes"), rnd.get("n")),
         "dừng (F)" if stop else "tiếp (" + ", ".join(sorted({str(o) for o in outs})) + ")",
     )
-    return ev, lp + jig_lp_suffix
+    return ev, lp
 
 
 def status() -> dict[str, Any]:
