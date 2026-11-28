@@ -42,12 +42,8 @@ export const state = {
   lang: typeof window !== "undefined" ? readPref("fw_lang", ["vi", "en"], "vi") : "vi",
   theme: typeof window !== "undefined" ? readPref("fw_theme", ["light", "dark"], "light") : "light",
   chatExplicit: explicitChatPref !== null,
-  chatOpen:
-    explicitChatPref !== null
-      ? explicitChatPref
-      : typeof window !== "undefined"
-        ? window.innerWidth >= 1220
-        : false,
+  // Closed until the reader opens it (decision Q3 / design P0-8, 28/11/2026).
+  chatOpen: explicitChatPref !== null ? explicitChatPref : false,
   dataViewMode:
     typeof window !== "undefined" ? readPref("fw_data_view", ["list", "gallery"], "gallery") : "gallery",
   // Default to locked until /api/status confirms otherwise (ui-spec §2).
@@ -893,7 +889,9 @@ export function scopeSimForTask(rawSim) {
   const tid = state.taskId;
   const teleop = (sim.teleop || []).filter((e) => !tid || e.task === tid);
   if (hasIndexAccess("sim")) {
-    return { ...sim, teleop };
+    // Both rounds list "sim"; sim.rounds[round] holds the round's own cut (index contract 28/11).
+    const own = sim.rounds && state.roundId ? sim.rounds[state.roundId] : null;
+    return { ...sim, ...(own && typeof own === "object" ? own : {}), teleop };
   }
   return {
     source: null,

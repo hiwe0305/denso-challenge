@@ -55,10 +55,13 @@ def test_clean_inline_markdown_function_and_quote_usage() -> None:
     )
 
 
-def test_chat_defaults_closed_below_desktop_and_deduplicates_requests() -> None:
+def test_chat_defaults_closed_and_deduplicates_requests() -> None:
     core = (WEB / "core.js").read_text(encoding="utf-8")
+    app = (WEB / "app.js").read_text(encoding="utf-8")
     chat = (WEB / "chat.js").read_text(encoding="utf-8")
-    assert "window.innerWidth >= 1220" in core
+    # Q3 / design P0-8 (28/11/2026): closed until the reader opens it, never auto-opened.
+    assert "chatOpen: explicitChatPref !== null ? explicitChatPref : false," in core
+    assert "window.innerWidth >= 1220" not in core + app
     assert "export async function ensureModels(" in core
     assert "if (!state.chatOpen) return;" in chat
     assert "toolsCache.has(" in chat

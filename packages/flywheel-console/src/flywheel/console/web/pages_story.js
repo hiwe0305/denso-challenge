@@ -2617,35 +2617,40 @@ function costLineLabel(id) {
   return hasI18nKey(key) ? t(key) : String(id ?? "");
 }
 
-// Measured cost of the jig round when the index carries it (story.jig.cost).
+// Cost of the jig round when the index carries it: story.jig.cost = {train: {cu, usd,
+// measure_kind, story, source}, eval: {...}, source_doc}.
 function renderJigCostCard(jigCost) {
   if (!jigCost || typeof jigCost !== "object") return null;
   const parts = Object.entries(jigCost).filter(([, v]) => v && typeof v === "object");
   if (!parts.length) return null;
+  const fmtCu = (v) => (Number.isFinite(v) ? `${formatNumber(v, { maximumFractionDigits: 2 })} CU` : "—");
   return el("section", { className: "card" }, [
     el("h2", { text: t("cost.jigTitle") }),
     el(
       "div",
       { className: "row-list" },
-      parts.map(([part, v]) =>
-        el("div", { className: "row" }, [
+      parts.map(([part, v]) => {
+        const kind = v.measure_kind || v.kind;
+        return el("div", { className: "row" }, [
           el("div", { className: "row-body" }, [
-            el("b", {
-              text: `${costLineLabel("jig_" + part)}: ${
-                v.cu != null ? formatNumber(v.cu, { maximumFractionDigits: 2 }) + " CU" : "—"
-              }`,
-            }),
+            el("b", { text: `${costLineLabel("jig_" + part)}: ${fmtCu(v.cu)}` }),
             el("p", {
               className: "muted",
-              text: [pickLang(v.label), v.kind === "measured" ? t("cost.kindMeasured") : t("cost.kindEstimated")]
+              text: [
+                kind === "measured" ? t("cost.kindMeasured") : kind ? t("cost.kindEstimated") : "",
+                Number.isFinite(v.usd)
+                  ? `~${formatNumber(v.usd, { maximumFractionDigits: 2 })} USD`
+                  : "",
+              ]
                 .filter(Boolean)
                 .join(" · "),
             }),
-            v.doc ? renderSourceCitation(v.doc.source, v.doc.quote) : null,
+            v.source ? renderSourceCitation(pickLang(v.source)) : null,
           ]),
-        ])
-      )
+        ]);
+      })
     ),
+    jigCost.source_doc ? renderSourceCitation(pickLang(jigCost.source_doc)) : null,
   ]);
 }
 
@@ -2700,7 +2705,9 @@ export function renderCostPage() {
                 ? `~${formatNumber(roundCost.total_usd, { maximumFractionDigits: 2 })} USD`
                 : roundCost
                   ? ""
-                  : t("cost.roundCostOther"),
+                  : jigCost
+                    ? t("cost.roundCostJig")
+                    : t("cost.roundCostOther"),
           },
           {
             label: t("cost.estimatesTitle"),

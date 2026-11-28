@@ -558,12 +558,10 @@ function bindHeaderEvents() {
     });
   }
 
+  // A narrow window closes a panel the reader did not pin open; nothing opens it by itself.
   window.addEventListener("resize", () => {
-    if (!state.chatExplicit) {
-      const shouldOpen = window.innerWidth >= 1220;
-      if (state.chatOpen !== shouldOpen) {
-        setChatOpen(shouldOpen, false);
-      }
+    if (!state.chatExplicit && state.chatOpen && window.innerWidth < 1220) {
+      setChatOpen(false, false);
     }
   });
 }

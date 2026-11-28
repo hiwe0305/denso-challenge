@@ -726,7 +726,6 @@ export default {
   "studio.btnOverride": "✎ Override (Spec 6.14)",
   "studio.overridePlaceholder": "Enter engineer diagnosis & override reason…",
   "studio.overrideSave": "Record",
-  "studio.GatewayHint": "Supports hosted.yaml gateway profiles (ckey claude-opus-5-5, claude-haiku-5-5), OpenAI, DeepSeek, Gemini, OpenRouter.",
   "ux.continueTaskBtn": "Continue: {task} →",
   "ux.openTaskShort": "Open task →",
   "ux.continueShort": "Continue →",
@@ -1089,4 +1088,5 @@ export default {
   "ep.env.successNo": "not successful",
   "exp.rolloutSuccess": "Success",
   "exp.rolloutFail": "Failed",
+  "cost.roundCostJig": "Jig round: see each part below",
 };

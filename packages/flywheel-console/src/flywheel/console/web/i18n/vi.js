@@ -726,7 +726,6 @@ export default {
   "studio.btnOverride": "✎ Ghi đè (Spec 6.14)",
   "studio.overridePlaceholder": "Nhập chẩn đoán của kỹ sư & lý do ghi đè…",
   "studio.overrideSave": "Ghi nhận",
-  "studio.GatewayHint": "Hỗ trợ cổng hosted.yaml (ckey claude-opus-5-5, claude-haiku-5-5), OpenAI, DeepSeek, Gemini, OpenRouter.",
   "ux.continueTaskBtn": "Tiếp tục: {task} →",
   "ux.openTaskShort": "Mở bài toán →",
   "ux.continueShort": "Tiếp tục →",
@@ -1089,4 +1088,5 @@ export default {
   "ep.env.successNo": "không thành công",
   "exp.rolloutSuccess": "Thành công",
   "exp.rolloutFail": "Thất bại",
+  "cost.roundCostJig": "Vòng jig: xem từng phần bên dưới",
 };
