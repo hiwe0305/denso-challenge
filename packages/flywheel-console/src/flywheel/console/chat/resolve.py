@@ -64,11 +64,19 @@ def ledgers_dir() -> Path:
 
 
 def run_index() -> list[dict[str, Any]]:
-    """All training runs: job id, branch, dir, from ``tray/pair60k/*/*/metrics.jsonl``."""
-    return [
+    """All training runs: job id, branch, dir, from ``tray/pair60k`` and ``tray/jig-*``."""
+    out = [
         {"id": f.parent.name, "branch": f.parent.parent.name, "dir": f.parent, "metrics": f}
         for f in sorted(pair_dir().glob("*/*/metrics.jsonl"))
     ]
+    tray_dir = active().fw_root / "tray"
+    for f in sorted(tray_dir.glob("jig-*/*/metrics.jsonl")):
+        pname = f.parent.parent.name
+        if ".attempt" in pname:
+            continue
+        branch = pname.removeprefix("jig-").upper() or pname
+        out.append({"id": f.parent.name, "branch": branch, "dir": f.parent, "metrics": f})
+    return out
 
 
 def resolve_run(q: Any) -> tuple[str, Any]:

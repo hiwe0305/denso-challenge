@@ -34,6 +34,7 @@ BUDGET: dict[str, int] = {
     "pages_proc.js": 40,  # stage template, overview and Chạy thử (brief 2 · T2); text is in i18n
     "pages_ego.js": 20,  # the seven fw egocentric commands; text is in i18n
     "pages_tasks.js": 30,  # workspace cards, stage strip, add-a-task command names
+    "pages_chat.js": 30,  # full-screen Agent Studio workspace; text is in i18n
 }
 # Dictionary rule (one-site design 5.5, a change to BA 15.1b): a lead (key ending ".a" or ".lead")
 # has at most LEAD_WORDS words; all "st.N.*" text of one station has at most STATION_WORDS.

@@ -1,95 +1,464 @@
-/* Workspace (#/tasks): one card per task of the manifest, and what adding a task takes. Also the hero and the
-   six-stage strip of the task overview (#/home, called from PROC.home).
-   Every number is a stage's EXPLAIN.node, read with that task in scope (withTask), so a card never shows another
-   task's numbers; a stage without data says "chưa chạy". Text: i18n (tk.*). */
-"use strict";
-const TASKS = (() => {
-  const T = {}, STG = [1, 2, 3, 4, 5, 6];
-  const L = o => o == null ? "" : typeof o === "object" ? (o[UI.lang] || o.vi || "") : String(o);
-  const lab = nd => nd.l || nd.label || nd.k || "";
-  /* run fn with task id as the (task, round) context, then restore: the EXPLAIN readers ask TASK, STORY and SIMD */
-  function withTask(id, fn) {
-    const k = [TASK.id, TASK.roundId], s = STORY, d = SIMD;
-    try { TASK.set(id); STORY = TASK.scopeStory(STORY_RAW || {}); SIMD = TASK.scopeSim(SIMD_RAW || {}); return fn(); }
-    finally { TASK.set(k[0], k[1]); STORY = s; SIMD = d; }
-  }
-  function media() {
-    const c = ((STORY && STORY.demo) || {}).success_clip, e = ((SIMD && SIMD.teleop) || [])[0] || ((SIMD && SIMD.episodes) || [])[0];
-    if (c && c.path) return { video: "/demomedia/" + String(c.path).split("/").pop() };
-    return e ? { poster: e.poster ? "/simmedia/" + e.poster : null, video: e.video ? "/simmedia/" + e.video : null } : null;
-  }
-  T.summary = id => withTask(id, () => {
-    const c = TASK.cur() || {}, rd = TASK.round(), nodes = {}, done = {};
-    STG.forEach(n => { const p = TASK.process(n) || {}; nodes[n] = EXPLAIN.node(n); done[n] = !!nodes[n] || ((p.needs || []).length > 0 && TASK.hasData(n)); });
-    const todo = STG.find(n => !done[n]);
-    return { id, name: TASK.name(), desc: L(c.description), meta: [c.robot, c.model, t("tk.steps", { n: (c.stages || []).length })].filter(Boolean).join(" · "),
-      nodes, done, media: media(), round: rd ? L(rd.title) : null, cost: PROC.costOf(0),
-      next: todo ? t("tk.next", { s: PROC.name(todo) }) : t("tk.next.round"), open: !todo };
-  });
-  /* the clip: a poster that plays on hover, or the video's first frame when the index has no poster */
-  function clip(m, cls) {
-    if (!m || (!m.poster && !m.video)) return h("div", { class: "tk-clip none " + (cls || "") });
-    if (m.poster) return hoverVideo(m.poster, m.video, "tk-clip " + (cls || ""));
-    const v = h("video", { src: m.video, preload: "metadata", playsinline: true, muted: true, loop: true }); v.muted = true;
-    const box = h("div", { class: "tk-clip " + (cls || "") }, [v, h("span", { class: "tk-play", text: "▶" })]);
-    box.onmouseenter = () => { v.play().catch(() => {}); box.classList.add("on"); };
-    box.onmouseleave = () => { v.pause(); box.classList.remove("on"); };
-    return box;
-  }
-  const bar = s => h("div", { class: "tk-bar" }, STG.map(n => h("i", { class: s.done[n] ? "on" : "", title: n + " · " + PROC.name(n) + " · " + t(s.done[n] ? "pr.s.done" : "pr.s.none") })));
-  const big = s => { const nd = s.nodes[4];
-    return h("div", { class: "tk-big" }, nd ? [h("b", { text: nd.v }), h("span", { text: lab(nd) || t("tk.best") }), UI.origin(nd.origin, nd.src)] : [h("b", { class: "dim", text: "—" }), h("span", { text: t("tk.noeval") })]); };
-  const facts = s => [s.round || t("task.noround"), s.nodes[1] ? t("tk.eps", { n: s.nodes[1].v }) : null, s.cost ? s.cost.v : null].filter(Boolean).join(" · ");
-  const pick = id => { TASK.set(id); UI.pref("v5task", TASK.id); retask(); };
+import {
+  announce,
+  el,
+  ensureCatalog,
+  ensureSimRaw,
+  safeThumbUrl,
+  formatNumber,
+  getCurrentTask,
+  getTasks,
+  hasI18nKey,
+  pickLang,
+  renderErrorBlock,
+  selectTask,
+  state,
+  t,
+} from "./core.js";
 
-  function card(s) {
-    const on = s.id === TASK.id;
-    return h("a", { class: "tk-card" + (on ? " on" : ""), href: "#/home", onclick: () => { if (!on) pick(s.id); } }, [clip(s.media),
-      h("div", { class: "tk-body" }, [h("div", { class: "tk-name" }, [h("b", { text: s.name }), on ? h("span", { class: "pr-chip run", text: t("tk.cur") }) : null]),
-        h("div", { class: "tk-meta", text: s.meta }), big(s), bar(s), h("div", { class: "tk-meta", text: facts(s) }),
-        h("div", { class: "tk-foot" }, [h("span", { class: "tk-next" + (s.open ? " ok" : ""), text: s.next }), h("span", { class: "tk-open", text: t("tk.open") + " →" })])])]);
-  }
-  /* every task against the six stages: the stage's number, or "chưa chạy" */
-  function matrix(ss) {
-    const cell = (s, n) => { const nd = s.nodes[n];
-      return h("td", { class: nd ? "" : "dim", title: nd ? lab(nd) : null }, nd ? [h("b", { text: nd.v }), UI.origin(nd.origin, nd.src)] : t("pr.s.none")); };
-    return h("section", { class: "tk-new" }, [h("div", { class: "tk-newh" }, [h("b", { text: t("tk.mx") }), h("span", { text: t("tk.mx.sub") })]),
-      h("div", { class: "pr-tscroll" }, h("table", { class: "pr-tbl tk-mx" }, [
-        h("thead", null, h("tr", null, [h("th", { text: t("pr.c.task") }), ...STG.map(n => h("th", null, [h("span", { class: "pr-sn sm", text: String(n) }), " " + PROC.name(n)])), h("th")])),
-        h("tbody", null, ss.map(s => h("tr", { class: "lnk", onclick: () => { if (s.id !== TASK.id) pick(s.id); location.hash = "#/home"; } }, [h("td", null, h("b", { text: s.name })), ...STG.map(n => cell(s, n)),
-          h("td", null, h("span", { class: "tk-next" + (s.open ? " ok" : ""), text: s.next }))])))]))]);
-  }
-  function newTask() {
-    const ex = (TASK.list()[0] || {}).scorer_config || "", steps = [["seed/tasks.yaml"], [ex], ["fw data ingest", "fw data qa", "fw data release"], ["fw console index"]];
-    return h("section", { class: "tk-new", id: "tk-new" }, [h("div", { class: "tk-newh" }, [h("b", { text: "＋ " + t("tk.new") }), h("span", { text: t("tk.new.sub") })]),
-      h("div", { class: "tk-steps" }, steps.map((codes, i) => h("div", { class: "tk-step" }, [h("span", { class: "pr-sn sm", text: String(i + 1) }), h("b", { text: t("tk.new." + (i + 1) + ".t") }),
-        h("p", { text: t("tk.new." + (i + 1) + ".d") }), ...codes.filter(Boolean).map(c => h("code", { text: c }))]))),
-      h("p", { class: "tk-note", text: t("tk.new.note") })]);
-  }
-  UI.route("tasks", async body => {
-    document.title = "FW · " + t("tk.title"); await PROC.kinds();
-    const ss = TASK.list().map(x => T.summary(x.id));
-    body.appendChild(h("header", { class: "pr-head" }, [h("div", { class: "pr-kick", text: t("tk.kick") }),
-      h("div", { class: "pr-title" }, [h("h1", { text: t("tk.title") }), h("span", { class: "pr-where", text: t("tk.count", { n: ss.length }) })]), h("p", { class: "pr-lead", text: t("tk.lead") })]));
-    body.appendChild(h("div", { class: "tk-grid" }, [...ss.map(card),
-      h("a", { class: "tk-card add", href: "javascript:void 0", onclick: () => document.getElementById("tk-new").scrollIntoView({ block: "center" }) }, [h("span", { class: "tk-plus", text: "＋" }), h("b", { text: t("tk.new") }), h("span", { text: t("tk.new.sub") })])]));
-    body.appendChild(matrix(ss));
-    body.appendChild(newTask());
-  });
+const STAGE_ORDER = ["1", "2", "3", "4", "5", "6", "0"];
+const GROUP_ORDER = ["egocentric", "teleop", "s1", "s2", "eval", "other", "all"];
 
-  /* ---------- #/home: the clip and headline, then the six stages as one strip with their numbers ---------- */
-  T.hero = function () {
-    const s = T.summary(TASK.id);
-    const tile = n => { const nd = s.nodes[n];
-      return h("a", { class: "tk-st s" + n + (s.done[n] ? "" : " none"), href: EXPLAIN.href(n), title: nd && nd.src ? t("xb.src") + ": " + nd.src : null }, [
-        h("div", { class: "tk-sth" }, [h("span", { class: "pr-sn sm", text: String(n) }), h("span", { text: PROC.name(n) })]),
-        nd ? h("b", { text: nd.v }) : h("b", { class: "dim", text: t("pr.s.none") }),
-        h("small", null, nd ? [lab(nd) || t("tk.u." + n), UI.origin(nd.origin, nd.src)] : [L((TASK.process(n) || {}).remote) || t("pr.laptop")])]); };
-    return h("section", { class: "tk-hero" }, [
-      h("div", { class: "tk-top" }, [clip(s.media, "lg"), h("div", { class: "tk-head" }, [big(s), h("p", { class: "tk-meta", text: facts(s) }), bar(s),
-        h("div", { class: "tk-foot" }, [h("span", { class: "tk-next" + (s.open ? " ok" : ""), text: s.next }), TASK.round() ? h("a", { href: "#/report", text: t("pr.toReport") }) : null])])]),
-      h("div", { class: "tk-strip" }, STG.map(tile)), h("div", { class: "tk-loop", text: "↺ " + t("tk.loop") })]);
+function renderCrumbAndHeading(actionsNode = null) {
+  return [
+    el("div", { className: "crumb" }, [
+      `${t("app.crumbRoot")} / `,
+      el("span", { text: t("tasks.title") }),
+    ]),
+    el("div", { className: "heading" }, [
+      el("div", {}, [
+        el("h1", { text: t("tasks.title") }),
+
+      ]),
+      actionsNode ? el("div", { className: "actions" }, [actionsNode]) : null,
+    ]),
+  ];
+}
+
+function renderSkeleton() {
+  return el("div", { "aria-busy": "true" }, [
+    ...renderCrumbAndHeading(),
+    el("div", { className: "skeleton-box" }),
+    el("div", { className: "grid" }, [0, 1].map(() =>
+      el("div", { className: "card" }, [
+        el("div", { className: "skeleton-line lg" }),
+        el("div", { className: "skeleton-line" }),
+        el("div", { className: "skeleton-box" }),
+        el("div", { className: "skeleton-box" }),
+      ])
+    )),
+  ]);
+}
+
+function formatHowList(howItems) {
+  if (!Array.isArray(howItems) || howItems.length === 0) return "";
+  return howItems
+    .map((item) => {
+      if (!item || typeof item !== "object") return "";
+      if (item.text) return item.text;
+      if (item.path) return item.section ? `${item.path} §${item.section}` : item.path;
+      return "";
+    })
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function renderCatalogTotals(task) {
+  const totals = task.catalog_totals;
+  const invKey = task.inventory ? "tasks.inv." + task.inventory : "";
+  const invNote = invKey && hasI18nKey(invKey) ? t("tasks.inv." + task.inventory) : "";
+
+  if (!totals || typeof totals !== "object" || Object.keys(totals).length === 0) {
+    return el("p", { className: "muted", text: invNote || t("tasks.catalogEmpty") });
+  }
+
+  const keys = Object.keys(totals)
+    .filter((k) => k !== "all")
+    .sort((a, b) => {
+      const ia = GROUP_ORDER.indexOf(a);
+      const ib = GROUP_ORDER.indexOf(b);
+      const oa = ia === -1 ? 99 : ia;
+      const ob = ib === -1 ? 99 : ib;
+      return oa - ob || a.localeCompare(b);
+    });
+
+  if (keys.length === 0) {
+    return el("p", { className: "muted", text: invNote || t("tasks.catalogEmpty") });
+  }
+
+  const maxEps = Math.max(1, ...keys.map((k) => Number((totals[k] || {}).episodes || 0)));
+
+  return el("div", {}, [
+    invNote ? el("p", { className: "muted", text: invNote }) : null,
+    el("p", { className: "tiny muted", text: t("ux.streamSubNote") }),
+    el(
+      "div",
+      { className: "stream-bars" },
+      keys.map((groupKey) => {
+        const entry = totals[groupKey] || {};
+        const eps = Number(entry.episodes || 0);
+        const pct = eps <= 0 ? 0 : Math.max(2, Math.min(100, (eps / maxEps) * 100));
+        const i18nKey = "cat.group." + groupKey;
+        const label = hasI18nKey(i18nKey) ? t("cat.group." + groupKey) : groupKey;
+        const hoursText =
+          entry.hours == null
+            ? t("state.na")
+            : t("tasks.unitHours", { val: formatNumber(entry.hours, { maximumFractionDigits: 2 }) });
+        const metricText = `${t("tasks.unitEpisodes", { val: formatNumber(eps) })} · ${t(
+          "data.setsHoursSub",
+          {
+            sets: formatNumber(entry.sets ?? 0),
+            hours: hoursText,
+          }
+        )}`;
+        return el("div", { className: "stream-row" }, [
+          el("div", { className: "stream-row-head" }, [
+            el("span", { text: label }),
+            el("span", {
+              className: "tiny mono",
+              text: metricText,
+            }),
+          ]),
+          el("div", { className: "stream-track" }, [
+            el("div", { className: "stream-fill", style: `width:${pct.toFixed(1)}%` }),
+          ]),
+        ]);
+      })
+    ),
+  ]);
+}
+
+function renderProcessBlock(task) {
+  const procMap = task.process && typeof task.process === "object" ? task.process : {};
+  const presentKeys = STAGE_ORDER.filter((k) => Object.prototype.hasOwnProperty.call(procMap, k));
+  if (presentKeys.length === 0) {
+    return el("p", { className: "muted", text: t("state.empty") });
+  }
+
+  const missingEntries = presentKeys
+    .map((k) => ({ key: k, missing: pickLang((procMap[k] || {}).missing) }))
+    .filter((item) => Boolean(item.missing));
+
+  return el("div", {}, [
+    el("p", {
+      className: "muted",
+      text:
+        missingEntries.length > 0
+          ? t("tasks.processMissingCount", { count: formatNumber(missingEntries.length) })
+          : t("tasks.processAllReady", { count: formatNumber(presentKeys.length) }),
+    }),
+    missingEntries.length > 0
+      ? el(
+          "ul",
+          { className: "missing-list" },
+          missingEntries.map((item) =>
+            el("li", { className: "missing-item" }, [
+              el("strong", { text: `${t("proc.stage." + item.key)}:` }),
+              el("span", { text: item.missing }),
+            ])
+          )
+        )
+      : null,
+    el("details", { className: "studio-details" }, [
+      el("summary", {
+        text: t("tasks.processToggleHow", { count: formatNumber(presentKeys.length) }),
+      }),
+      el(
+        "ul",
+        { className: "how-list" },
+        presentKeys.map((stageKey) => {
+          const info = procMap[stageKey] || {};
+          const howText = formatHowList(info.how);
+          const remoteText = info.remote ? t("tasks.remoteLabel", { where: info.remote }) : "";
+          const line = [remoteText, howText].filter(Boolean).join(" · ") || t("state.na");
+          return el("li", { className: "how-item" }, [
+            el("b", { text: t("proc.stage." + stageKey) }),
+            el("span", { className: "mono", text: line }),
+          ]);
+        })
+      ),
+    ]),
+  ]);
+}
+
+function renderTaskCard(task, roundsById, media) {
+  const isSelected = state.taskId === task.id;
+  const stages = Array.isArray(task.stages) ? task.stages : [];
+  const roundIds = Array.isArray(task.rounds) ? task.rounds : [];
+  const successText = pickLang(task.success) || t("state.na");
+  const successSource = task.success && task.success.source ? task.success.source : null;
+  const descText = pickLang(task.description) || t("state.na");
+  const taskTitle = pickLang(task.name) || task.id;
+  const allTotals = (task.catalog_totals && task.catalog_totals.all) || {};
+  const allSets = allTotals.sets ?? 0;
+  const epsText =
+    allTotals.episodes != null
+      ? t("tasks.unitEpisodes", { val: formatNumber(allTotals.episodes) })
+      : t("state.na");
+  const compareLineText =
+    roundIds.length > 0
+      ? t("ux.taskCardCompareHasRounds", {
+          sets: formatNumber(allSets),
+          episodes: epsText,
+          rounds: formatNumber(roundIds.length),
+        })
+      : t("ux.taskCardCompareNoRound", {
+          sets: formatNumber(allSets),
+          episodes: epsText,
+        });
+
+  const chooseAndOpenHome = () => {
+    selectTask(task.id);
+    window.location.hash = "#/home";
   };
-  return T;
-})();
-window.TASKS = TASKS;
+
+  const copyIdBtn = el(
+    "button",
+    {
+      type: "button",
+      className: "short-hash mono",
+      title: t("ux.copyIdTitle"),
+      onClick: (ev) => {
+        ev.stopPropagation();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(task.id).catch(() => {});
+        }
+        copyIdBtn.textContent = t("chat.copiedBtn");
+        announce(t("chat.copiedBtn"));
+        window.setTimeout(() => {
+          copyIdBtn.textContent = task.id;
+        }, 1200);
+      },
+    },
+    [task.id]
+  );
+
+  const preview = el("div", { className: "task-preview", hidden: true });
+  media.then(([doc, sim]) => {
+    const row = doc?.rows?.find((item) =>
+      item.task === (task.catalog_task || task.id) && safeThumbUrl(item.thumbs?.[0])
+    );
+    const clip = sim?.teleop?.find((ep) => ep.task === task.id && ep.poster);
+    const src = safeThumbUrl(row?.thumbs?.[0]) || (clip && `/simmedia/${clip.poster}`);
+    if (!src) return;
+    preview.appendChild(el("img", {
+      src, alt: row?.title || taskTitle, decoding: "async",
+      onLoad: () => { preview.hidden = false; },
+    }));
+  });
+
+  return el(
+    "article",
+    {
+      className: `card task-card${isSelected ? " is-selected" : ""}`,
+      "data-task-id": task.id,
+    },
+    [
+      preview,
+      el("div", { className: "task-head" }, [
+        el("div", { className: "ds" }, [
+          el("div", {}, [
+            el("h3", { className: "task-title" }, [
+              el(
+                "a",
+                {
+                  href: "#/home",
+                  onClick: (ev) => {
+                    ev.preventDefault();
+                    chooseAndOpenHome();
+                  },
+                },
+                [taskTitle]
+              ),
+            ]),
+            el("p", {
+              className: "task-compare-line",
+              text: compareLineText,
+            }),
+          ]),
+        ]),
+        el("div", { className: "actions" }, [
+          isSelected
+            ? el("span", { className: "chip", text: `✓ ${t("tasks.selectedBadge")}` })
+            : null,
+          el(
+            "button",
+            {
+              type: "button",
+              className: isSelected ? "btn primary" : "btn",
+              onClick: chooseAndOpenHome,
+            },
+            [isSelected ? t("ux.continueShort") : t("ux.openTaskShort")]
+          ),
+        ]),
+      ]),
+
+      el("div", { className: "meta-strip" }, [
+        el("div", { className: "meta-box" }, [
+          el("span", { text: t("tasks.robot") }),
+          el("b", { text: task.robot || t("state.na") }),
+        ]),
+        el("div", { className: "meta-box" }, [
+          el("span", { text: t("tasks.model") }),
+          el("b", { text: task.model || t("state.na") }),
+        ]),
+        el("div", { className: "meta-box" }, [
+          el("span", { text: "ID" }),
+          copyIdBtn,
+        ]),
+      ]),
+
+      el("details", { className: "studio-details" }, [
+        el("summary", { text: t("tasks.success") }),
+        el("p", { className: "muted", text: descText }),
+        el("div", { className: "row" }, [
+          el("div", { className: "row-body" }, [
+            el("b", { text: t("tasks.success") }),
+            el("p", { className: "muted", text: successText }),
+            successSource
+              ? el("div", {
+                  className: "sources-note mono",
+                  text: `${t("common.source")}: ${successSource}`,
+                })
+              : null,
+          ]),
+        ]),
+
+        el("div", { className: "row" }, [
+          el("div", { className: "row-body" }, [
+            el("b", { text: t("tasks.roundsTitle") }),
+            roundIds.length === 0
+              ? el("div", { className: "step-tags" }, [
+                  el("span", { className: "chip neutral", text: t("tasks.roundsNone") }),
+                ])
+              : el(
+                  "div",
+                  { className: "step-tags" },
+                  roundIds.map((rid) => {
+                    const rObj = roundsById.get(rid);
+                    const rTitle = rObj ? pickLang(rObj.title) : "";
+                    return el("span", {
+                      className: "step-tag",
+                      text: rTitle ? `${rid} · ${rTitle}` : rid,
+                    });
+                  })
+                ),
+          ]),
+        ]),
+      ]),
+
+      el("details", { className: "studio-details", style: "margin-top:auto" }, [
+        el("summary", {
+          text: t("ux.detailsDataProcess", { sets: formatNumber(allSets) }),
+        }),
+        el("div", { className: "row-list", style: "margin-top:8px" }, [
+          el("div", { className: "row" }, [
+            el("div", { className: "row-body" }, [
+              el("b", { text: t("tasks.catalogTitle") }),
+              renderCatalogTotals(task),
+            ]),
+          ]),
+
+          stages.length > 0
+            ? el("div", { className: "row" }, [
+                el("div", { className: "row-body" }, [
+                  el("b", {
+                    text: t("tasks.stages", { count: formatNumber(stages.length) }),
+                  }),
+                  el(
+                    "div",
+                    { className: "step-tags" },
+                    stages.map((st, idx) =>
+                      el("span", {
+                        className: "step-tag",
+                        text: `${String(idx + 1).padStart(2, "0")} · ${pickLang(st) || st.id}`,
+                      })
+                    )
+                  ),
+                ]),
+              ])
+            : null,
+
+          el("div", { className: "row" }, [
+            el("div", { className: "row-body" }, [
+              el("b", { text: t("tasks.processTitle") }),
+              renderProcessBlock(task),
+            ]),
+          ]),
+
+          task.scorer_config
+            ? el("div", { className: "row" }, [
+                el("div", { className: "row-body" }, [
+                  el("span", { className: "tiny mono", text: task.scorer_config }),
+                ]),
+              ])
+            : null,
+        ]),
+      ]),
+    ]
+  );
+}
+
+export function renderTasksPage({ onRetry }) {
+  if (state.tasksLoading && !state.tasksLoaded) {
+    return renderSkeleton();
+  }
+
+  if (state.tasksError && !state.tasksDoc) {
+    return el("div", {}, [
+      ...renderCrumbAndHeading(),
+      renderErrorBlock(state.tasksError, onRetry),
+    ]);
+  }
+
+  const tasks = getTasks();
+  const activeTask = getCurrentTask() || tasks[0] || null;
+  const activeName = activeTask ? pickLang(activeTask.name) || activeTask.id : t("state.na");
+  const rounds = (state.tasksDoc && Array.isArray(state.tasksDoc.rounds))
+    ? state.tasksDoc.rounds
+    : [];
+  const media = tasks.length ? Promise.all([
+    ensureCatalog().catch(() => null),
+    ensureSimRaw().catch(() => null),
+  ]) : null;
+  const roundsById = new Map(rounds.map((r) => [r.id, r]));
+  const docSource = state.tasksDoc && state.tasksDoc.source ? state.tasksDoc.source : null;
+
+  return el("div", {}, [
+    ...renderCrumbAndHeading(
+      activeTask
+        ? el(
+            "a",
+            {
+              className: "btn primary",
+              href: "#/home",
+              onClick: () => selectTask(activeTask.id),
+            },
+            [t("ux.continueTaskBtn", { task: activeName })]
+          )
+        : null
+    ),
+
+    el("div", { className: "sect" }, [
+      el("div", { className: "actions" }, [
+        el("h2", { text: t("tasks.sectionTitle") }),
+        el("span", {
+          className: "chip neutral",
+          text: t("ux.taskCountBadge", { count: formatNumber(tasks.length) }),
+        }),
+      ]),
+      docSource
+        ? el("span", {
+            className: "muted mono",
+            text: t("tasks.indexSource", { source: docSource }),
+          })
+        : null,
+    ]),
+    tasks.length === 0
+      ? el("div", { className: "empty", text: t("state.empty") })
+      : el(
+          "div",
+          { className: "grid" },
+          tasks.map((task) => renderTaskCard(task, roundsById, media))
+        ),
+  ]);
+}

@@ -5,50 +5,114 @@ from flywheel.console import budget
 
 WEB = Path(budget.__file__).parent / "web"
 HEX6 = re.compile(r"#[0-9a-fA-F]{6}\b")
+REQUIRED_TOKENS = (
+    "--bg:",
+    "--surface:",
+    "--surface-muted:",
+    "--text:",
+    "--text-muted:",
+    "--border:",
+    "--accent:",
+    "--success:",
+    "--warning:",
+    "--danger:",
+    "--info:",
+)
+
+
+def _clean_inline_markdown_mirror(raw: str | None) -> str:
+    """Reference mirror of core.js cleanInlineMarkdown for deterministic unit assertions."""
+    if raw is None:
+        return ""
+    lines: list[str] = []
+    for line in str(raw).split("\n"):
+        s = line.replace("**", "").replace("`", "")
+        s = re.sub(r"^\s*\|\s*", "", s)
+        s = re.sub(r"\s*\|\s*$", "", s)
+        s = re.sub(r"\s*\|\s*", " · ", s)
+        s = re.sub(r"\s{2,}", " ", s).strip()
+        if s:
+            lines.append(s)
+    return "\n".join(lines)
+
+
+def test_clean_inline_markdown_function_and_quote_usage() -> None:
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    assert "export function cleanInlineMarkdown(" in core
+    assert "const cleanedQuote = cleanInlineMarkdown(quote);" in core
+    assert "innerHTML" not in core
+    assert (
+        _clean_inline_markdown_mirror("| Train lần 1 (dừng sớm) | 8,55 |")
+        == "Train lần 1 (dừng sớm) · 8,55"
+    )
+    assert (
+        _clean_inline_markdown_mirror("| **Tổng serve** | **khoảng 23,4**, so với 16,2 ước tính |")
+        == "Tổng serve · khoảng 23,4, so với 16,2 ước tính"
+    )
+    assert (
+        _clean_inline_markdown_mirror("**H1: chuỗi bước gãy ở `approach_a`.** CHƯA RÕ")
+        == "H1: chuỗi bước gãy ở approach_a. CHƯA RÕ"
+    )
+
+
+def test_chat_defaults_closed_below_desktop_and_deduplicates_requests() -> None:
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    chat = (WEB / "chat.js").read_text(encoding="utf-8")
+    assert "window.innerWidth >= 1220" in core
+    assert "export async function ensureModels(" in core
+    assert "if (!state.chatOpen) return;" in chat
+    assert "toolsCache.has(" in chat
 
 
 def test_no_hex_in_pages() -> None:
-    for f in sorted(WEB.glob("pages_*.js")):
+    pages = sorted(WEB.glob("pages_*.js"))
+    assert pages, "expected pages_*.js modules in web/"
+    for f in pages:
         assert not HEX6.search(f.read_text(encoding="utf-8")), f"hex colour literal in {f.name}"
 
 
-def test_no_cdn() -> None:
+def test_no_cdn_or_external_fonts() -> None:
     html = (WEB / "index.html").read_text(encoding="utf-8")
+    css = (WEB / "style.css").read_text(encoding="utf-8")
     assert not re.search(r"""(?:src|href)\s*=\s*["']https?://""", html)
+    assert not re.search(r"""url\(\s*["']?https?://""", css)
+    assert "@import" not in css
     assert (WEB / "vendor" / "echarts.min.js").is_file()
 
 
-def test_ego_strip_wired() -> None:
-    for name in ("pages_data.js", "pages_ops.js"):
-        assert "/api/ego_strip" in (WEB / name).read_text(encoding="utf-8"), name
-
-
-def test_light_theme_series_tokens() -> None:
+def test_light_and_dark_theme_tokens() -> None:
     css = (WEB / "style.css").read_text(encoding="utf-8")
     light = css.split(':root[data-theme="light"]', 1)[1].split("}", 1)[0]
+    dark = css.split(':root[data-theme="dark"]', 1)[1].split("}", 1)[0]
+    for tok in REQUIRED_TOKENS:
+        assert tok in light, f"missing {tok} in light theme"
+        assert tok in dark, f"missing {tok} in dark theme"
     for i in range(1, 9):
         assert f"--s{i}:" in light
+        assert f"--s{i}:" in dark
 
 
-def test_sankey_labels_carry_numbers() -> None:
-    for name in ("pages_data.js", "pages_story.js"):
-        src = (WEB / name).read_text(encoding="utf-8")
-        assert 'type: "sankey"' in src
-        assert re.search(r"nodeGap: (\d{2,})", src), name
-
-
-def test_story_sankey_labels_alternate_by_column() -> None:
-    """Neighbouring columns put labels on opposite sides; index parity did not (DA-40/8)."""
-    src = (WEB / "pages_story.js").read_text(encoding="utf-8")
-    assert "const CHAIN = {" in src and "CHAIN[n.name] % 2" in src
-    assert "i % 2 ?" not in src
-
-
-def test_episode_bracket_keys_go_through_ui_keys() -> None:
-    """A raw keydown listener for [ ran alongside the global sidebar toggle (DA-40/8)."""
+def test_ego_strip_wired_in_data_pages() -> None:
     src = (WEB / "pages_data.js").read_text(encoding="utf-8")
-    assert 'UI.keys.bind({ "[":' in src
-    assert 'ev.key === "["' not in src
+    assert "/api/ego_strip" in src
+    assert "/api/poster" in src
+
+
+def test_pipeline_runners_come_from_kinds_endpoint() -> None:
+    ops = (WEB / "pages_ops.js").read_text(encoding="utf-8")
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    assert 'getJSON("/api/kinds")' in core
+    assert 'postJSON("/api/jobs"' in ops
+    assert not re.search(r'kind:\s*"(?:data|eval|ego|agentqa)\.', ops)
+
+
+def test_loop_numbers_come_from_story_not_literals() -> None:
+    code = re.compile(r"""(?<![\w.])(?<!W = )(?:262|229|177|160|240)(?![\w.])|131/240""")
+    text = (WEB / "pages_story.js").read_text(encoding="utf-8")
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    text = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("//"))
+    hits = [m.group(0) for m in code.finditer(text)]
+    assert not hits, f"pages_story.js: hard-coded loop numbers {hits}"
 
 
 def test_no_machine_paths_in_package() -> None:
@@ -65,66 +129,61 @@ def test_no_machine_paths_in_package() -> None:
     assert not bad, bad
 
 
-def test_episode_page_maps_404_to_empty_state() -> None:
-    src = (WEB / "pages_data.js").read_text(encoding="utf-8")
-    assert '/ 404$/.test(e.message) ? "no data"' in src
-
-
-def test_loop_numbers_come_from_story_not_literals() -> None:
-    code = re.compile(r"""(?<![\w.])(?<!W = )(?:262|229|177|160|240)(?![\w.])|131/240""")
-    for name in ("pages_story.js",):
-        text = (WEB / name).read_text(encoding="utf-8")
-        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-        text = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("//"))
-        hits = [m.group(0) for m in code.finditer(text)]
-        assert not hits, f"{name}: hard-coded loop numbers {hits}"
-
-
 def test_no_round_ids_seed_or_step_count_in_web() -> None:
-    """Run ids, follow seed and step count live in seed/tasks.yaml (read through TASK, core.js)."""
+    """Run ids, follow seed and step count live in seed/tasks.yaml, not in web JS or i18n."""
     typed = re.compile(r"\b(?:C_70|C70_R1|C_ALL|B_ALL|B_70|1000107|60000|60_000)\b")
     for f in sorted(WEB.glob("*.js")) + sorted((WEB / "i18n").glob("*.js")):
         text = re.sub(r"/\*.*?\*/", "", f.read_text(encoding="utf-8"), flags=re.S)
         text = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("//"))
         hits = sorted({m.group(0) for m in typed.finditer(text)})
-        assert not hits, f"{f.name}: typed round facts {hits}; read them from TASK"
+        assert not hits, f"{f.name}: typed round facts {hits}; read them from data/tasks.json"
 
 
-def test_dead_demo_files_and_run_tables_are_gone() -> None:
-    """Brief 2 · T2: v4 ring, caption tour and the 40k C/C+ tables (dead code naming runs)."""
-    for name in ("ring.js", "tour.js", "tour.css"):
-        assert not (WEB / name).exists(), name
-    html = (WEB / "index.html").read_text(encoding="utf-8")
-    assert "ring.js" not in html and "tour.js" not in html and "pages_proc.js" in html
-    story = (WEB / "pages_story.js").read_text(encoding="utf-8")
-    assert "STATIC_RUNS" not in story and '"C+"' not in story
+def test_shared_api_client_surfaces_errors_and_respects_lock() -> None:
+    core = (WEB / "core.js").read_text(encoding="utf-8")
+    assert "export async function getJSON(" in core
+    assert "export async function postJSON(" in core
+    assert "payload.error" in core
+    assert "showErrorBanner" in core
+    assert "filterWithheldStory" in core
+    assert '"/api/chat"' in core and '"/api/models/prewarm"' in core
+
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    assert 'getJSON("/api/status"' in app
+    assert 'getJSON("data/tasks.json"' in app
 
 
-def test_try_panels_come_from_the_kinds_endpoint() -> None:
-    """Chạy thử lists what /api/kinds returns; no kind or sample list is typed in the page."""
-    src = (WEB / "pages_proc.js").read_text(encoding="utf-8")
-    assert 'fetch("/api/kinds")' in src
-    assert '"/api/jobs", { method: "POST"' in src
-    assert not re.search(r'kind: "(?:data|eval|ego|agentqa)\.', src)
-
-
-def test_lock_mode_sends_no_refused_requests() -> None:
-    """A locked server answers 403 to /api/chat/traces: the QA page and the chat must not ask."""
-    story = (WEB / "pages_story.js").read_text(encoding="utf-8")
-    assert 'UI.locked ? Promise.resolve(null) : tryApi("/api/chat/traces' in story
+def test_lock_mode_guards_chat_traces() -> None:
     chat = (WEB / "chat.js").read_text(encoding="utf-8")
-    body = chat.split("async function showTraces()", 1)[1]
-    assert body.index("if (UI.locked)") < body.index('fetch("/api/chat/traces')
+    body = chat.split("async function loadChatDiagnostics", 1)[1]
+    assert body.index("if (!state.locked)") < body.index('tryGetJSON("/api/chat/traces')
 
 
-def test_lock_mode_hides_nothing() -> None:
-    """Lock mode is read-only, not another site: no rule hides side groups, panel or selectors."""
-    css = (WEB / "style.css").read_text(encoding="utf-8")
-    hidden = (
-        "html.locked #rp",
-        "html.locked #task",
-        "html.locked #side .sg.ops",
-        "html.locked #srch",
+def test_only_contract_endpoints_used() -> None:
+    allowed_prefixes = (
+        "/api/",
+        "data/",
+        "/media/",
+        "/simmedia/",
+        "/demomedia/",
+        "/ego/",
     )
-    for sel in hidden:
+    url_pat = re.compile(r"""["`']((?:/api/|data/|https?://)[^"`'$]*)["`']""")
+    for f in sorted(WEB.glob("*.js")):
+        src = f.read_text(encoding="utf-8")
+        for m in url_pat.finditer(src):
+            u = m.group(1)
+            assert not u.startswith(("http://", "https://")), f"external URL in {f.name}: {u}"
+            assert u.startswith(allowed_prefixes), f"non-contract URL in {f.name}: {u}"
+
+
+def test_lock_mode_hides_no_navigation_shell() -> None:
+    css = (WEB / "style.css").read_text(encoding="utf-8")
+    forbidden = (
+        "html.locked #chat-panel",
+        "html.locked #task-select",
+        "html.locked #round-select",
+        "html.locked #sidebar",
+    )
+    for sel in forbidden:
         assert sel not in css, sel

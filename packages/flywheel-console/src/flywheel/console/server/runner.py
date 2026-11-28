@@ -1633,32 +1633,52 @@ def agent_results(out_dir: str) -> dict[str, Any]:
 
 # ------------------------------------------------------------------ status
 def max_steps(job_dir: Path) -> int | None:
-    """``--train.max_training_steps`` from the run's launch.json argv; None when absent."""
+    """``--train.max_training_steps`` from launch.json, result.json, or expected-100000.json."""
     launch = jread(job_dir / "launch.json", {}) or {}
     for a in launch.get("argv") or [] if isinstance(launch, dict) else []:
         m = re.match(r"^--train\.max_training_steps=(\d+)$", str(a))
         if m:
             return int(m.group(1))
+    for fn, key in (("result.json", "checkpoint_step"), ("expected-100000.json", "ckpt_step")):
+        res = jread(job_dir / fn, {}) or {}
+        if isinstance(res, dict) and isinstance(res.get(key), int):
+            return int(res[key])
     return None
 
 
 def train_runs() -> list[dict[str, Any]]:
     runs: list[dict[str, Any]] = []
+    seen: set[Path] = set()
+    candidates: list[tuple[str, str, Path]] = []
     for task_id, tdir in _train_dirs():
         for f in sorted(_fw().glob(f"{tdir}/*/*/metrics.jsonl")):
-            if ".attempt" in f.parent.parent.name:  # an abandoned try, e.g. <run>.attempt1
+            if ".attempt" in f.parent.parent.name:
                 continue
-            try:
-                ln = [x for x in tail_text(f, 6000).splitlines() if x.strip().startswith("{")]
-                last = json.loads(ln[-1])
-            except Exception:
-                continue
-            age = time.time() - f.stat().st_mtime
-            runs.append(
-                {"name": f.parent.name, "branch": f.parent.parent.name, "task": task_id,
-                 "step": last.get("step"), "max": max_steps(f.parent), "loss": last.get("loss"),
-                 "running": age < 1200, "age_min": round(age / 60, 1)}
-            )  # fmt: skip
+            candidates.append((task_id, f.parent.parent.name, f))
+    for f in sorted(_fw().glob("tray/jig-*/*/metrics.jsonl")):
+        parent_name = f.parent.parent.name
+        if ".attempt" in parent_name:
+            continue
+        branch = parent_name.removeprefix("jig-").upper() or parent_name
+        candidates.append(("tray", branch, f))
+    for task_id, branch, f in candidates:
+        if f in seen:
+            continue
+        seen.add(f)
+        try:
+            ln = [x for x in tail_text(f, 6000).splitlines() if x.strip().startswith("{")]
+            last = json.loads(ln[-1])
+        except Exception:
+            continue
+        age = time.time() - f.stat().st_mtime
+        exp_ckpt = (jread(f.parent / "expected-100000.json", {}) or {}).get("ckpt_step")
+        step_val = exp_ckpt if isinstance(exp_ckpt, int) else last.get("step")
+        is_running = (age < 1200) and not isinstance(exp_ckpt, int)
+        runs.append(
+            {"name": f.parent.name, "branch": branch, "task": task_id,
+             "step": step_val, "max": max_steps(f.parent), "loss": last.get("loss"),
+             "running": is_running, "age_min": round(age / 60, 1)}
+        )  # fmt: skip
     return runs
 
 
@@ -1733,19 +1753,48 @@ def _eval_loop_text() -> tuple[str, str]:
         return "", ""
     frac = "{}/{}".format
     ev = "Tốt nhất {} {}".format(best["run"], frac(best.get("successes"), best.get("n")))
+    jig = doc.get("jig")
+    jig_dict: dict[str, Any] = jig if isinstance(jig, dict) else {}
+    jig_runs = jig_dict.get("runs")
+    jig_best_id = jig_dict.get("best")
+    jbest = (
+        next(
+            (r for r in jig_runs if isinstance(r, dict) and r.get("run") == jig_best_id),
+            None,
+        )
+        if isinstance(jig_runs, list)
+        else None
+    )
+    jig_ev_suffix = (
+        " · Cảnh jig2: {} {}".format(
+            jbest["run"], frac(jbest.get("successes"), jbest.get("n"))
+        )
+        if isinstance(jbest, dict) and jbest.get("run") not in held
+        else ""
+    )
+    next_cut = jig_dict.get("next_cut")
+    jig_lp_suffix = (
+        f" · Cảnh jig2: đã đóng tập {next_cut['name']}.tar"
+        if isinstance(next_cut, dict) and next_cut.get("name")
+        else ""
+    )
     rnd = next((r for name, r in runs.items() if re.search(r"_R\d+$", name or "")), None)
     if not rnd:
         sel = ((doc.get("round") or {}).get("chain") or {}).get("selected")
         if held and sel:  # the round ran; its retest is not presented, which is not "waiting"
-            return ev, f"Đã chọn {sel} tập nhắm lỗi · kết quả thi lại không trình bày"
-        return ev, ""
+            return (
+                ev + jig_ev_suffix,
+                f"Đã chọn {sel} tập nhắm lỗi · kết quả thi lại không trình bày" + jig_lp_suffix,
+            )
+        return ev + jig_ev_suffix, jig_lp_suffix.removeprefix(" · ")
     ev += " · vòng {} {}".format(rnd["run"], frac(rnd.get("successes"), rnd.get("n")))
+    ev += jig_ev_suffix
     outs = [
         c.get("outcome") for c in pair.get("comparisons") or [] if c.get("variant") == rnd["run"]
     ]
     chain = (doc.get("round") or {}).get("chain") or {}
     if not outs or not chain:
-        return ev, ""
+        return ev, jig_lp_suffix.removeprefix(" · ")
     stop = all(o == "F" for o in outs)
     lp = "Vòng {}: chọn {} tập → {} → {}".format(
         rnd["run"],
@@ -1753,7 +1802,7 @@ def _eval_loop_text() -> tuple[str, str]:
         frac(rnd.get("successes"), rnd.get("n")),
         "dừng (F)" if stop else "tiếp (" + ", ".join(sorted({str(o) for o in outs})) + ")",
     )
-    return ev, lp
+    return ev, lp + jig_lp_suffix
 
 
 def status() -> dict[str, Any]:

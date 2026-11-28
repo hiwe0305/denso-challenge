@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pytest
 from chat_index import make_idx  # noqa: F401
@@ -41,7 +42,7 @@ def test_hosted_provider_needs_https_a_model_and_a_key(monkeypatch: pytest.Monke
 
 
 def test_messages_take_the_chat_completions_shape() -> None:
-    msgs = [
+    msgs: list[dict[str, Any]] = [
         {"role": "system", "content": "s"},
         {"role": "user", "content": "q"},
         {"role": "assistant", "content": "", "tool_calls": [
@@ -100,3 +101,61 @@ def test_openrouter_turns_reasoning_off_unless_asked(monkeypatch: pytest.MonkeyP
     assert providers.reasoning_body(p) is None
     monkeypatch.setenv("FW_CHAT_BASE_URL", "http://127.0.0.1:11435/v1")
     assert providers.reasoning_body(providers.active(NEMO, "nemo")) is None  # not OpenRouter
+
+
+def test_runtime_api_config_keeps_key_in_ram_only_and_supports_presets(
+    idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for k in (
+        "FW_CHAT_BASE_URL",
+        "FW_CHAT_MODEL",
+        "FW_CHAT_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "ANTHROPIC_API_KEY",
+    ):
+        monkeypatch.delenv(k, raising=False)
+    providers.reset_runtime_config()
+    try:
+        pub = providers.set_runtime_config(
+            {"preset": "deepseek", "model": "deepseek-reasoner", "api_key": "sk-secret-ram-only"}
+        )
+        assert pub["ready"] is True and pub["has_key"] is True
+        assert "sk-secret-ram-only" not in json.dumps(pub)
+        cfg_file = idx.console_dir / "config" / "chat_provider.json"
+        assert cfg_file.is_file()
+        assert "sk-secret-ram-only" not in cfg_file.read_text(encoding="utf-8")
+
+        p = providers.active(NEMO, "nemo")
+        assert (p.kind, p.hosted, p.model) == ("openai", True, "deepseek-reasoner")
+        assert p.key == "sk-secret-ram-only" and providers.problem(p) is None
+
+        # Anthropic preset maps to native Messages API
+        providers.set_runtime_config(
+            {"preset": "anthropic", "model": "claude-sonnet-4-20250514", "api_key": "sk-ant-test"}
+        )
+        pa = providers.active(NEMO, "nemo")
+        assert (pa.kind, pa.hosted) == ("anthropic", True)
+        sys_txt, anth_msgs = providers.to_anthropic(
+            [
+                {"role": "system", "content": "sys"},
+                {"role": "user", "content": "hi"},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "function": {
+                                "name": "qa_summary",
+                                "arguments": {"dataset_id": "S70"},
+                            }
+                        }
+                    ],
+                },
+                {"role": "tool", "tool_name": "qa_summary", "content": "425 pass"},
+            ]
+        )
+        assert sys_txt == "sys"
+        assert anth_msgs[1]["content"][0]["type"] == "tool_use"
+        assert anth_msgs[2]["content"][0]["type"] == "tool_result"
+    finally:
+        providers.reset_runtime_config()
