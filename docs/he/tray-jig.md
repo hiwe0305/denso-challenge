@@ -220,7 +220,7 @@ Dữ liệu thêm và bộ lọc: [place-data.md](../g0/tray/place-data.md) mụ
 **Runbook.** Như mục 3, đổi theo bảng trên. Bước A và đóng tar đã làm ngày 27/11/2026:
 
 - `N.tar` (7 075 532 800 byte, sha256 `ae443c49efe63cb2b2962e95cb1db83f845eb870d182d27fdbee36d466a89f48`) và `N.tar.json` ở `rtx3060:~/fwdata/da50-n/` và trên laptop ở `fwdata/tray/jig-n/`; sha256 trên laptop đã so khớp.
-- **Chưa làm:** đưa hai file lên `MyDrive/denso/da50/cuts/` (Hiếu làm, hoặc cho phép).
+- Hai file đã ở `MyDrive/denso/da50/cuts/` từ 27/11/2026 (Hiếu cho phép); sha256 đọc lại từ Drive khớp.
 
 Sau khi PR merge (code trên VM phải có `--branch N`):
 
@@ -244,6 +244,31 @@ Mất VM giữa chừng: `setup` lại rồi `colab_train restore --branch N --w
 
 Điều chưa kiểm: nhánh `N` của `colab_train` mới chạy trên bộ giả CPU, chưa chạy trên VM; `restore` sau bản sửa symlink chưa chạy trên job thật; tiến trình `guard` thoát sớm chưa sửa (kiểm nó còn sống sau khi phiên được cấp). Token CLI hết hạn sau khoảng 16 giờ, run khoảng 21 giờ nên cần đăng nhập lại một lần.
 
+## 8. Kết quả train run N (thực đo, 28/11/2026)
+
+Chỉ là số của lần train. Chưa có eval; mọi quy tắc của khối `jig-n-rules` còn nguyên.
+
+| Mục | Giá trị thực đo |
+|---|---|
+| Số bước | 100 000 / 100 000; `train.log` kết thúc bằng `train exit 0` |
+| Phiên | Một phiên L4 `da50-n`, 02:59Z 27/11 tới 03:02Z 28/11 (24,05 giờ); VM tự kết thúc, không phải do vòng `follow` dừng |
+| Train | Bắt đầu 03:42Z 27/11, 20 giờ 55 phút 48 giây (trung bình 1,33 bước/giây), xong khoảng 00:38Z 28/11 |
+| Chi phí | 55,78 CU (số dư 151,76 xuống 95,98), 2,33 CU/giờ; trần 70 không chạm. Ước lượng trước là 52 CU và 21 giờ. Khoảng 5,6 CU là VM chờ 2,4 giờ sau khi train xong, khoảng 1,2 CU là lúc `setup` treo |
+| Checkpoint | `ckpt_10000` … `ckpt_100000` trên `MyDrive/denso/da50/runs/da50-ft-n-s0/`, mỗi cái đủ bốn file và cùng cỡ. **Laptop không có checkpoint nào** |
+| sha256 của `ckpt_100000/model.safetensors` | `1011d2ce42bc4969d727a3f0f47106eea7b473586b4459784362b36af112d0e2`, đọc trên Drive (6 253 648 840 byte); chưa có bản thứ hai để so |
+| Loss | Loss train ở bước cuối 0,0556 (thanh tiến độ). Loss validation chưa đọc |
+| wandb | `offline`, run `pjoscwo7`; file nằm trong thư mục run trên Drive, chưa đẩy lên wandb.ai |
+| Sổ chi phí | [DA-50.csv](../g0/ledger/DA-50.csv): dòng thực đo `job_da50_ft_n_s0_measured` trỏ về dòng ước tính |
+
+Lỗi vận hành gặp trong run, không ảnh hưởng trọng số:
+
+1. `setup` treo khoảng 30 phút khi tải checkpoint cha từ Hugging Face (đứng ở 5,5 GB). Dừng lệnh tải và chạy lại `setup`; lần hai xong trong 43 giây, sha256 của hai file checkpoint cha được kiểm.
+2. Vòng `follow` hỏng từ bước 8 198: mọi lần kéo bị từ chối với "Already-active SSH session (HTTP 429)" vì một kết nối `colab ssh` khác giữ VM (Colab chỉ cho một kết nối mỗi runtime). Nó ghi ALERT 128 lần vào log mà không ai đọc, nên không kéo checkpoint về và không dừng VM khi train xong. `persist` chạy trên VM nên Drive vẫn đủ. Chưa sửa: ALERT của `follow` cần tới được người vận hành, và không mở `colab ssh` tay trong lúc `follow` chạy.
+3. `cu_watch` và `he1_fetch` mặc định gọi CLI Colab 0.7.5 chưa đăng nhập; lần mở đầu thoát mã 6, 0 CU. Chạy lại với `COLAB_CLI` trỏ sang bản 0.8.0 đã đăng nhập. Lúc phiên kết thúc, lệnh `unassign` của watcher trả mã 1 trên bản 0.8.0 (VM đã mất nên không tốn thêm); đường dừng VM ở trần CU bằng bản này vẫn chưa được thử.
+4. `guard` lần này sống suốt phiên.
+
+Giao cho làn eval (nhiệm vụ 6): đường dẫn Drive và sha256 ở bảng trên.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -253,3 +278,4 @@ Mất VM giữa chừng: `setup` lại rồi `colab_train restore --branch N --w
 | 26/11/2026 | Mục 4 mới: số thực đo của lần train (100 000 bước, 56,15 CU, sha256 của `ckpt_100000`), ba lỗi vận hành; sửa câu cuối bước E | Hiếu (soạn với Claude) |
 | 26/11/2026 | Mục 5 mới: kết quả eval run M đọc theo mục 2 (thực đo). Mục 6 mới: đề xuất run N và khối luật đọc `jig-n-rules`. Khối `jig-m-rules` không đổi | Hiếu (soạn với Claude) |
 | 27/11/2026 | Mục 7 mới: tập dữ liệu, plan đóng băng và runbook train của run N. Hai khối luật không đổi | Hiếu (soạn với Claude) |
+| 28/11/2026 | Mục 8 mới: số thực đo của lần train run N (100 000 bước, 55,78 CU, sha256 của `ckpt_100000` trên Drive), các lỗi vận hành; mục 7 ghi tar đã lên Drive. Hai khối luật không đổi | Hiếu (soạn với Claude) |

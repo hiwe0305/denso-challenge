@@ -93,7 +93,7 @@ Luật đọc: khối `jig-n-rules` ở [tray-jig.md](../../he/tray-jig.md) mụ
 - [x] 4. Plan của run N
   - [x] 4.1 Dựng tập ghép, kiểm seed (tiêu chí 3). Tập N trên `rtx3060` (`~/fwdata/da50-n/N/`): 1 591 episode (1 037 của M, cộng 227 và 327 đoạn đặt lệch góc), 1 230 839 khung; 554 seed mới không trùng seed eval và seed của M (lệnh và output trong commit)
   - [x] 4.2 Viết và đóng băng `he-tray-jig-n.yaml`; dòng ledger ước tính. Plan `rp_23b25206d96e`, `mixplan check --launch` in "launch OK"; runbook ở tray-jig.md mục 7; trần 70 CU là **[Đề xuất]**, chờ Hiếu duyệt trong PR
-- [ ] 5. Train run N trên Colab L4 (Hiếu chạy), dừng VM ngay khi xong
+- [x] 5. Train run N trên Colab L4 (Hiếu chạy), dừng VM ngay khi xong. Xong 28/11/2026: 100 000 bước, 55,78 CU, `ckpt_100000` trên Drive; VM không được dừng ngay (chờ khoảng 2,4 giờ), xem [tray-jig.md](../../he/tray-jig.md) mục 8
 - [ ] 6. Eval và đọc
   - [x] 6.1 Hiệu ghép cặp trên nhiều lượt mỗi điều kiện trong `eval_results` (`paired_diff_repeats`, khối `paired.repeats`), có test CPU. Lệnh đọc N so với M: `eval_results configs/runplans/tray/he-tray-v2.yaml --set <tập> --out <lô N> --baseline <lô M> --repeats 3 --no-yaw --bootstrap-seed 20261126`
   - [x] 6.4 Sửa theo review sau merge của PR 228 (phiên điều phối, 27/11/2026): `eval_set` từ chối cảnh lệch với `task.env_id` của plan; `eval_results` và `place_error` cảnh báo và ghi `plan_mismatch` khi tập điều kiện được dựng cho plan khác plan đang đọc
@@ -155,3 +155,4 @@ Hiếu (làm cùng Claude), duyệt cuối: Hiếu.
 | 27/11/2026 | 6.1 xong: hiệu ghép cặp trên mọi lượt và `--bootstrap-seed` trong `eval_results` | Hiếu (soạn với Claude) |
 | 27/11/2026 | Thêm và làm xong 6.4 (hai điểm review sau merge của PR 228); chờ Hiếu xác nhận việc này thuộc DA-50 | Hiếu (soạn với Claude) |
 | 27/11/2026 | 3.1, 3.2, 4.1, 4.2 xong: lô lệch góc (554 đoạn đặt giữ lại), tập N và plan `rp_23b25206d96e`; Phạm vi file ghi từng đường dẫn để `pr_guard` đọc được | Hiếu (soạn với Claude) |
+| 28/11/2026 | Nhiệm vụ 5 xong: train run N (Hiếu cho chạy 27/11/2026, "Chạy train N"), số thực đo ở tray-jig.md mục 8 và dòng sổ thực đo | Hiếu (soạn với Claude) |
