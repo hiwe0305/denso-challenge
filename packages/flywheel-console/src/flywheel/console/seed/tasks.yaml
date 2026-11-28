@@ -35,12 +35,12 @@ tasks:
       vi: khay trong ô đích trên bàn B, lệch tối đa target_pos_tol và target_yaw_tol_deg
       en: tray inside the target zone on table B, within target_pos_tol and target_yaw_tol_deg
       source: configs/eval/scorer/tray.yaml thresholds (giả định, chưa hiệu chỉnh)
-    rounds: [tray-r1]
+    # newest round first: the pages open on it (story DA-53, 28/11/2026)
+    rounds: [tray-jig-r1, tray-r1]
     # story.json keys that belong to this task (besides the keys of its rounds)
-    index: [story.runs, story.train_log_tail, story.vm_phases, story.sources, story.heat,
-            story.reasons, story.qa_sample, story.h1m, story.ledger, story.colab_balance,
-            story.colab_sessions, story.ds, story.eval, story.loop_chain, story.loop_detail,
-            story.jig]
+    index: [story.sources, story.heat, story.reasons, story.qa_sample, story.h1m, story.ledger,
+            story.colab_balance, story.colab_sessions, story.ds, story.eval, story.loop_chain,
+            story.loop_detail]
     evals: []
     clusters: []
     process:
@@ -230,4 +230,64 @@ rounds:
     follow: {level: 1, seed: 1000107}
     deck_corrections: true           # the box "số cập nhật sau khi nộp slide" (#/base)
     # story.json / sim.json keys that hold the round's numbers
-    index: [story.pair, story.round, story.follow, story.demo, sim]
+    index: [story.pair, story.round, story.follow, story.demo, sim, story.runs,
+            story.train_log_tail, story.vm_phases]
+
+  # Story DA-53 (Hiếu, 28/11/2026, option A): runs M and N on the jig scene as one Failure → Data
+  # round. Each run names its own folders; the eval numbers are copied from the `results.json`
+  # that `flywheel_psi0.tray.eval_results --json` writes beside each outcome (never recomputed in
+  # the console), and the index only compares their CI lower bounds with `rules` below.
+  - id: tray-jig-r1
+    task: tray
+    number: 2
+    title: {vi: "Vòng trên cảnh đồ gá: run M → run N", en: "Jig-scene round: run M → run N"}
+    doc: docs/he/tray-jig.md §2, §5, §6
+    eval: {levels: [1, 2], level_key: "levels 1-2"}
+    max_steps: 100000
+    log_run: N                       # whose VM log the training page shows (else any run with one)
+    scene: jig2
+    # the eval set both runs were scored on; results are read only when the set's
+    # conditions.sha256 file holds this value, the file counts this many rollouts with none
+    # missing, and its scorer version and bootstrap seed match (story DA-53, "Luật đọc")
+    eval_set: tray/eval-sets/jig-m-rp_a410d01efa62
+    conditions_sha256: bbec07e31ee022ac46d59e5322628c226519abe76363160ccbdb78b68725d348
+    rollouts_expected: 180
+    scorer_version: 2
+    # thresholds of rules 1, 2, 3 of jig-m-rules (rule 1 of jig-n-rules applies them to N);
+    # a reading says "met" only when the CI lower bound is at or above the threshold
+    rules:
+      whole_task: 0.80
+      per_level: 0.70
+      place: 0.50
+      read_at: lower_bound
+      source:
+        vi: "docs/he/tray-jig.md mục 2 (khối jig-m-rules) và mục 6 (khối jig-n-rules)"
+        en: "docs/he/tray-jig.md §2 (block jig-m-rules) and §6 (block jig-n-rules)"
+    runs:                            # display order; paths under FW_ROOT
+      - id: M
+        train_set: M
+        session: da48-m
+        train: tray/jig-m/da48-ft-m-s0           # the train job folder (metrics.jsonl, vm-logs)
+        stats: tray/jig-m/M-stats_psi0.json      # episode and frame counts
+        cut: da48/cuts/M.tar.json
+        outcome: tray/outcomes/jig-m-100000-r3   # scores.jsonl, outcomes.jsonl, results.json
+        bootstrap_seed: 20261125
+        rules_block: jig-m-rules
+        # the command that writes results.json (story DA-53 step 3.1; FW = fwdata/tray)
+        results_cmd: "uv run python -m flywheel_psi0.tray.eval_results configs/runplans/tray/he-tray-v2.yaml --set $FW/eval-sets/jig-m-rp_a410d01efa62 --out $FW/eval/jig-m-100000-r3 --repeats 3 --bootstrap-seed 20261125 --json $FW/outcomes/jig-m-100000-r3/results.json"
+      - id: N
+        train_set: N
+        session: da50-n
+        train: tray/jig-n/da50-ft-n-s0
+        stats: tray/jig-n/N-stats_psi0.json
+        cut: tray/jig-n/N.tar.json
+        outcome: tray/outcomes/jig-n-100000-r3
+        bootstrap_seed: 20261126
+        rules_block: jig-n-rules
+        # --baseline gives paired.repeats (N minus M per condition, rules 2 and 3 of jig-n-rules)
+        results_cmd: "uv run python -m flywheel_psi0.tray.eval_results configs/runplans/tray/he-tray-v2.yaml --set $FW/eval-sets/jig-m-rp_a410d01efa62 --out $FW/eval/jig-n-100000-r3 --repeats 3 --bootstrap-seed 20261126 --baseline $FW/eval/jig-m-100000-r3 --json $FW/outcomes/jig-n-100000-r3/results.json"
+    baseline: M
+    after_round: N
+    controls: []
+    withhold_eval: []                # Hiếu, 28/11/2026: M and N are shown (decision 3)
+    index: [story.jig]

@@ -66,7 +66,7 @@ def ladder(
     fw: Path, pair: dict[str, Any], cites: dict[str, dict[str, Any]], rnd: Round
 ) -> dict[str, Any]:
     """Runs out of n per model: tray on B (cited), relaxed placement, success at the 5 cm rule."""
-    folder = fw / rnd.eval_dir
+    folder = fw / (rnd.eval_dir or "")
     succ = {r["run"]: r.get("successes") for r in pair.get("runs") or []}
     onb = (cites.get("on_table_b") or {}).get("value") or {}
     runs: dict[str, Any] = {}
@@ -120,7 +120,7 @@ def ladder(
 def round1(fw: Path, cites: dict[str, dict[str, Any]], rnd: Round) -> dict[str, Any]:
     if not cites:
         return {}
-    folder = fw / rnd.eval_dir
+    folder = fw / (rnd.eval_dir or "")
     from_file: dict[str, Any] = {}
     for run in (rnd.baseline, rnd.after_round):
         g = (_dict(folder / f"place-error-{run}.json").get("groups") or {}).get(

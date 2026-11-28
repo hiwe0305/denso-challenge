@@ -1,8 +1,15 @@
 """Task and round manifests (``seed/tasks.yaml``): load, validate, and write ``tasks.json``.
 
 The manifest is the one place that names a task's scoring stages, a round's runs and their roles,
-the follow case, the folders a round's files live in and its step count. ``story.py``, ``demo.py``
-and ``sim.py`` read them from here; the web pages read ``tasks.json``.
+the follow case, the folders a round's files live in and its step count. ``story.py``, ``demo.py``,
+``jig.py`` and ``sim.py`` read them from here; the web pages read ``tasks.json``.
+
+Two shapes of round exist. A round listing ``story.pair`` (``tray-r1``) keeps its runs under one
+``train_dir`` and its stage-1 reads in ``eval_dir``. A round listing ``story.jig``
+(``tray-jig-r1``, story DA-53) names a train job folder, a stats file and an eval outcome folder per
+run, the eval set with its ``conditions.sha256``, and the thresholds of its reading rules; the
+indexer copies the numbers from each run's ``results.json`` and only compares them to those
+thresholds.
 
 ``tasks.json`` carries the manifest plus what the indexer resolves for each task: its catalog
 totals (origin "file"), the evaluations it lists (read from their summary file, origin "file") and
@@ -12,7 +19,8 @@ its cited clusters (``seed/cited.yaml``, origin "cited").
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+import re
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +32,8 @@ FILE = "tasks.yaml"
 PROCESS_STAGES = ("1", "2", "3", "4", "5", "6", "0")
 HOW_KINDS = ("cmd", "config", "module", "doc")
 ROLES = ("baseline", "after_round", "control")
+RULE_KEYS = ("whole_task", "per_level", "place")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
 class ManifestError(ValueError):
@@ -43,6 +53,14 @@ class Run:
     train_set: str
     session: str | None
     role: str | None
+    # per-run paths (a ``story.jig`` round): train job folder, stats file, eval outcome folder
+    train: str | None = None
+    stats: str | None = None
+    outcome: str | None = None
+    bootstrap_seed: int | None = None
+    rules_block: str | None = None
+    results_cmd: str | None = None
+    cut: str | None = None  # the run's data cut record (``<name>.tar.json``)
 
 
 @dataclass(frozen=True)
@@ -51,12 +69,12 @@ class Round:
     task: str
     number: int
     max_steps: int
-    train_dir: str
-    eval_dir: str
+    train_dir: str | None
+    eval_dir: str | None
     cut: str | None
     rollouts: str | None
     log_run: str | None
-    rule_tag: str
+    rule_tag: str | None
     level_key: str
     runs: tuple[Run, ...]
     baseline: str
@@ -65,6 +83,14 @@ class Round:
     follow: tuple[int, int] | None
     index: tuple[str, ...]
     raw: dict[str, Any] = field(repr=False, compare=False)
+    withhold_eval: tuple[str, ...] = ()
+    # a ``story.jig`` round: scene, eval set, rollouts and scorer the results must match, rules
+    scene: str | None = None
+    eval_set: str | None = None
+    conditions_sha256: str | None = None
+    rollouts_expected: int | None = None
+    scorer_version: int | None = None
+    rules: dict[str, Any] | None = None
 
     @property
     def run_ids(self) -> tuple[str, ...]:
@@ -117,6 +143,10 @@ class Manifest:
         """The round whose training cut ``sim.json`` describes (the one listing ``sim``)."""
         return next((r for r in self.rounds if "sim" in r.index), None)
 
+    def jig_round(self) -> Round | None:
+        """The round whose runs ``story.json · jig`` holds (the one listing ``story.jig``)."""
+        return next((r for r in self.rounds if "story.jig" in r.index), None)
+
 
 # ------------------------------------------------------------------ validation
 def _need(d: Any, key: str, where: str, kind: type | tuple[type, ...] = str) -> Any:
@@ -126,6 +156,27 @@ def _need(d: Any, key: str, where: str, kind: type | tuple[type, ...] = str) -> 
     if not isinstance(v, kind) or isinstance(v, bool) and kind is int:
         raise ManifestError(f"{where}.{key}: expected {getattr(kind, '__name__', kind)}, got {v!r}")
     return v
+
+
+def _opt(d: Any, key: str, where: str, required: bool, kind: type | tuple[type, ...] = str) -> Any:
+    """``d[key]`` checked like ``_need`` when present or ``required``; else None."""
+    if required or (isinstance(d, dict) and d.get(key) is not None):
+        return _need(d, key, where, kind)
+    return None
+
+
+def _rules(v: Any, where: str) -> dict[str, Any]:
+    """Thresholds of a round's reading rules: each in (0, 1), read at the CI's lower bound."""
+    if not isinstance(v, dict):
+        raise ManifestError(f"{where}: missing (a story.jig round declares its reading rules)")
+    for k in RULE_KEYS:
+        x = v.get(k)
+        if isinstance(x, bool) or not isinstance(x, (int, float)) or not 0 < x < 1:
+            raise ManifestError(f"{where}.{k}: expected a number between 0 and 1, got {x!r}")
+    if v.get("read_at") != "lower_bound":
+        raise ManifestError(f"{where}.read_at: expected 'lower_bound', got {v.get('read_at')!r}")
+    _text(v, "source", where)
+    return dict(v)
 
 
 def _text(d: Any, key: str, where: str) -> dict[str, str]:
@@ -202,10 +253,28 @@ def _round(r: Any, i: int) -> Round:
     rid = _need(r, "id", where)
     where = f"round '{rid}'"
     _text(r, "title", where)
+    index = tuple(_need(r, "index", where, list))
+    jig = "story.jig" in index
     runs: list[Run] = []
     for j, x in enumerate(_need(r, "runs", where, list)):
         w = f"{where}.runs[{j}]"
-        runs.append(Run(_need(x, "id", w), _need(x, "train_set", w), x.get("session"), None))
+        rid_j = _need(x, "id", w)
+        w = f"{where}.runs '{rid_j}'"
+        runs.append(
+            Run(
+                rid_j,
+                _need(x, "train_set", w),
+                x.get("session"),
+                None,
+                train=_opt(x, "train", w, jig),
+                stats=_opt(x, "stats", w, False),
+                outcome=_opt(x, "outcome", w, jig),
+                bootstrap_seed=_opt(x, "bootstrap_seed", w, jig, int),
+                rules_block=_opt(x, "rules_block", w, False),
+                results_cmd=_opt(x, "results_cmd", w, jig),
+                cut=_opt(x, "cut", w, False),
+            )
+        )
     ids = [x.id for x in runs]
     if len(set(ids)) != len(ids):
         raise ManifestError(f"{where}.runs: duplicate run id in {ids}")
@@ -217,7 +286,7 @@ def _round(r: Any, i: int) -> Round:
         if v not in ids:
             raise ManifestError(f"{where}.{name}: '{v}' is not one of its runs {ids}")
     role = {baseline: "baseline", after: "after_round"} | {c: "control" for c in controls}
-    runs = [Run(x.id, x.train_set, x.session, role.get(x.id)) for x in runs]
+    runs = [replace(x, role=role.get(x.id)) for x in runs]
     fol = r.get("follow")
     follow: tuple[int, int] | None = None
     if fol is not None:
@@ -227,30 +296,45 @@ def _round(r: Any, i: int) -> Round:
     steps = _need(r, "max_steps", where, int)
     if steps <= 0:
         raise ManifestError(f"{where}.max_steps: must be positive")
-    for v in r.get("withhold_eval") or []:
+    withhold = tuple(r.get("withhold_eval") or [])
+    for v in withhold:
         if v not in ids:
             raise ManifestError(f"{where}.withhold_eval: '{v}' is not one of its runs {ids}")
     if r.get("log_run") is not None and r["log_run"] not in ids:
         raise ManifestError(f"{where}.log_run: '{r['log_run']}' is not one of its runs {ids}")
+    pair = "story.pair" in index  # the stage-1 reads need one train folder and one eval folder
+    sha = _opt(r, "conditions_sha256", where, jig)
+    if sha is not None and not _SHA256.match(sha):
+        raise ManifestError(f"{where}.conditions_sha256: expected 64 lowercase hex, got {sha!r}")
+    expected = _opt(r, "rollouts_expected", where, jig, int)
+    if expected is not None and expected <= 0:
+        raise ManifestError(f"{where}.rollouts_expected: must be positive")
     return Round(
         id=rid,
         task=_need(r, "task", where),
         number=_need(r, "number", where, int),
         max_steps=steps,
-        train_dir=_need(r, "train_dir", where),
-        eval_dir=_need(r, "eval_dir", where),
+        train_dir=_opt(r, "train_dir", where, pair),
+        eval_dir=_opt(r, "eval_dir", where, pair),
         cut=r.get("cut"),
         rollouts=r.get("rollouts"),
         log_run=r.get("log_run"),
-        rule_tag=_need(r, "rule_tag", where),
+        rule_tag=_opt(r, "rule_tag", where, pair),
         level_key=_need(ev, "level_key", f"{where}.eval"),
         runs=tuple(runs),
         baseline=baseline,
         after_round=after,
         controls=controls,
         follow=follow,
-        index=tuple(_need(r, "index", where, list)),
+        index=index,
         raw=r,
+        withhold_eval=withhold,
+        scene=_opt(r, "scene", where, False),
+        eval_set=_opt(r, "eval_set", where, jig),
+        conditions_sha256=sha,
+        rollouts_expected=expected,
+        scorer_version=_opt(r, "scorer_version", where, jig, int),
+        rules=_rules(r.get("rules"), f"{where}.rules") if jig or "rules" in r else None,
     )
 
 

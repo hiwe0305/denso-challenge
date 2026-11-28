@@ -767,7 +767,7 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         tray_steps = tuple(s.id for s in manifest.task("tray").stages)
     except KeyError:
         pass
-    if rnd is not None:
+    if rnd is not None and rnd.train_dir:
         runs, run_dirs = _runs(fw, rnd.train_dir, rnd.max_steps)
         tail, phases = _train_log(run_dirs, rnd.log_run)
     else:
@@ -789,7 +789,8 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         demo_cited = cited.demo_groups(paths)
     except (OSError, KeyError, TypeError, ValueError):
         demo_cited = {}
-    pair = _pair(fw, rnd.eval_dir, rnd.run_ids) if rnd else {}
+    eval_dir = rnd.eval_dir if rnd else None  # a story.pair round always names it (tasks.py)
+    pair = _pair(fw, eval_dir, rnd.run_ids) if rnd and eval_dir else {}
     jig = _jig(fw, tray_steps, sessions)
     h1m = _h1m(fw)
     data: dict[str, Any] = {
@@ -807,7 +808,7 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
         "loop_detail": detail,
         "pair": pair,
         "round": round_cited,
-        "follow": _follow(fw, rnd.eval_dir, rnd.follow) if rnd else {},
+        "follow": _follow(fw, eval_dir, rnd.follow) if rnd and eval_dir else {},
         "demo": demo.build(fw, pair, round_cited, h1m, demo_cited, rnd),
         "jig": jig,
     }
