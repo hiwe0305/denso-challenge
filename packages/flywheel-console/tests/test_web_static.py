@@ -95,6 +95,8 @@ def test_default_round_and_round_links() -> None:
     assert 'readSession("fw_round")' not in core
     assert core.count("rememberSelection({ roundPicked: true })") == 2
     assert "export function renderRoundLinks" in core and "export function renderTimeline" in core
+    # carried / placed come as bare numbers out of the link's n (index PR #266)
+    assert "linkCount(L.carried, L.n)" in core and "linkCount(L.placed, L.n)" in core
     ops = (WEB / "pages_ops.js").read_text(encoding="utf-8")
     assert "renderRoundLinks(curRound)" in ops and "renderTimeline(state.storyRawDoc)" in ops
     for lang in ("vi", "en"):
