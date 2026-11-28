@@ -1968,7 +1968,110 @@
    ],
    "earlier_scorer": null,
    "earlier_source": "fwdata/tray/pair60k/stage1-60k",
-   "earlier_doc": "docs/he/tray.md §19, §20"
+   "earlier_doc": "docs/he/tray.md §19, §20",
+   "ladder": {
+    "rule": "place_error.py tolerance_curve: success, or L-PLACE-POSE with dist ≤ t and yaw ≤ 10° (reach_b not required)",
+    "n": 60,
+    "thresholds_cm": [
+     "5",
+     "7.5",
+     "10",
+     "15",
+     "20"
+    ],
+    "repeats_range": [
+     42,
+     47
+    ],
+    "runs": [
+     {
+      "run": "C_ALL",
+      "round": "tray-r1",
+      "scene": "không đồ gá",
+      "scorer": "bản 1",
+      "success": 5,
+      "relaxed": {
+       "5": 5,
+       "7.5": 9,
+       "10": 12,
+       "15": 14,
+       "20": 17
+      },
+      "reach_b": 39,
+      "dev": {
+       "n": 39,
+       "dist_cm": {
+        "p50": 10.8,
+        "p90": 42.81
+       },
+       "yaw_deg": {
+        "p50": 10.91,
+        "p90": 22.47
+       },
+       "yaw_le_10": 18
+      }
+     },
+     {
+      "run": "C_70",
+      "round": "tray-r1",
+      "scene": "không đồ gá",
+      "scorer": "bản 1",
+      "success": 10,
+      "relaxed": {
+       "5": 10,
+       "7.5": 14,
+       "10": 19,
+       "15": 23,
+       "20": 23
+      },
+      "reach_b": 46,
+      "dev": {
+       "n": 46,
+       "dist_cm": {
+        "p50": 5.65,
+        "p90": 15.99
+       },
+       "yaw_deg": {
+        "p50": 8.41,
+        "p90": 18.55
+       },
+       "yaw_le_10": 26
+      }
+     },
+     {
+      "run": "M",
+      "round": "tray-jig-r1",
+      "scene": "jig2",
+      "scorer": "bản 2",
+      "success": 47,
+      "relaxed": {
+       "5": 47,
+       "7.5": 50,
+       "10": 51,
+       "15": 53,
+       "20": 53
+      },
+      "reach_b": 60,
+      "dev": {
+       "n": 60,
+       "dist_cm": {
+        "p50": 2.08,
+        "p90": 7.91
+       },
+       "yaw_deg": {
+        "p50": 1.69,
+        "p90": 9.61
+       },
+       "yaw_le_10": 55
+      }
+     }
+    ],
+    "sources": [
+     "fwdata/tray/pair60k/stage1-60k/place-error-C_ALL.json rows",
+     "fwdata/tray/pair60k/stage1-60k/place-error-C_70.json rows",
+     "story.jig.rollouts (repeat 0; reach_b = steps[:5] all passed)"
+    ]
+   }
   },
   "cost": {
    "train": {

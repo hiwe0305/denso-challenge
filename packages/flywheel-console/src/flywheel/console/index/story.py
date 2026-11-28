@@ -644,7 +644,7 @@ def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
     jig_block = jig.build(fw, jrnd, jruns, jtail, jphases, tray_steps, sessions, jlog)
     ledger = _ledger(paths.repo, hide)
     if jig_block:  # AC 11: repeat 0 of the jig baseline beside the story.pair round's runs
-        jig_block["compare60"] = jig.compare60(jig_block, jrnd, pair, rnd)
+        jig_block["compare60"] = jig.compare60(jig_block, jrnd, pair, rnd, fw)
         jig_block["cost"] = _jig_cost(paths, jrnd, ledger)
     try:
         diag: dict[str, Any] = cited.diag_block(paths)
