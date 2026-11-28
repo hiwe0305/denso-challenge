@@ -72,7 +72,7 @@ FOCUS = [
     ("cost", re.compile(r"\btốn\b|chi phí|bao nhiêu tiền|\bcost|\bCU\b|\bUSD\b|budget|ngân sách", re.I)),
     ("steps", re.compile(r"bước nào|từng bước|qua từng|which step|each step|per step|step by step", re.I)),
     ("diag", re.compile(r"chẩn đoán|nhóm lỗi|cụm lỗi|phiếu|diagnos|failure group|ticket", re.I)),
-    ("compare", re.compile(r"so sánh|khác nhau|khác gì|\bcompare|difference between|\bso\b .* với|\bvs\.?\b|rollout", re.I)),
+    ("compare", re.compile(r"so sánh|khác nhau|khác gì|đặt cạnh|\bcompare|difference between|side by side|\bso\b.*\bvới\b|\bvs\.?\b|rollout", re.I)),
     ("fail", re.compile(r"hỏng|lỗi nào|lỗi gì|thất bại|\bfail|failure|điểm yếu|weak", re.I)),
     ("best", re.compile(r"tốt nhất|\bbest\b|bản nào|which model|cao nhất|nhiều nhất|most success", re.I)),
     ("qa", re.compile(r"kiểm định|lỗi cấy|planted|quality check|inspector", re.I)),
@@ -131,6 +131,24 @@ def focus_of(question: Any) -> str:
     return next((k for k, rx in FOCUS if rx.search(q)), "all")
 
 
+def focuses_of(question: Any) -> list[str]:
+    """Every part the question asks about, in FOCUS order ("đạt mốc 80% không, và đặt cạnh bảng
+    60 rollout" asks for the verdict and the comparison)."""
+    q = str(question or "")
+    return [k for k, rx in FOCUS if rx.search(q)]
+
+
+def _with_extra(plan: dict[str, tuple[str | None, list[str]]], focus: str, extra: list[str]) -> tuple[str | None, list[str]]:
+    """The facts of the main focus, then the lead and facts of each other focus of the question."""
+    first, more = plan.get(focus, plan["all"])
+    more = list(more)
+    for e in extra:
+        if e != focus and e in plan:
+            f2, m2 = plan[e]
+            more += ([f2] if f2 else []) + list(m2)
+    return first, list(dict.fromkeys(more))
+
+
 def manifest() -> dict[str, Any]:
     d = jload(active().index / "tasks.json", {})
     d = d if isinstance(d, dict) else {}
@@ -160,29 +178,54 @@ def _plain_runs(rnd: dict[str, Any]) -> list[str]:
     return [str(x.get("id")) for x in rnd.get("runs") or [] if re.fullmatch(r"[A-Z][A-Za-z]{0,3}", str(x.get("id") or ""))]
 
 
+def _covers(rnd: dict[str, Any]) -> set[str]:
+    """Run ids a round's report gives numbers for: its own runs and, for the jig round, the runs
+    of the 60-rollout table it sets side by side (story.jig.compare60)."""
+    ids = {str(x.get("id")) for x in rnd.get("runs") or [] if x.get("id")}
+    if "story.jig" in (rnd.get("index") or []):
+        c60 = (story().get("jig") or {}).get("compare60") or {}
+        ids |= {str(e.get("run")) for e in c60.get("earlier") or [] if e.get("run")}
+        if c60.get("run"):
+            ids.add(str(c60["run"]))
+    return ids
+
+
+def _named_rounds(q: str, rounds: list[dict[str, Any]]) -> list[str]:
+    """Rounds the question names by id, by number ("vòng 1") or by scene ("đồ gá", "jig")."""
+    out: list[str] = []
+    for r in sorted(rounds, key=lambda r: -len(str(r["id"]))):
+        if re.search(r"(?<![\w-])" + re.escape(str(r["id"])) + r"(?![\w-])", q, re.I):
+            out.append(str(r["id"]))
+    for m in re.finditer(r"(?:vòng|round)\s*(\d)\b", q, re.I):
+        out += [str(r["id"]) for r in rounds if str(r.get("number")) == m.group(1)]
+    if re.search(r"đồ gá|\bjig", q, re.I):
+        out += [str(r["id"]) for r in rounds if r.get("scene") or "story.jig" in (r.get("index") or [])]
+    return list(dict.fromkeys(out))
+
+
 def round_named(question: Any, current: Any = None) -> str:
-    """The round a question is about: one it names (id, "vòng 1", "jig", a run only that round
-    has, like "run M"), else ``current`` (the round chosen in the top bar)."""
+    """The round a question is about, from every round it names and every run it names.
+
+    A run named in the question ("run M", "C_ALL") picks a round whose report covers all of them
+    (the jig round covers its run M and the DA-34 runs of its 60-rollout table); among those, the
+    one the question also names, then ``current``. With no run named: ``current`` when the
+    question names it, else the first round named. Else ``current`` (the top bar)."""
     q = str(question or "")
     cur = str(current or "")
     rounds = _rounds()
-    for r in sorted(rounds, key=lambda r: -len(str(r["id"]))):
-        if str(r["id"]).lower() in q.lower():
-            return str(r["id"])
-    m = re.search(r"(?:vòng|round)\s*(\d)\b", q, re.I)
-    if m:
-        hit = next((r for r in rounds if str(r.get("number")) == m.group(1)), None)
-        if hit:
-            return str(hit["id"])
-    if re.search(r"đồ gá|\bjig", q, re.I):
-        hit = next((r for r in rounds if r.get("scene") or "story.jig" in (r.get("index") or [])), None)
-        if hit:
-            return str(hit["id"])
-    here = next((r for r in rounds if r["id"] == cur), None)
-    for r in rounds:
-        for run in _plain_runs(r):
-            if _word_in(run, q, case=True) and not (here and run in _plain_runs(here)):
-                return str(r["id"])
+    named = _named_rounds(q, rounds)
+    runs = {run for r in rounds for run in _plain_runs(r) if _word_in(run, q, case=True)}
+    runs |= {str(x.get("id")) for r in rounds for x in r.get("runs") or []
+             if x.get("id") and not re.fullmatch(r"[A-Z][A-Za-z]{0,3}", str(x["id"])) and _word_in(str(x["id"]), q)}  # fmt: skip
+    if runs:
+        cover = [str(r["id"]) for r in rounds if runs <= _covers(r)]
+        if cover:
+            both = [x for x in cover if x in named]
+            if cur in both or (not both and cur in cover):
+                return cur
+            return (both or cover)[0]
+    if named:
+        return cur if cur in named else named[0]
     return cur
 
 
@@ -353,6 +396,7 @@ def round_report(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     if rnd is None:
         return _no_round(task, say)
     focus = focus_of(ctx.get("question"))
+    extra = focuses_of(ctx.get("question"))[1:] if focus != "held" else []
     if ctx.get("deep") and focus != "held":
         focus = "all"  # a deep analysis reads the whole round: marks, failures, controls, limits
     if focus == "held":
@@ -362,9 +406,9 @@ def round_report(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         out["round"] = str(rnd.get("id"))
         return _held_answer(out, say)
     if "story.jig" in (rnd.get("index") or []):
-        out = _jig_report(task, rnd, say, focus)
+        out = _jig_report(task, rnd, say, focus, extra)
     else:
-        out = _pair_report(task, rnd, say, focus)
+        out = _pair_report(task, rnd, say, focus, extra)
     out["round"] = str(rnd.get("id"))
     return out
 
@@ -391,7 +435,7 @@ def _verdict(say: Say, lower: Any, thr: Any, what: str) -> str:
     return say(f"đạt mốc {t} %", f"meets the {t}% mark") if met else say(f"chưa đạt mốc {t} %", f"below the {t}% mark")
 
 
-def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str) -> Result:
+def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str, extra: list[str] | None = None) -> Result:
     j = _jig_block(rnd)
     if j is None:
         return fail(f"The index has no test result for round {rnd.get('id')} (story.jig; run: fw console index). "
@@ -467,7 +511,7 @@ def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str)
     if len(runs_here) <= 1:
         F["rule5"] = say(f"Chưa có run đối chứng K trên cùng tập điều kiện, nên không quy kết quả của run {run} cho dữ liệu bước đặt (luật 5): run {run} đổi cùng lúc cảnh, dữ liệu và số bước.",
                          f"There is no control run K on the same conditions, so run {run}'s result is not credited to the placing data (rule 5): run {run} changed scene, data and number of steps at once.")  # fmt: skip
-    F["limits"] = say("Giới hạn: một seed train, một lần train, trong mô phỏng; số là sơ bộ.", "Limits: one training seed, one training run, in simulation; the numbers are preliminary.")
+    F["limits"] = say("Giới hạn: số liệu sơ bộ; một seed train, một lần train, chạy trong mô phỏng.", "Limits: one training seed, one training run, in simulation; the numbers are preliminary.")
     if ckpt:
         F["what"] = say(f"Số chính là của checkpoint {ckpt} (luật 6).", f"The main numbers are those of checkpoint {ckpt} (rule 6).")
     F["untested"] = say("Chưa xem video các lượt hỏng; mọi lý do nêu cho lỗi lúc này là phỏng đoán.", "The failed runs have not been reviewed on video; any reason given for a failure now is a guess.")
@@ -498,7 +542,7 @@ def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str)
         "qa": ("headline", ["fails"]),
         "all": ("headline", ["levels", "place", "fails", "near", "compare60", "rule5", "wilson", "limits"]),
     }  # fmt: skip
-    first, more_k = PLAN.get(focus, PLAN["all"])
+    first, more_k = _with_extra(PLAN, focus, extra or [])
     title = f"{say.name(task.get('name'))}, {say.name(rnd.get('title'))}"
     conds = h.get("conditions")
     lines = [say(f"VÒNG {rnd.get('id')} ({title}). Run {run}" + (f", checkpoint {ckpt}" if ckpt else "") + f", cảnh {j.get('scene', '')}, bộ chấm bản {j.get('scorer_version', '')}: {n} rollout" + (f" ({conds} điều kiện × {n // conds} lượt)" if conds and n else "") + ". Mọi số dưới đây thuộc vòng này; đơn vị thống kê là điều kiện.",
@@ -524,7 +568,7 @@ def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str)
 
 
 # ------------------------------------------------------------------ pair round (DA-34)
-def _pair_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str) -> Result:
+def _pair_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str, extra: list[str] | None = None) -> Result:
     s = story()
     pair, R, demo = s.get("pair") or {}, s.get("round") or {}, s.get("demo") or {}
     # runs whose test result some round does not present (manifest withhold_eval): the tool never
@@ -694,7 +738,7 @@ def _pair_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str
         PLAN["why"] = ("dominant", ["strength", "tickets", "withheld", "untested"])
         PLAN["all"] = ("best", ["each", "strength", "dominant", "diag", "order", "withheld", "tickets", "cost", "untested"])
         PLAN["next"] = (None, ["strength", "dominant", "tickets", "withheld"])
-    first, more = PLAN.get(focus, PLAN["all"])
+    first, more = _with_extra(PLAN, focus, extra or [])
     title = f"{say.name(task.get('name'))}, {say.name(rnd.get('title'))}"
     lines = [say(f"VÒNG {rnd.get('id')} ({title}). Mọi bản model thi cùng {n} lượt; một lượt chỉ thành công khi vật nằm trong {tol} cm quanh đích. Mọi số dưới đây thuộc vòng này.",
                  f"ROUND {rnd.get('id')} ({title}). Every model is tested on the same {n} runs; a run succeeds only when the object ends within {tol} cm of the target. Every number below belongs to this round.")]  # fmt: skip

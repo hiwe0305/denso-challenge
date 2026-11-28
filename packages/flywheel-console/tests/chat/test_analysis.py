@@ -394,3 +394,32 @@ def test_ollama_is_ready_when_the_tunnel_serves_the_model(idx: ConsolePaths, mon
     tags = ["nemo:latest"]
     cfg = providers.get_runtime_config(NEMO, "nemo")
     assert cfg["ready"] and cfg["problem"] is None
+
+
+# ------------------------------------------------------------------ merged-build check 28/11 (Website session)
+def test_a_question_naming_several_rounds_keeps_the_round_that_covers_its_runs(idx: ConsolePaths) -> None:
+    _two_rounds(idx)
+    q = "Phân tích kết quả run M trên vòng đồ gá: có đạt mốc 80% không, so với các bản vòng 1 thế nào?"
+    # "vòng 1" comes first in the text, but run M and its 60-rollout table are in the jig round
+    assert tools_round.round_named(q, "jig-r1") == "jig-r1"
+    assert tools_round.round_named(q, "r1") == "jig-r1"
+    assert tools_round.round_named("So M với C_ALL trên 60 rollout", "r1") == "jig-r1"
+    assert tools_round.round_named("C_70 của vòng 1 có bao nhiêu lượt thành công?", "jig-r1") == "r1"
+    assert tools_round.round_named("Chi phí vòng 1 bao nhiêu?", "jig-r1") == "r1"
+    assert tools_round.round_named("Phân tích vòng jig-r1", "r1") == "jig-r1"  # "r1" inside "jig-r1" is not round r1
+    t = ask(q, "jig-r1")
+    assert t["round"] == "jig-r1" and "cả task 75,6 %" in t["model"] and "chỉ đặt cạnh nhau" in t["model"]
+
+
+def test_the_60_rollout_table_is_shown_with_the_verdict(idx: ConsolePaths) -> None:
+    _two_rounds(idx)
+    q = "Phân tích kết quả run M: có đạt mốc 80% không, và đặt cạnh bảng 60 rollout thì thế nào?"
+    assert not tools_round.asks_held(q)
+    assert tools_round.focuses_of(q)[:2] == ["verdict", "compare"]
+    t = ask(q, "jig-r1")["model"]
+    assert "chưa đạt mốc 80 %" in t  # the verdict leads
+    assert "M 47/60" in t and "C_70 10/60" in t and "chỉ đặt cạnh nhau" in t  # and the table follows
+    assert "C70_R1" not in t and "4/60" not in t and WITHHELD_VI not in t
+
+
+WITHHELD_VI = tools_round.WITHHELD[0]
