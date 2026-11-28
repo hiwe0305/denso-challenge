@@ -590,7 +590,7 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
     tool_rounds = 0
     retried = False
     pending_calls: list[dict[str, Any]] = [{"name": n, "arguments": {}} for n in prefetch]
-    tool_ctx = {**context, "lang": "vi" if lang == "Vietnamese" else "en", "question": question}
+    tool_ctx = {**context, "lang": "vi" if lang == "Vietnamese" else "en", "question": question, "deep": mode == "investigate"}
 
     def _call_gen(m_list: list[dict[str, Any]], sch: list[dict[str, Any]] | None) -> Iterator[tuple[str, Any]]:
         if max_predict == NUM_PREDICT:
