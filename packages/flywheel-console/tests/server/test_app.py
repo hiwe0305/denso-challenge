@@ -593,7 +593,8 @@ def test_hidden_run_never_leaves_the_server(locked_srv: Srv) -> None:
     assert [r["branch"] for r in out["runs"]] == ["M"]
     assert [r["run"] for r in out["jig"]["runs"]] == ["M"] and out["jig"]["best"] == "M"
     assert out["jig"]["next_cut"] is None and out["jig"]["n_ckpt_done"] is None
-    assert out["ledger"] == story["ledger"]  # money spent stays
+    # money spent stays, but the hidden story DA-50 is summed into one "other" row (Q1)
+    assert out["ledger"] == [["other", 1.0, 2.5]] and story["ledger"] == [["DA-50", 1.0, 2.5]]
     # withhold_eval of tray-r1 still holds C70_R1's result (index tasks.json)
     assert [r["run"] for r in out["pair"]["runs"]] == ["C_70"]
     st, body = locked_srv.get("/data/tasks.json")
