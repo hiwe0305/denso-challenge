@@ -88,6 +88,8 @@ SYSTEM = (
     "When the rows say comparable=no (different scene, eval set or scorer), put the numbers side by side and never write that one is better or up by an amount. "
     "When intervals overlap, give the highest count and say the runs cannot be told apart. Never call a run 'tốt nhất' / 'best'; 'cao nhất' / 'highest' with its number is fine. "
     "Keep each verdict (met or not met) next to the number it reads, one per level: never one verdict after two levels. "
+    "'đạt' / 'met' is only the verdict of a mark whose interval lower bound reaches it ('mức 1 đạt mốc 70 %'); a count is written as a count, "
+    "'C_70: 10/60 lượt thành công (16,7 %)' / 'C_70: 10/60 successes (16.7%)', never 'đạt 10/60' / 'met 10/60'. "
     "Never rank runs or models by training loss and never judge a run from its loss ('rất tốt', 'good'); when training numbers are given, say that training loss is not a measure of the result. "
     "Leave out of any ranking a run whose test result is not presented, and do not mention it unless asked; "
     "after_round_retest=not presented only means that result is never given: never write a note about a re-test (kiểm tra lại, thi lại) the user did not ask about. For a result that is not presented write only the sentence the tool gives; never confirm or deny a figure the user offers for it. "
