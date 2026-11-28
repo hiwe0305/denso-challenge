@@ -153,6 +153,7 @@ Theo 07 mục 3.1. File story luôn được sửa.
 
 - `packages/flywheel-console/src/flywheel/console/index/` (`tasks.py`, `story.py` và một module mới đọc `results.json`)
 - `packages/flywheel-console/src/flywheel/console/seed/tasks.yaml`
+- `packages/flywheel-console/src/flywheel/console/server/runner.py`: chỉ `_train_dirs` (vòng không có `train_dir`) và dòng trạng thái đọc khối `story.jig`. Thêm ngày 28/11/2026 khi viết 2.1
 - `packages/flywheel-console/src/flywheel/console/web/` (chỉ trang Train, Đánh giá, Vòng và i18n)
 - `packages/flywheel-console/tests/`
 - `docs/console/api-contract.md`, `docs/console/api-samples/`
