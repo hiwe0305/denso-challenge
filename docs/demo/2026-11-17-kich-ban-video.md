@@ -2,6 +2,7 @@
 
 | Ngày | Phiên bản | Nội dung | Người viết |
 |---|---|---|---|
+| 28/11/2026 | 0.9 | Mục 6 về bật server, chat và những gì không được lộ được thay bằng [danh sách kiểm 28/11](2026-11-28-checklist-quay.md); lời nói các cảnh chưa soát lại theo câu chữ mới | Hiếu (soạn với Claude) |
 | 19/11/2026 | 0.8 | Bỏ khỏi dòng change log 0.2 cặp số của kết quả không trình bày (quyết định 16/11/2026); lệnh bật server dùng `$PWD/fwdata` thay cho đường dẫn máy; ghi chú rằng với model hosted, chat chỉ thấy dữ liệu `public` và không có tool đọc job, log, phát hiện QA, video người | Hiếu (soạn với Claude) |
 | 17/11/2026 | 0.7 | Trợ lý ở cảnh 12 chạy bằng model Nemotron của NVIDIA qua dịch vụ OpenRouter (quyết định của Hiếu), không còn là model tự host. Sửa lời cảnh 12, bảng yêu cầu, bảng nguồn và danh sách kiểm (cách bật server, giới hạn lượt gọi mỗi ngày của gói miễn phí) | Hiếu (soạn với Claude) |
 | 16/11/2026 | 0.6 | Theo quyết định của Hiếu ngày 16/11/2026: không trình bày kết quả thi lại của bản sau vòng 1. Bỏ mọi câu và số về kết quả đó (cảnh 1, 8, 9, 11, 12) và các dòng nguồn tương ứng; cảnh 9 còn ba màn; cảnh 11 nói vòng sửa lỗi là phần chưa chứng minh; cảnh 12 đổi câu hỏi cho trợ lý. Website nói "không trình bày", không nói "chưa chạy". Đếm lại thời lượng | Hiếu (soạn với Claude) |
@@ -231,6 +232,8 @@ Mọi số dưới đây đã kiểm trong repo hoặc trong chỉ mục `fwdata
 Số không dùng vì chưa tìm thấy nguồn trong repo: "thi 60 lượt khoảng 9 CU" và "dạy 1 lần khoảng 76 CU" (deck slide 9, 15, 16; kịch bản dùng số đo 77,27 CU và 23,4 CU thay), "922 bước con có nhãn" (deck slide 11; chưa thấy trong chỉ mục), "×28" (deck slide 8).
 
 ## 6. Danh sách kiểm trước khi quay
+
+(bản 0.9) Phần bật server, chat và những gì không được lộ ở mục này đã cũ (cổng 4190, OpenRouter). Dùng [danh sách kiểm 28/11/2026](2026-11-28-checklist-quay.md) thay cho phần đó.
 
 **Máy và trình duyệt**
 
