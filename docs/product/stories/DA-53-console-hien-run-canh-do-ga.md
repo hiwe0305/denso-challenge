@@ -162,7 +162,7 @@ Story này thay cách quét đó bằng vòng `tray-jig-r1` (quyết định 1) 
 - [x] 2.6 Bảng 60 lượt: lượt lặp 0 của M cạnh `C_ALL`, `B_ALL`, `B_70`, `C_70`, kèm số các lượt và câu nêu điểm khác, số đọc từ file outcome (AC 11)
 - [x] 2.4 Giao diện: trang Train, Đánh giá, Vòng hiện vòng `tray-jig-r1`, chỉ cho run M (quyết định 28/11/2026); câu so với DA-34 có điểm khác đi kèm (AC 2, 3, 4, 7)
 - [ ] 3.1 (Hiếu, vận hành) Ghi `results.json` của M cạnh outcome bằng lệnh đầu ở mục "Điều chỉnh sau khi đọc dữ liệu", rồi chạy `fw console index` (AC 3). Theo quyết định 28/11/2026 không ghi `results.json` của N và không kéo `metrics.jsonl` của N
-- [ ] 3.2 Cập nhật hợp đồng API và mẫu; chạy đủ kiểm tra (AC 8, 9)
+- [x] 3.2 Cập nhật hợp đồng API và mẫu; chạy đủ kiểm tra (AC 8, 9)
 
 ## Phạm vi file
 

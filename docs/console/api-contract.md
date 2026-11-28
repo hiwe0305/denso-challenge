@@ -1,12 +1,12 @@
 # Hợp đồng API của Flywheel Console
 
-Ngày viết: 25/11/2026. Trạng thái: **[Đề xuất]**, chờ Hiếu duyệt.
+Ngày viết: 25/11/2026; cập nhật 28/11/2026 cho vòng `tray-jig-r1` (story [DA-53](../product/stories/DA-53-console-hien-run-canh-do-ga.md): mục 1.2, 2, 2.1 và 3). Trạng thái: **[Đề xuất]**, chờ Hiếu duyệt.
 
 File này mô tả mọi URL mà giao diện web của Console gọi tới server. Mục đích: xây lại giao diện (`packages/flywheel-console/src/flywheel/console/web/`) mà **không đổi server**. Giao diện mới chỉ được gọi các URL trong file này.
 
 Nguồn sự thật là mã: [server/app.py](../../packages/flywheel-console/src/flywheel/console/server/app.py), [server/runner.py](../../packages/flywheel-console/src/flywheel/console/server/runner.py), [server/media.py](../../packages/flywheel-console/src/flywheel/console/server/media.py), [chat/llm.py](../../packages/flywheel-console/src/flywheel/console/chat/llm.py). Khi file này lệch với mã, mã thắng; sửa file này cho khớp.
 
-JSON mẫu thật nằm trong [api-samples/](api-samples/). Cách lấy: chạy server trên `fwdata/` của laptop ngày 25/11/2026, rồi cắt mỗi danh sách còn 2 phần tử, cắt chuỗi dài, bỏ dòng catalog không `public`, thay đường dẫn máy bằng `fwdata/`, `~/` và `<repo>/`. Mẫu chỉ cho biết **hình dạng**, không phải số liệu để trình bày.
+JSON mẫu thật nằm trong [api-samples/](api-samples/). Cách lấy: chạy server trên `fwdata/` của laptop ngày 25/11/2026, rồi cắt mỗi danh sách còn 2 phần tử, cắt chuỗi dài, bỏ dòng catalog không `public`, thay đường dẫn máy bằng `fwdata/`, `~/` và `<repo>/`. `data_story.json` và `data_tasks.json` lấy lại ngày 28/11/2026 từ index dựng trên bản sao `fwdata` có `results.json` của run M (cắt danh sách còn 2 phần tử, trừ `readings` và `rounds`; cắt chuỗi quá 260 ký tự). Mẫu chỉ cho biết **hình dạng**, không phải số liệu để trình bày.
 
 ## 1. Quy tắc chung
 
@@ -35,7 +35,7 @@ JSON mẫu thật nằm trong [api-samples/](api-samples/). Cách lấy: chạy 
 Vòng có danh sách `withhold_eval` trong [seed/tasks.yaml](../../packages/flywheel-console/src/flywheel/console/seed/tasks.yaml) (hiện là `C70_R1`, quyết định của Hiếu 16/11/2026). Kết quả thi lại của các run này **không được trình bày** ở bất kỳ trang, biểu đồ hay tooltip nào.
 
 - Server đã bỏ các khối kết quả của run này khỏi `data/story.json` trước khi gửi ([server/withhold.py](../../packages/flywheel-console/src/flywheel/console/server/withhold.py)).
-- Giao diện mới **vẫn phải lọc lần nữa** theo `rounds[].withhold_eval` của `data/tasks.json`, giống hàm `unhide` trong `web/core.js` hiện tại: bỏ run khỏi `pair.runs`, bỏ so sánh có run đó khỏi `pair.comparisons`, bỏ khóa run khỏi `follow.runs`, xóa `follow.r3`, xóa `demo.round1_reading`, bỏ khóa run khỏi `demo.ladder.runs` và `demo.ladder.on_table_b.value`.
+- Giao diện mới **vẫn phải lọc lần nữa** theo `rounds[].withhold_eval` của `data/tasks.json`, giống hàm `unhide` trong `web/core.js` hiện tại: bỏ run khỏi `pair.runs`, bỏ so sánh có run đó khỏi `pair.comparisons`, bỏ khóa run khỏi `follow.runs`, xóa `follow.r3`, xóa `demo.round1_reading`, bỏ khóa run khỏi `demo.ladder.runs` và `demo.ladder.on_table_b.value`. Trong khối `jig` (mục 2.1): mục của run trong `evals` chỉ còn `{run, role, status: "withheld"}`, run bị bỏ khỏi `outcomes`, `rollouts`, `conditions` và `compare60.earlier`, `featured` không trỏ tới nó (hàm `filterWithheldStory` của `web/core.js`).
 - Thông tin train, bản cắt dữ liệu và chi phí của run vẫn được hiện.
 
 ### 1.3. Run bị ẩn (`withhold_runs`)
@@ -54,30 +54,48 @@ Do `fw console index` tạo trong `fwdata/console/index/`, server phục vụ �
 
 | URL | Mẫu | Nội dung |
 |---|---|---|
-| `data/tasks.json` | [data_tasks.json](api-samples/data_tasks.json) | `{version, source, tasks[], rounds[]}`. Mỗi task: `id` (`tray`, `two_table`…), `name`/`word`/`description` song ngữ `{vi, en}`, `robot`, `model`, `simulator`, `stages[]`, `success`, `rounds[]` (id vòng), `index[]` (khóa của `story.json` mà task được thấy), `process` (stage 0–6: thiếu gì, chạy ở đâu, lệnh), `catalog_totals`, `catalog_rows`. Mỗi round: `id`, `task`, `title`, `runs[]`, `baseline`, `after_round` (có thể `null`, mục 1.3), `controls[]`, `withhold_eval[]`, `follow`, `max_steps`, `index[]`. Run trong `withhold_runs` không có mặt (mục 1.3) |
+| `data/tasks.json` | [data_tasks.json](api-samples/data_tasks.json) | `{version, source, tasks[], rounds[]}`. Mỗi task: `id` (`tray`, `two_table`…), `name`/`word`/`description` song ngữ `{vi, en}`, `robot`, `model`, `simulator`, `stages[]`, `success`, `rounds[]` (id vòng), `index[]` (khóa của `story.json` mà task được thấy), `process` (stage 0–6: thiếu gì, chạy ở đâu, lệnh), `catalog_totals`, `catalog_rows`. Mỗi round: `id`, `task`, `number`, `title`, `doc`, `eval`, `runs[]`, `baseline`, `after_round` (có thể `null`, mục 1.3), `controls[]` (có thể rỗng), `withhold_eval[]`, `follow`, `max_steps`, `log_run`, `index[]`. Vòng đọc một thư mục (`tray-r1`) có thêm `train_dir`, `eval_dir`, `cut`, `rollouts`; vòng trên cảnh đồ gá (`tray-jig-r1`) có thêm `scene`, `eval_set`, `conditions_sha256`, `rollouts_expected`, `scorer_version`, `rules` (`whole_task`, `per_level`, `place`, `read_at`, `source{vi,en}`), và mỗi run của nó có `train`, `stats`, `outcome`, `cut`, `bootstrap_seed`, `rules_block`, `results_cmd`. Thứ tự `tasks[].rounds` là thứ tự của bộ chọn vòng; vòng đầu là vòng mặc định (`tray-jig-r1`). Run trong `withhold_runs` không có mặt (mục 1.3) |
 | `data/catalog.json` | [data_catalog.json](api-samples/data_catalog.json) | `{generated, rows[], edges[], runs[], totals}`. Mỗi row là một tập dữ liệu: `id`, `title`, `kind`, `group`, `data_type`, `task`, `episodes`, `frames`, `hours`, `fps`, `format`, `licence`, `data_class`, `status`, `parents[]`, `children[]`, `view`, `thumbs[]`. `edges` là cặp `[cha, con]` của cây nguồn gốc. `totals` theo nhóm (`egocentric`, `teleop`, `s1`, `s2`, `all`) |
-| `data/story.json` | [data_story.json](api-samples/data_story.json) | Số liệu cho các trang câu chuyện: `runs`, `train_log_tail`, `sources`, `heat`, `reasons`, `ledger`, `colab_balance`, `colab_sessions`, `eval`, `loop_chain`, `loop_detail`, `pair`, `round`, `follow`, `demo`, `h1m`, `ds`, `vm_phases`, `qa_sample`, `jig` (vòng trên cảnh đồ gá, mục 2.1). Mỗi task chỉ được đọc các khóa có trong `index[]` của task và round (`story.<khóa>`); không hiện số của task khác |
+| `data/story.json` | [data_story.json](api-samples/data_story.json) | Số liệu cho các trang câu chuyện: `runs`, `train_log_tail`, `sources`, `heat`, `reasons`, `ledger`, `colab_balance`, `colab_sessions`, `eval`, `loop_chain`, `loop_detail`, `pair`, `round`, `follow`, `demo`, `h1m`, `ds`, `vm_phases`, `qa_sample`, `jig` (vòng trên cảnh đồ gá, mục 2.1). Mỗi task chỉ được đọc các khóa có trong `index[]` của task và round (`story.<khóa>`); không hiện số của task khác. `runs`, `train_log_tail`, `vm_phases` thuộc `index[]` của vòng `tray-r1`; vòng `tray-jig-r1` chỉ có `story.jig` và đọc ba khối này trong `jig`. Trong `vm_phases` (và `runs[].vm_phases`), `setup*` và `train` là thời lượng của pha; `persist` chạy song song với `train`, nên giá trị là phần đồng bộ sau train (`persist − train`), không phải mốc cộng dồn |
 | `data/sim.json` | [data_sim.json](api-samples/data_sim.json) | Tập episode mô phỏng: `source`, `sha8`, `parts[]`, `cuts{}`, `batch{}`, `episodes[]`, `round`, `format`, `teleop[]`. Task không có khóa `sim` trong `index[]` chỉ thấy `teleop[]` lọc theo task |
 | `data/ds/<id>/episodes.json` | (không có mẫu) | Danh sách episode của một tập; đây là nguồn số episode cho `#/data/:id/ep/:n`. Tập robot (do [index/robot.py](../../packages/flywheel-console/src/flywheel/console/index/robot.py) viết): `i`, `n`, `s` (giây), `lv`, `seed`, `part`, `cut`, `out`… Tập egocentric và nguồn: `id`, `title`, `s`, `qa`, `reasons`, `poster`… Tập robot chỉ có khi laptop có dữ liệu LeRobot lúc chạy `fw console index` |
 | `data/ds/<id>/quality.json`, `method.json`, `qa.json`, `env.json` | (không có mẫu) | Chất lượng, cách tạo tập, kết quả QA từng episode, môi trường (chỉ tập robot); file nào thiếu thì khối đó rỗng |
 | `data/ds/<id>/posters/<i>.jpg` | | Ảnh đại diện từng episode |
 
-### 2.1. Khối `jig`: lượt lặp và bảng 60 lượt
+### 2.1. Khối `jig`: vòng trên cảnh đồ gá
 
-Hình dạng đầy đủ của khối `jig` ghi trong docstring của [index/jig.py](../../packages/flywheel-console/src/flywheel/console/index/jig.py). Hai trường thêm cho bảng 60 lượt (story DA-53, AC 11, quyết định của Hiếu 28/11/2026):
+Khối của vòng có `story.jig` trong `index[]` (`tray-jig-r1`, story DA-53). Hình dạng đầy đủ ghi trong docstring của [index/jig.py](../../packages/flywheel-console/src/flywheel/console/index/jig.py); vòng không có khối thì `jig` là `{}`. Theo quyết định của Hiếu ngày 28/11/2026, khối chỉ có run M: run N nằm trong `withhold_runs` (mục 1.3).
+
+| Trường | Nội dung |
+|---|---|
+| `round`, `scene`, `doc`, `source` | Id vòng, cảnh (`jig2`), tài liệu, nguồn |
+| `rules` | Ngưỡng của luật đọc, chép từ `tasks.yaml`: `whole_task`, `per_level`, `place`, `read_at` (`lower_bound`), `source{vi,en}` (khối `jig-m-rules` của [tray-jig.md](../he/tray-jig.md) mục 2). Trang hiện nguồn này cạnh câu đọc và không viết cứng ngưỡng |
+| `eval_set`, `rollouts_expected`, `scorer_version` | Tập điều kiện (`path`, `conditions_sha256`, `sha_ok`), số rollout khai báo (180), bản bộ chấm (2) |
+| `runs[]` | Mục train của từng run, như `story.runs[]`: `job`, `branch` (`M`), `step`, `ckpt_step`, `max_steps`, `loss_last`, `val_last`, đường cong `loss`/`val`/`thr`/`vram`/`gn`, `vm_phases`, `log_tail`, `scene`, và `fetched_final`, `fetched_train`, `fetched_step` (bản `metrics.jsonl` trên laptop). File chỉ là bản chưa đủ khi `fetched_final` là `false` và `fetched_train` khác `"done"`. Không có kết quả eval ở đây |
+| `log_run`, `train_log_tail`, `vm_phases` | Run có log VM (`M`) và log, pha của nó |
+| `evals[]` | Một mục mỗi run được hiện: `run`, `role`, `status`, `results_source`. `status`: `ready` (đủ điều kiện đọc), `blocked` (có số, `problems` nêu điều kiện thiếu, mọi câu đọc `null`), `missing` (chưa có `results.json`: chỉ có `command` là lệnh ghi file, không có số, trang ghi "Chưa có", không ghi 0), `withheld` (run trong `withhold_eval`: chỉ `run`, `role`, `status`). Khi `ready` hoặc `blocked`: `headline` và `levels{"1","2"}` (`n`, `conditions`, `successes`, `p`, `ci` bootstrap theo điều kiện, `wilson` và `wilson_method` chỉ mô tả, `failures`, `step_pass`; chép nguyên từ `results.json`), `place{p, successes, n, ci: null}`, `bootstrap_seed`, `scorer_version`, `plan_mismatch`, `readings[]` |
+| `evals[].readings[]` | `{rule, scope, level?, threshold, lower, verdict, why?}`. `scope`: `whole_task` (quy tắc 1), `level` (quy tắc 2, có `level`), `place` (quy tắc 3). `verdict`: `met` khi cận dưới từ ngưỡng trở lên, `not_met`, hoặc `null` kèm `why`: `blocked` (file chưa đủ điều kiện) hay `no_ci` (bước đặt: `results.json` không có khoảng tin cậy, trang hiện tỉ lệ và không có câu đọc). Câu chữ là của trang |
+| `paired` | `null` (phép N trừ M không trình bày, AC 6 tạm không hiệu lực) |
+| `featured` | Run có eval `ready` mà trang tổng quan và trang Đánh giá đặt lên đầu (`M`), hoặc `null` khi chưa có |
+| `steps`, `outcomes[]`, `rollouts[]`, `conditions[]` | Mô tả đọc từ `scores.jsonl` và `outcomes.jsonl` của thư mục outcome, không có khoảng tin cậy hay câu đọc: tỉ lệ qua từng bước, nhãn lỗi, phân bố lặp lại, đường cong nới dung sai, sai số đặt từng rollout, từng điều kiện. Trang chỉ hiện các khối này khi eval của run là `ready` hoặc `blocked` |
+| `cuts{run: {name, files, bytes, source}}`, `m_cut` | Tập dạy của run (`M.tar.json`); `m_cut` là của baseline |
+| `next_cut`, `n_ckpt_done` | `null` (của run sau vòng, đang bị ẩn) |
+| `live_evals[]`, `active_sessions[]`, `agentqa[]` | Eval đang chạy, phiên Colab đang chạy, gói Agent QA trên các run `jig-*`; không có gì của run bị ẩn |
+
+Hai trường cho bảng 60 lượt (story DA-53, AC 11, quyết định của Hiếu 28/11/2026):
 
 | Trường | Nội dung |
 |---|---|
 | `jig.outcomes[].repeats` | `[{repeat, n, successes, levels: {"1": {n, successes}, "2": {...}}}]`, một phần tử cho mỗi lượt lặp. Lượt lặp đọc từ trường `repeat` của dòng `outcomes.jsonl` có cùng `episode_id` với dòng `scores.jsonl`. Hai file không khớp một-một theo `episode_id` thì không có trường này (không đoán) |
 | `jig.compare60` | `null`, hoặc `{run, repeat: 0, n, successes, p, levels, repeats: [{repeat, n, successes}], scorer_version, source: {scores, outcomes}, earlier: [{run, n, successes, p}], earlier_scorer, earlier_source, earlier_doc}`. `run` là baseline của vòng (M); số là lượt lặp 0, chọn trước theo số thứ tự, không phải lượt cao nhất. `earlier` lấy từ `pair.runs` của vòng `tray-r1`, chỉ baseline và các run đối chứng, theo thứ tự hiện của vòng, không bao giờ có run trong `withhold_eval` hay `withhold_runs`. `earlier_scorer` là `null` khi file stage 1 không ghi bộ chấm; trang ghi "bộ chấm bản 1". Khối là `null` khi chưa có lượt lặp 0 hoặc có run trong `earlier` khác cỡ `n` |
 
-Khối chỉ mô tả: không có hiệu, khoảng tin cậy hay câu đọc (quy tắc 4 của `jig-m-rules` trong [tray-jig.md](../he/tray-jig.md)). Trang luôn kèm câu nêu điểm khác (cảnh, bộ chấm, tập điều kiện, số bước train) và không dùng chữ "tốt hơn".
+Khối chỉ mô tả: không có hiệu, khoảng tin cậy hay câu đọc (quy tắc 4 của `jig-m-rules` trong [tray-jig.md](../he/tray-jig.md)). Trang luôn kèm câu nêu điểm khác (cảnh, bộ chấm, tập điều kiện, số bước train) và không dùng chữ "tốt hơn" (test `test_no_dictionary_value_ranks_runs` kiểm cả hai từ điển).
 
 ## 3. API đọc (GET)
 
 | URL | Tham số | Trả về | Mẫu | Khi khóa |
 |---|---|---|---|---|
-| `/api/status` | | Trạng thái 6 stage của vòng (`collect`, `process`, `release`, `train`, `eval`, `loop`; mỗi cái có `state` = `idle`/`running`/`done`/`blocked`/`waiting`, `now`, `issue`, `how`, `jobs[]`, `link`), 10 job gần nhất, `machines` (`laptop.slots`, `rtx3060.tunnel`, `colab.balance`), `locked`, `chat_on` | [api_status.json](api-samples/api_status.json) | được |
+| `/api/status` | | Trạng thái 6 stage của vòng (`collect`, `process`, `release`, `train`, `eval`, `loop`; mỗi cái có `state` = `idle`/`running`/`done`/`blocked`/`waiting`, `now`, `issue`, `how`, `jobs[]`, `link`; `eval.now` thêm `Cảnh jig2: <run> <đạt>/<n>` chỉ khi `jig.featured` có eval `ready`), 10 job gần nhất, `machines` (`laptop.slots`, `rtx3060.tunnel`, `colab.balance`), `locked`, `chat_on` | [api_status.json](api-samples/api_status.json) | được |
 | `/api/kinds` | | Danh mục loại job chạy được: `kinds[]` (`kind`, `stage`, `title`, `command`, `args[]` mô tả form, `samples[]` tham số gợi ý, `available`, `reason`, `typical_seconds`) và `remote[]` (việc chạy ở Colab hoặc 3060, chỉ để giải thích) | [api_kinds.json](api-samples/api_kinds.json) | được, `available` thành false |
 | `/api/jobs` | `limit` (mặc định 100) | Danh sách job, mới nhất trước: `id`, `kind`, `stage`, `task`, `params`, `argv`, `state` (`queued`/`running`/`ok`/`failed`/`cancelled`), `rc`, `created`, `started`, `ended`, `seconds`, `outputs`, `note` | [api_jobs.json](api-samples/api_jobs.json) | được |
 | `/api/jobs/<id>` | | Một job như trên, thêm `tail` (dòng log cuối) | | được |
