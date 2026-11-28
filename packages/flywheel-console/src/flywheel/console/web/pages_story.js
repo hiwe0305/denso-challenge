@@ -1647,6 +1647,21 @@ export function renderDiagnosePage() {
       const diagDemo = story.demo && story.demo.diagnose ? story.demo.diagnose : null;
       const roundClusters =
         story.round && Array.isArray(story.round.clusters) ? story.round.clusters : [];
+      // story.round.clusters carries the document's Vietnamese words; story.diag.clusters adds
+      // diagnosis_en / intervention_en for the same ids (index contract, 28/11/2026).
+      const diagById = new Map(
+        (story.diag && Array.isArray(story.diag.clusters) ? story.diag.clusters : []).map((d) => [
+          d.id,
+          d,
+        ])
+      );
+      const clusterText = (c, field) => {
+        const en =
+          state.lang === "en"
+            ? c[field + "_en"] || (diagById.get(c.id) || {})[field + "_en"]
+            : null;
+        return en || c[field] || "–";
+      };
       const jigAgentQa =
         story.jig && Array.isArray(story.jig.agentqa) ? story.jig.agentqa : [];
       const latestAsm = jigAgentQa.length > 0 ? jigAgentQa[jigAgentQa.length - 1] : null;
@@ -1802,8 +1817,8 @@ export function renderDiagnosePage() {
                       el("td", { className: "mono", text: c.id }),
                       el("td", { text: stageLabel(c.stage) }),
                       el("td", { className: "num", text: formatNumber(c.n) }),
-                      el("td", { text: c.diagnosis }),
-                      el("td", { text: c.intervention }),
+                      el("td", { text: clusterText(c, "diagnosis") }),
+                      el("td", { text: clusterText(c, "intervention") }),
                     ])
                   )
                 ),
