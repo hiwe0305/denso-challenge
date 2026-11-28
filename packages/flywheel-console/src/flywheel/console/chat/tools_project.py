@@ -622,8 +622,8 @@ def project_status(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
                                        ("run", ln.get("run") if show else None),
                                        ("successes", ln.get("successes") if show else None),
                                        ("n", ln.get("n") if show else None),
-                                       ("carried", ln.get("carried") if show else None),
-                                       ("placed", ln.get("placed") if show else None),
+                                       ("carried_to_table_b", ln.get("carried") if show else None),
+                                       ("placed_within_tolerance", ln.get("placed") if show else None),
                                        ("scene_differs", _flag(ln.get("scene_differs")) if "scene_differs" in ln else None),
                                        ("scorer_differs", _flag(ln.get("scorer_differs")) if "scorer_differs" in ln else None)]))  # fmt: skip
     if not has_links:

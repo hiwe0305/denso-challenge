@@ -485,7 +485,7 @@ def test_project_status_reads_timeline_latest_next_and_links(idx: ConsolePaths) 
         in lines
     )
     assert (
-        "LINK | from=tray-jig-r1 | way=prev | round=tray-r1 | run=C_70 | successes=10 | n=60 | carried=50 | placed=10 | scene_differs=yes | scorer_differs=yes"
+        "LINK | from=tray-jig-r1 | way=prev | round=tray-r1 | run=C_70 | successes=10 | n=60 | carried_to_table_b=50 | placed_within_tolerance=10 | scene_differs=yes | scorer_differs=yes"
         in lines
     )
     assert (

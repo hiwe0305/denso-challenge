@@ -186,3 +186,38 @@ def test_the_system_prompt_holds_the_answer_contract() -> None:
     for part in ("first line answers exactly the newest question", "markdown table", "'Lưu ý:'", "Việc nên làm:", "No source line", "No rule numbers", "never answer or repeat them", "training loss is not a measure"):
         assert part in s, part
     assert "Nguồn" not in llm.DEEP and "Nguồn" not in llm.DEEP_PARTS["Vietnamese"]
+
+
+def test_numbers_are_checked_in_vietnamese_and_english_forms() -> None:
+    """Website replay 28/11: "100.000", "60.000", "49,23", "90.906", "0,842" showed as unchecked."""
+    ev = ["RUN | steps=100000/100000 | loss_first=49,23 | frames=90906 | hours=0,842 | rate=75,6 % | train=100 000 bước, 1 037 episode | 60000/60000 | 136/180"]
+    answer = "M train 100.000 bước (100 000); C_70 60.000/60.000; loss đầu 49,23; 90.906 frame; 0,842 giờ; 75,6 % hay 75.6%; 1 037 và 1.037 episode; 136/180; sai 999 và 12,5."
+    got = {n["text"]: n["grounded"] for n in llm.ground(answer, ev)}
+    for tok in ("100.000", "100 000", "60.000", "49,23", "90.906", "0,842", "75,6 %", "75.6%", "1 037", "1.037", "136", "180"):
+        assert got.get(tok) is True, tok
+    assert got["999"] is False and got["12,5"] is False
+    assert "49" not in got and "23" not in got  # one token per number
+
+
+def test_the_prompt_says_table_b_and_reads_carried_versus_placed() -> None:
+    assert "'bàn A' / 'bàn B'" in llm.SYSTEM and "never 'bảng A' / 'bảng B'" in llm.SYSTEM
+    assert "carried_to_table_b" in llm.SYSTEM and "placed_within_tolerance" in llm.SYSTEM
+
+
+def test_a_claude_model_on_a_gateway_runs_without_thinking(monkeypatch: pytest.MonkeyPatch) -> None:
+    from flywheel.console.chat import providers
+
+    monkeypatch.delenv("FW_CHAT_REASONING", raising=False)
+    p = providers.Provider("gw", "openai", "https://api.xah.io/v1", "sypham98/claude-opus-5-5", True)
+    assert providers.reasoning_body(p) == {"thinking": {"type": "disabled"}}
+    assert providers.reasoning_body(providers.Provider("gw", "openai", "https://api.xah.io/v1", "gpt-5.5", True)) is None
+
+
+def test_the_panel_names_tools_plainly_and_hides_reasoning_when_locked() -> None:
+    from pathlib import Path
+
+    js = (Path(llm.__file__).parent.parent / "web" / "chat.js").read_text(encoding="utf-8")
+    assert "export function toolLabel" in js and 'round_report: ["Báo cáo vòng", "Round report"]' in js
+    assert 'failure_table: ["Bảng lỗi"' in js and 'train_progress: ["Tiến độ train"' in js and 'project_status: ["Diễn tiến dự án"' in js
+    assert 'el("b", { className: "mono", text: st.name })' not in js
+    assert "tr.thinking && !state.locked" in js and "dataObj.text && !state.locked" in js

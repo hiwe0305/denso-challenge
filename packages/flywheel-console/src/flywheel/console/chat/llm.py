@@ -28,7 +28,7 @@ from flywheel.console.server import runner
 
 from . import providers, registry, tools_round
 from .common import HOSTED, UNREADABLE, ManifestUnreadable, fail, hidden_runs, withheld_runs
-from .numbers import numbers_in, unsupported_numbers
+from .numbers import numbers_any, unsupported_any
 from .tools_ops import all_jobs
 
 ENDPOINT = "http://127.0.0.1:11435"
@@ -63,13 +63,16 @@ SYSTEM = (
     "ANSWER SHAPE. (1) The first line answers exactly the newest question in at most two sentences, with the key fact in **bold**. "
     "(2) Then a markdown table when three or more numbers are compared, or when the user asks for a table, statistics or a comparison (bảng, thống kê, so sánh, table); otherwise at most four bullets. "
     "In a table the header names each run or round once; a cell holds only its value, never the run name again. "
-    "(3) When the question asks why (vì sao, tại sao, why) and the rows have ORIGIN or ORIGIN_STEP, add a bold line '<run> đến từ đâu:' / 'Where <run> comes from:' with at most two bullets: what the earlier round found (carried versus placed) and what this round changed (scene, data, training steps). It says where the result comes from, never a proven cause. "
+    "(3) When the question asks why (vì sao, tại sao, why) and the rows have ORIGIN or ORIGIN_STEP, add a bold line '<run> đến từ đâu:' / 'Where <run> comes from:' with at most two bullets: what the earlier round found (carried to table B versus placed within tolerance) and what this round changed (scene, data, training steps). It says where the result comes from, never a proven cause. "
     "(4) One line starting 'Lưu ý:' (Vietnamese) or 'Note:' (English) only when a limit changes the reading, such as a different scene or scorer, preliminary numbers or no control run. "
     "(5) Next steps only when the question asks what to do, as one bold 'Việc nên làm:' / 'Next step:' line after the facts (never the first line), taken from the OPTION or NEXT rows; never offer a ticket or intervention the rows mark closed or handled. "
     "(6) No source line: the interface shows the sources. No rule numbers (luật 1, rule 2) and no internal ids (failure codes such as L-PLACE-POSE, job or session ids, cluster ids unless the user asks about clusters). "
     "(7) Short: about 120 words, at most 200. "
     "Answer only the newest question: earlier questions of the conversation are already answered, so never answer or repeat them. "
     "A follow-up such as 'chi tiết hơn', 'thành bảng', 'vì sao', 'more detail', 'as a table' or 'why' applies to the topic of the previous question; for 'thành bảng' / 'as a table' give the same facts as a table. "
+    "GLOSSARY. The task carries a tray from table A to table B: write 'bàn A' / 'bàn B' (table A / table B), never 'bảng A' / 'bảng B'. "
+    "carried_to_table_b counts the rollouts that brought the tray to table B; placed_within_tolerance counts those that also set it down within the tolerance (the successes): "
+    "say e.g. 'C_70 mang khay tới bàn B 50/60 lượt nhưng chỉ đặt đúng trong dung sai 10/60', never that the placing came from the carrying. "
     "READING. Name the round once at the start and the run next to each number when the answer gives numbers of a round; every number belongs to that round unless you name another. Never give a number of one round for another round. "
     "When the rows say comparable=no (different scene, eval set or scorer), put the numbers side by side and never write that one is better or up by an amount. "
     "When intervals overlap, give the highest count and say the runs cannot be told apart. Never call a run 'tốt nhất' / 'best'; 'cao nhất' / 'highest' with its number is fine. "
@@ -172,9 +175,8 @@ def lang_of(q: str) -> str:
 def ground(answer: str, evidence_texts: list[str]) -> list[dict[str, Any]]:
     """[{text, grounded}] for every numeral of the answer, matched against the turn's evidence."""
     ev = [t for t in evidence_texts if t]
-    return [
-        {"text": tok, "grounded": not unsupported_numbers(tok, ev)} for tok in numbers_in(answer)
-    ]
+    # Vietnamese and English forms alike ("100.000", "49,23", "75,6 %", "100 000"), one token each
+    return [{"text": tok, "grounded": not unsupported_any(tok, ev)} for tok in numbers_any(answer)]
 
 
 # ------------------------------------------------------------------ model status
