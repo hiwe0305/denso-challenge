@@ -737,7 +737,8 @@ def test_no_fact_line_of_a_tool_holds_an_instruction(idx: ConsolePaths) -> None:
     _two_rounds(idx)
     qs = ["Phân tích kết quả vòng này", "Run M đạt mốc ở những mức nào?", "Vì sao run C_70 hỏng nhiều ở bước đặt?",
           "Nên làm gì tiếp?", "Chi phí của vòng?", "So sánh các bản model", "Vòng 1 so với vòng đồ gá khác nhau thế nào?",
-          "đặt cạnh bảng 60 rollout", "Chẩn đoán ra những nhóm lỗi nào?"]  # fmt: skip
+          "đặt cạnh bảng 60 rollout", "Chẩn đoán ra những nhóm lỗi nào?", "Which run is the best, and why?",
+          "Run nào tốt nhất, vì sao?", "Which run is the best by loss?"]  # fmt: skip
     seen = 0
     for tool in ("round_report", "round_diagnosis", "pair_comparisons", "rounds_side_by_side"):
         for rnd in ("r1", "jig-r1"):
@@ -752,3 +753,50 @@ def test_no_fact_line_of_a_tool_holds_an_instruction(idx: ConsolePaths) -> None:
     assert seen > 200
     side = registry.call("rounds_side_by_side", {}, {"task": "tray", "round": "r1", "lang": "vi", "question": "Vòng 1 so với vòng đồ gá?"})["model"]
     assert "Hai vòng khác cảnh, tập eval, bộ chấm và số bước, nên chỉ đặt cạnh nhau, không so như một kết quả." in side
+
+
+# ------------------------------------------------------------------ "which run is best" (Website, 28/11)
+BEST_QS = ["Which run is the best, and why?", "Run nào tốt nhất, vì sao?", "Xếp hạng các run", "Which run is better, C_70 or C_ALL?"]
+
+
+def test_a_best_or_ranking_question_reads_the_test_results_never_the_loss(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
+    _two_rounds(idx)
+    for q in BEST_QS:
+        assert registry.forced_tools(q) == ["round_report"], q
+        assert tools_round.focus_of(q) == "best", q
+    assert registry.forced_tools("Which run has the lowest loss?") == []  # a loss lookup stays a lookup
+    assert registry.forced_tools("C70_R1 có tốt hơn C_70 không?") == ["round_report"]
+    assert ask("C70_R1 có tốt hơn C_70 không?", "r1")["answer"] == tools_round.WITHHELD[0]  # W5 unchanged
+    tools, _ = _turn_tools(monkeypatch, "Which run is the best, and why?", "jig-r1")
+    assert tools == ["round_report"]  # no run_list, no loss ranking
+    assert "never rank runs or models by training loss" in llm.SYSTEM.lower()
+
+
+def test_best_on_the_pair_round_gives_the_highest_count_and_no_winner(idx: ConsolePaths) -> None:
+    _two_rounds(idx)
+    for lang in ("vi", "en"):
+        t = ask(BEST_QS[0 if lang == "en" else 1], "r1", lang)["model"]
+        direct = t.splitlines()[t.splitlines().index(next(ln for ln in t.splitlines() if ln.startswith(("CÂU TRẢ LỜI THẲNG", "DIRECT ANSWER")))) + 1]
+        if lang == "vi":
+            assert "C_70 có số lượt thành công cao nhất, 10/60, nhưng khoảng tin cậy của hai bản chồng nhau, nên chưa phân biệt được" in direct
+            assert "tốt nhất" not in t
+        else:
+            assert "C_70 has the most successful runs, 10/60, but the intervals of the 2 models overlap" in direct
+        assert "C70_R1" not in t and "4/60" not in t  # never in a ranking, not mentioned unasked
+        assert "da34-" not in t  # labels, not session ids
+    loss = ask("Which run is the best by loss?", "r1", "en")["model"]
+    assert "- Training loss is not a measure of the result: a run's result is its number of successful test runs." in loss
+
+
+def test_best_on_the_jig_round_has_nothing_to_rank_and_gives_the_rule_readings(idx: ConsolePaths) -> None:
+    _two_rounds(idx)
+    t = ask("Run nào tốt nhất, vì sao?", "jig-r1")["model"]
+    lines = t.splitlines()
+    assert lines[lines.index("CÂU TRẢ LỜI THẲNG (mở đầu bằng câu này):") + 1].startswith("- Run M là run duy nhất của vòng này trên cảnh jig2 với bộ chấm bản 2, nên trong vòng không có run nào để xếp hạng")
+    assert "cả task 75,6 % (136/180 lượt thành công), CI 70,0–81,1: chưa đạt mốc 80 %" in t
+    assert "Mức 1: 85,6 % (77/90), CI 78,9–92,2, đạt mốc 70 %. Mức 2: 65,6 % (59/90), CI 55,6–75,6, chưa đạt mốc 70 %." in t
+    assert "Bước đặt (luật 3)" in t and "nên chỉ đặt cạnh nhau" in t
+    assert "C70_R1" not in t and "4/60" not in t and "tốt nhất" not in t
+    en = ask("Which run is the best, and why?", "jig-r1", "en")["model"]
+    assert "Run M is the only run of this round on scene jig2 with scorer v2, so there is nothing to rank within the round" in en
+    assert "C70_R1" not in en

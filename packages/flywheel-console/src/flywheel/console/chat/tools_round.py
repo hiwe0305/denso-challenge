@@ -101,6 +101,11 @@ FOCUS = [
     ("data", re.compile(r"dữ liệu|bài mẫu|\bdata\b|demonstration", re.I)),
 ]
 
+# a question that asks which run or model is best, or for a ranking: read from the test results
+# (W3), never from the training loss (Website, 28/11/2026)
+RANK_RX = re.compile(r"tốt nhất|tốt hơn|mạnh nhất|xếp hạng|hạng nhất|\bbest\b|\bbetter\b|\branks?\b|\branking\b|\bwinner\b|top run", re.I)
+LOSS_RX = re.compile(r"\bloss\b|ema50|đường cong|curve", re.I)
+
 AFTER_RX = re.compile(r"sau vòng|bản mới|dạy lại|thi lại|after the round|retest|re-test|retrain", re.I)
 # a figure offered for the user to confirm ("... chỉ đạt 4/60 phải không?")
 _FIGURE_RX = re.compile(r"\d+\s*/\s*\d+|\d+(?:[.,]\d+)?\s*%")
@@ -166,6 +171,8 @@ def focus_of(question: Any) -> str:
     q = str(question or "")
     if asks_held(q):
         return "held"
+    if RANK_RX.search(q):
+        return "best"  # "which run is best, and why?" is a ranking question first
     return next((k for k, rx in FOCUS if rx.search(q)), "all")
 
 
@@ -471,8 +478,18 @@ def round_report(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         out = _jig_report(task, rnd, say, focus, extra)
     else:
         out = _pair_report(task, rnd, say, focus, extra)
+    if out.get("ok") and focus == "best" and LOSS_RX.search(str(ctx.get("question") or "")):
+        out["model"] = _with_fact(out["model"], say("Loss train không phải thước đo kết quả: kết quả của một run là số lượt thành công khi thi.",
+                                                    "Training loss is not a measure of the result: a run's result is its number of successful test runs."))  # fmt: skip
     out["round"] = str(rnd.get("id"))
     return out
+
+
+def _with_fact(text: str, fact: str) -> str:
+    """``text`` with one more fact line before its HOW TO ANSWER line."""
+    lines = text.splitlines()
+    at = next((i for i, ln in enumerate(lines) if ln.startswith(("CÁCH TRẢ LỜI", "HOW TO ANSWER"))), len(lines))
+    return "\n".join([*lines[:at], "- " + fact, *lines[at:]])
 
 
 def rounds_side_by_side(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
@@ -673,9 +690,12 @@ def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str,
     if "rule5" in F:
         opts.append(say("Train run K trên cùng tập điều kiện nếu muốn biết dữ liệu bước đặt có giúp không (luật 5).", "Train run K on the same conditions to learn whether the placing data helps (rule 5)."))
     opts.append(say("Thêm seed train, vì số hiện tại đến từ một seed.", "Add training seeds, since the numbers come from one seed."))
+    if len(rnd.get("runs") or []) == 1:
+        F["only"] = say(f"Run {run} là run duy nhất của vòng này trên cảnh {j.get('scene', '')} với bộ chấm bản {j.get('scorer_version', '')}, nên trong vòng không có run nào để xếp hạng; các run của vòng tray-r1 khác cảnh và bộ chấm, nên chỉ đặt cạnh nhau.",
+                        f"Run {run} is the only run of this round on scene {j.get('scene', '')} with scorer v{j.get('scorer_version', '')}, so there is nothing to rank within the round; the runs of round tray-r1 differ in scene and scorer, so they are only placed side by side.")  # fmt: skip
     PLAN = {
         "verdict": ("headline", ["levels", "place", "wilson", "limits"]),
-        "best": ("headline", ["levels", "compare60", "rule5"]),
+        "best": ("only" if "only" in F else "headline", ["headline", "levels", "place", "compare60", "rule5"]),
         "compare": ("compare60", ["headline", "levels", "rule5", "limits"]),
         "fail": ("dominant", ["fails", "steps", "near", "untested"]),
         "why": ("dominant", ["fails", "levels", "near", "untested", "rule5"]),
