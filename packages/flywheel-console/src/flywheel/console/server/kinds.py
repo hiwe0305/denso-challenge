@@ -491,6 +491,7 @@ def _mb(n: int) -> str:
 def dataset_samples() -> list[dict[str, Any]]:
     fw = runner._fw()
     found = cards.load_cards_lenient(fw)
+    gone = runner.hidden_data_names(runner.hidden_runs())
     out: list[dict[str, Any]] = []
     seen: set[Path] = set()
     for pat in DATASET_GLOBS:
@@ -500,7 +501,7 @@ def dataset_samples() -> list[dict[str, Any]]:
                 ds = runner.lerobot_dataset(str(ds))
             except ValueError:
                 continue
-            if ds in seen:
+            if ds in seen or gone.intersection(ds.parts):
                 continue
             seen.add(ds)
             info = runner.jread(info_f, {}) or {}

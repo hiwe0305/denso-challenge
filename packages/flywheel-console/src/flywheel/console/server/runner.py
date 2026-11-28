@@ -97,6 +97,41 @@ def hidden_runs() -> hidden.Hidden:
     return hidden.from_manifest(_manifest())
 
 
+_data_names: tuple[tuple[Any, ...], frozenset[str]] | None = None
+
+
+def hidden_data_names(hide: hidden.Hidden) -> frozenset[str]:
+    """Folder names that hold data of hidden runs, from the dataset cards under ``fw_root``.
+
+    The catalog drops these datasets when it is built, but their folders stay on disk: a hidden
+    dataset's id (``releases/<id>/``), and a round folder (``datasets/<round>/``) all of whose
+    cards are hidden.
+
+    Kept until a card, the seed catalog or the hidden list changes: reading the cards takes
+    200 ms on the real store, and every dataset file asks."""
+    global _data_names
+    if not hide:
+        return frozenset()
+    seed = _p().seed / "catalog.yaml"
+    mtime = seed.stat().st_mtime_ns if seed.is_file() else 0
+    key = (_fw(), mtime, *cards.cards_stamp(_fw()), hide)
+    hit = _data_names
+    if hit is None or hit[0] != key:
+        hit = _data_names = (key, _read_data_names(hide))
+    return hit[1]
+
+
+def _read_data_names(hide: hidden.Hidden) -> frozenset[str]:
+    rows, _ = cards.merged(_p(), strict=False)
+    gone = hidden.catalog_hidden_ids({"rows": rows}, hide)
+    rounds: dict[str, bool] = {}
+    for c in cards.load_cards_lenient(_fw()):
+        if c.path.parent.name == "cards":
+            name = c.path.parent.parent.name
+            rounds[name] = rounds.get(name, True) and c.id in gone
+    return gone | {name for name, off in rounds.items() if off}
+
+
 def _withheld_runs() -> set[str]:
     """Run ids under ``withhold_eval`` of any round in the **seed** manifest, never the index: a
     missing or broken index must not switch the filter off. Raises ``ManifestUnreadable``."""
@@ -2017,8 +2052,9 @@ def _run_folder(name: str, hide: hidden.Hidden) -> bool:
     )
 
 
-def _browsable(p: Path, hide: hidden.Hidden) -> Path:
-    """Refuse the folder of a hidden run, or a dot folder, anywhere on the way to ``p``.
+def _browsable(p: Path, hide: hidden.Hidden, data: frozenset[str]) -> Path:
+    """Refuse the folder of a hidden run or of its data (``hidden_data_names``), or a dot folder,
+    anywhere on the way to ``p``.
 
     Dot folders are counted below ``fw_root`` when ``p`` is inside it (a git worktree keeps its
     data under ``.claude/``), else below the home folder. The message is the one of a folder that
@@ -2028,7 +2064,9 @@ def _browsable(p: Path, hide: hidden.Hidden) -> Path:
         if p.is_relative_to(base):
             below = p.relative_to(base)
             break
-    if any(_run_folder(x, hide) for x in p.parts) or any(x.startswith(".") for x in below.parts):
+    if any(x in data or _run_folder(x, hide) for x in p.parts) or any(
+        x.startswith(".") for x in below.parts
+    ):
         raise ValueError("not a folder")
     return p
 
@@ -2036,13 +2074,14 @@ def _browsable(p: Path, hide: hidden.Hidden) -> Path:
 def fs_list(path: str) -> dict[str, Any]:
     home = Path.home()
     hide = hidden_runs()
-    p = _browsable(under(path or str(home), home), hide)
+    data = hidden_data_names(hide)
+    p = _browsable(under(path or str(home), home), hide, data)
     if not p.is_dir():
         raise ValueError("not a folder")
     dirs: list[dict[str, Any]] = []
     vids: list[dict[str, Any]] = []
     for e in sorted(p.iterdir(), key=lambda x: x.name.lower()):
-        if _hidden(e.name) or _run_folder(e.name, hide):
+        if _hidden(e.name) or e.name in data or _run_folder(e.name, hide):
             continue
         try:
             if e.is_dir():
@@ -2058,13 +2097,17 @@ def fs_list(path: str) -> dict[str, Any]:
 
 def dir_check(path: str) -> dict[str, Any]:
     hide = hidden_runs()
-    p = _browsable(under_import(path), hide)
+    data = hidden_data_names(hide)
+    p = _browsable(under_import(path), hide, data)
     return {
         "has_device": (p / "device.json").is_file(),
         "tasks": sorted(
             x.name
             for x in p.iterdir()
-            if x.is_dir() and not _run_folder(x.name, hide) and any(x.glob("*.mp4"))
+            if x.is_dir()
+            and x.name not in data
+            and not _run_folder(x.name, hide)
+            and any(x.glob("*.mp4"))
         ),
     }
 

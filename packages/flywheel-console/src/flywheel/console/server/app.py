@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from flywheel.console.index import hidden
+from flywheel.console.index import catalog, hidden
 from flywheel.console.paths import ConsolePaths, PathDenied, active, guard, set_active
 from flywheel.console.server import kinds, media, probe, runner, withhold
 
@@ -48,6 +48,47 @@ def _chat_missing(e: ModuleNotFoundError) -> bool:
 def _chat(mod: str) -> Any:
     """Lazy import of ``flywheel.console.chat.<mod>`` (Task 6 module; absent until it lands)."""
     return importlib.import_module(f"flywheel.console.chat.{mod}")
+
+
+class _Unfilterable(Exception):
+    """An index file needed to tell what to hide cannot be used; the request is refused."""
+
+
+def _checked(doc: Any, hide: hidden.Hidden) -> Any:
+    """``doc`` when it has the shape of a catalog. The filters of ``hidden`` leave a shape
+    they do not know as it is, which here would mean unfiltered, so it is refused while a run
+    is hidden."""
+    if hide and not (isinstance(doc, dict) and isinstance(doc.get("rows"), list)):
+        raise _Unfilterable("not a catalog document")
+    return doc
+
+
+def _read_catalog(index: Path, hide: hidden.Hidden) -> Any:
+    try:
+        doc = json.loads((index / "catalog.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise _Unfilterable("catalog.json cannot be read") from e
+    return _checked(doc, hide)
+
+
+def _task_datasets(doc: Any, index: Path, hide: hidden.Hidden) -> Any:
+    """``tasks[].catalog_rows`` cut to the datasets the filtered ``catalog.json`` shows, and
+    ``catalog_totals`` counted again. The trimmed rows carry no story or notes to judge by; an
+    id the catalog does not show is hidden or left over from an older build."""
+    tasks = doc.get("tasks") if isinstance(doc, dict) else None
+    if not hide or not isinstance(tasks, list) or not any(t.get("catalog_rows") for t in tasks):
+        return doc
+    cat = hidden.catalog_doc(_read_catalog(index, hide), hide)
+    shown = {str(r.get("id")): r for r in cat["rows"]}
+    out = []
+    for t in tasks:
+        rows = t.get("catalog_rows") or []
+        kept = [r for r in rows if str(r.get("id")) in shown]
+        if len(kept) < len(rows):
+            totals = catalog.totals([shown[str(r["id"])] for r in kept])
+            t = {**t, "catalog_rows": kept, "catalog_totals": totals}
+        out.append(t)
+    return {**doc, "tasks": out}
 
 
 class _Cache:
@@ -370,6 +411,9 @@ class Handler(BaseHTTPRequestHandler):
             found = fp is not None and fp.is_file()
         except (OSError, ValueError):  # a name the file system refuses (too long)
             fp, found = None, False
+        # before anything answers for a dataset, the 204 of a missing qa.json included
+        if fp is not None and self.refused_dataset(fp):
+            return
         if fp is None or not found:
             if fp is not None and self.no_qa(fp):
                 self.send_response(204)  # the pages ask for every dataset; this one has no checks
@@ -378,9 +422,34 @@ class Handler(BaseHTTPRequestHandler):
         # filtered by the file that would be sent, not by the URL: /data/./story.json,
         # /data/story.json/ and the like name the same file
         index = self.paths.index.resolve()
-        if fp in (index / "story.json", index / "tasks.json"):
-            return self.send_index(fp, fp.name == "story.json")
+        if fp in (index / n for n in ("catalog.json", "story.json", "tasks.json")):
+            return self.send_index(fp)
         self.send_file(fp)
+
+    def refused_dataset(self, fp: Path) -> bool:
+        """Answer 404 for any file of a hidden run's dataset (``ds/<id>/``), or 500 when the
+        seed or ``catalog.json`` cannot say which those are; ``False`` when ``fp`` may be
+        served. The dataset cards are asked too: a folder left by an older build has no row in
+        a catalog built since."""
+        ds = (self.paths.index / "ds").resolve()
+        if ds not in fp.parents:
+            return False
+        try:
+            hide = runner.hidden_runs()
+            if not hide:
+                return False
+            gone = hidden.catalog_hidden_ids(_read_catalog(self.paths.index, hide), hide)
+            gone |= runner.hidden_data_names(hide)
+        except (runner.ManifestUnreadable, _Unfilterable) as e:
+            self.jerr(500, str(e))
+            return True
+        except Exception:  # unfiltered is worse than unavailable
+            self.jerr(500, "the hidden datasets cannot be told apart")
+            return True
+        if fp.relative_to(ds).parts[0] not in gone:
+            return False
+        self.jerr(404, "not found")
+        return True
 
     def no_qa(self, fp: Path) -> bool:
         """``fp`` is the missing ``qa.json`` of an indexed dataset."""
@@ -390,17 +459,18 @@ class Handler(BaseHTTPRequestHandler):
             and (fp.parent / "quality.json").is_file()
         )
 
-    def send_index(self, fp: Path, is_story: bool) -> None:
-        """``story.json`` / ``tasks.json`` without the runs a round does not present.
+    def send_index(self, fp: Path) -> None:
+        """``catalog.json`` / ``story.json`` / ``tasks.json`` without the runs a round does not
+        present.
 
         ``withhold_runs`` (hidden.py): nothing of the run, even from an index built before the
-        switch. ``withhold_eval`` (withhold.py): the result blocks of a held run never reach the
-        browser. Both lists come from the seed; the file is never sent as it is, and a list or a
-        file that cannot be read refuses the request.
+        switch, the datasets of its story included. ``withhold_eval`` (withhold.py): the result
+        blocks of a held run never reach the browser. Both lists come from the seed; the file
+        is never sent as it is, and a list or a file that cannot be read refuses the request.
         """
         try:
             hide = runner.hidden_runs()
-            held = runner._withheld_runs() if is_story else set()
+            held = runner._withheld_runs() if fp.name == "story.json" else set()
         except runner.ManifestUnreadable as e:
             return self.jerr(500, str(e))
         try:
@@ -408,12 +478,18 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             return self.jerr(500, "index file is not valid JSON")
         try:
-            if is_story:
+            if fp.name == "catalog.json":
+                doc = hidden.catalog_doc(_checked(doc, hide), hide)
+            elif fp.name == "tasks.json":
+                doc = _task_datasets(hidden.tasks_doc(doc, hide), self.paths.index, hide)
+            else:
                 if not isinstance(doc, dict):
                     raise TypeError("story.json is not an object")
                 doc = withhold.story(hidden.story(doc, hide), held)
-            else:
-                doc = hidden.tasks_doc(doc, hide)
+                if doc.get("ds") is not None:  # the catalog the story page draws from
+                    doc = {**doc, "ds": hidden.catalog_doc(_checked(doc["ds"], hide), hide)}
+        except _Unfilterable as e:
+            return self.jerr(500, str(e))
         except Exception:  # unfiltered is worse than unavailable
             return self.jerr(500, "index file has an unexpected shape")
         self.send_bytes(json.dumps(doc, ensure_ascii=False).encode())
