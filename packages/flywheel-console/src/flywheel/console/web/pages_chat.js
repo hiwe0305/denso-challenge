@@ -60,12 +60,11 @@ const MODES = [
   { id: "operate", labelKey: "studio.modeOperate", subKey: "studio.modeOperateSub" },
 ];
 
-// Readable name of a chat tool step (tool.label.<name>), the raw name otherwise.
-function toolLabel(step) {
-  const name = step && step.name ? String(step.name) : "";
-  const key = "tool.label." + name;
-  if (name && hasI18nKey(key)) return t(key);
-  return (step && step.ui && step.ui.title) || name;
+// Readable tool name from chat.js (toolLabel reads chat.tool.*); the raw name where chat.js
+// has no such helper yet.
+function chatToolLabel(name) {
+  const raw = String(name || "");
+  return typeof chatApi.toolLabel === "function" ? chatApi.toolLabel(raw) : raw;
 }
 
 // Rows a finished tool step returned, read from its ui (the SSE tool_result carries no count):
@@ -486,7 +485,7 @@ export function renderChatStudioPage() {
       panel.appendChild(el("select", { className: "field", "aria-label": t("analysis.result"),
         onChange: (event) => draw(Number(event.target.value)) },
         results.map(({ step, ui }, index) => el("option", { value: String(index),
-          text: toolLabel(step), selected: index === results.length - 1 }))));
+          text: chatToolLabel(step.name), selected: index === results.length - 1 }))));
     }
     panel.appendChild(output);
     draw(results.length - 1);
@@ -509,7 +508,7 @@ export function renderChatStudioPage() {
       return el("li", { className: "reasoning-step" }, [
         el("span", { className: cls("step-status-icon", st.ms === null && "running", st.ms !== null && !st.ok && "err"), "aria-hidden": "true" },
           [st.ms === null ? icon("dot") : st.ok ? "✓" : "!"]),
-        el("b", { className: "reasoning-label", text: toolLabel(st), title: st.name || "" }),
+        el("b", { className: "reasoning-label", text: chatToolLabel(st.name), title: st.name || "" }),
         st.ok === false && st.ms !== null
           ? el("span", { className: "reasoning-rows", text: t("analysis.stepFailed") })
           : rows !== null
@@ -800,7 +799,7 @@ export function renderChatStudioPage() {
               facts.map((f) =>
                 el("tr", {}, [
                   el("td", {}, [el("span", { className: "tax-badge", text: `{${f.id}}` })]),
-                  el("td", { className: "mono", text: `${f.source} · ${toolLabel({ name: f.tool })}` }),
+                  el("td", { className: "mono", text: `${f.source} · ${chatToolLabel(f.tool)}` }),
                   el("td", { text: f.label }),
                   el("td", { className: "mono", text: f.value }),
                 ])
@@ -976,7 +975,7 @@ export function renderChatStudioPage() {
                     window.setTimeout(resizeChatCharts, 60);
                   },
                 },
-                [`#${idx + 1} ${toolLabel({ name: a.name })}`]
+                [`#${idx + 1} ${chatToolLabel(a.name)}`]
               )
             )
           )
@@ -984,7 +983,7 @@ export function renderChatStudioPage() {
       el("div", { className: "card" }, [
         el("div", { className: "task-head", style: "margin-bottom:10px" }, [
           el("div", {}, [
-            el("b", { text: toolLabel({ name: activeArt.name }), title: activeArt.name }),
+            el("b", { text: chatToolLabel(activeArt.name), title: activeArt.name }),
             el("div", {
               className: cls("tiny", "mono"),
               text: formatArgsChip(Object.fromEntries(Object.entries(activeArt.args || {}).filter(
