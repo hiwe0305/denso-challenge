@@ -25,6 +25,8 @@ ROUTES = [
     ("Thống kê các toàn bộ loại lỗi cho tôi xem nào?", ["failure_table"]),
     ("Dự án đang tiến tới đâu rồi?", ["project_status"]),
     ("Show me the failure breakdown per run", ["failure_table"]),
+    ("Vẽ biểu đồ số lỗi theo loại của từng run ở vòng tray-r1", ["failure_table"]),
+    ("Plot the failures by type for each run", ["failure_table"]),
     ("How is the training progress of the phases?", ["train_progress"]),
 ]
 

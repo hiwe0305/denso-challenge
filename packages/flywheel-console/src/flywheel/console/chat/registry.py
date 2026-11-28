@@ -326,7 +326,8 @@ _WHY_RX = re.compile(r"vì sao|tại sao|\bwhy\b|hỏng|thất bại|\bfail|lỗ
 
 # the questions the audit of 28/11/2026 found with no lookup of their own (05-danh-gia-chat-2811.md)
 FAILURE_TABLE_RX = re.compile(r"thống kê.{0,40}lỗi|loại lỗi|nhãn lỗi|bảng lỗi|(các|mọi|toàn bộ|tất cả)( các)? (loại )?lỗi|lỗi (của )?(các|mọi|từng) run|"
-                              r"failure (table|labels?|types?|breakdown|counts?|statistics)|(types?|kinds?) of failures?|all (the )?failures|failures? (by|per) run|error types", re.I)  # fmt: skip
+                              r"số lỗi theo|lỗi theo (loại|nhãn|run)|(biểu đồ|vẽ).{0,30}\blỗi\b|"
+                              r"failure (table|labels?|types?|breakdown|counts?|statistics)|(types?|kinds?) of failures?|all (the )?failures|failures? (by|per) (run|type|label)|error types|(chart|plot).{0,30}failures?", re.I)  # fmt: skip
 TRAIN_PROGRESS_RX = re.compile(r"tiến độ.{0,30}(train|huấn luyện)|(train|training|huấn luyện).{0,40}(tiến độ|phase|log)|\bphases?\b|\blogs? (train|training)|"
                                r"training (log|progress|phases?)|đánh giá.{0,30}\blogs?\b|train (đến đâu|tới đâu|bao nhiêu bước)", re.I)  # fmt: skip
 PROJECT_STATUS_RX = re.compile(r"tiến độ (của )?dự án|dự án.{0,30}(đến đâu|tới đâu|thế nào|ra sao|tiến độ|diễn tiến)|diễn tiến|timeline|dòng thời gian|"
