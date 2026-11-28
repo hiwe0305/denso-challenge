@@ -141,7 +141,9 @@ def test_pair_round_wording_and_held_runs_on_every_round(idx: ConsolePaths) -> N
     allr = ask("Phân tích kết quả vòng này", "r1")["model"]
     assert "290 lượt sinh, 262 ghi được, 204 qua bộ lọc, chọn 181" in allr
     assert "vòng dừng" not in allr  # read from the held result: never shown (A11)
-    assert "Kết quả thi lại của lượt này không trình bày ở bản demo." in allr
+    # W5 is not a point of an answer nobody asked for; only the rule line names it, for when asked
+    assert "- Kết quả thi lại của lượt này không trình bày ở bản demo." not in allr
+    assert "Chỉ khi được hỏi thì viết đúng câu: Kết quả thi lại của lượt này không trình bày ở bản demo." in allr
     cost = ask("Chi phí của vòng", "r1")["model"]
     assert "Train và serve của vòng: 109,22 CU thực đo" in cost and "chưa có trong index" in cost
     cmp_ = ask("khoảng tin cậy của các phép so sánh", "r1", tool="pair_comparisons")
@@ -656,3 +658,50 @@ def test_a_hidden_run_or_story_gets_the_scoped_sentence_neither_confirmed_nor_de
         text = "".join(d.get("text", "") for e, d in evs if e == "token")
         assert text == want and evs[-1][1]["guard"] == "hidden"
         assert not any(e == "tool_start" for e, _ in evs)
+
+
+# ------------------------------------------------------------------ re-test of 28/11 (Website)
+def test_the_round_report_names_the_baseline_run_and_says_w5_only_when_asked(idx: ConsolePaths) -> None:
+    _two_rounds(idx)
+    why = ask("Vì sao run C_70 hỏng nhiều ở bước đặt?", "r1")["model"]
+    assert "C_70 (bản gốc của vòng)" in why and "lượt hỏng của C_70" in why
+    assert "lượt hỏng của bản gốc" not in why
+    en = ask("Why does C_70 fail so often at placing?", "r1", "en")["model"]
+    assert "C_70 (the round's baseline)" in en
+    diag = ask("Vì sao C_70 hỏng?", "r1", tool="round_diagnosis")["model"]
+    assert "Cụm lỗi của C_70 (bản gốc của vòng)" in diag
+    for q in ("Phân tích kết quả vòng này", "Vì sao run C_70 hỏng nhiều ở bước đặt?", "Nên làm gì tiếp?"):
+        t = ask(q, "r1")["model"]
+        assert "- " + tools_round.WITHHELD[0] not in t, q  # not a point of an answer nobody asked for
+    side = registry.call("rounds_side_by_side", {}, {"task": "tray", "round": "r1", "lang": "vi", "question": "Vòng 1 so với vòng đồ gá?"})["model"]
+    assert "- " + tools_round.WITHHELD[0] not in side
+    held = ask("Kết quả thi lại của C70_R1 thế nào?", "r1")
+    assert held["answer"] == tools_round.WITHHELD[0]  # asked: the sentence, as it stands
+
+
+def test_an_answer_streaming_past_the_turn_cap_is_not_cut(idx: ConsolePaths, monkeypatch: pytest.MonkeyPatch) -> None:
+    import time
+
+    _two_rounds(idx)
+    _hosted(monkeypatch)
+    monkeypatch.setattr(llm, "TURN_CAP_S", 0.3)
+    monkeypatch.setattr(llm, "STREAM_GRACE_S", 5.0)
+
+    def gen(msgs: Any, schemas: Any, deadline: float, *a: Any) -> Any:
+        # like providers.generate: the deadline is checked on every chunk
+        yield "tok", "Vòng r1: C_70 10/60. "
+        time.sleep(0.5)  # past the cap, while streaming
+        if time.time() > deadline:
+            raise TimeoutError("turn cap reached")
+        yield "tok", "Vòng jig-r1: run M 136/180."
+        yield "end", ("Vòng r1: C_70 10/60. Vòng jig-r1: run M 136/180.", [], 1, 1)
+
+    monkeypatch.setattr(llm, "generate", gen)
+    evs = list(llm.events(_body("Vòng 1 so với vòng đồ gá khác nhau thế nào?", "r1")))
+    assert evs[-1][0] == "done", evs[-1]
+    assert not any(e == "error" for e, _ in evs)
+
+    # a generation that would only start after the cap is not started: the turn ends with timeout
+    monkeypatch.setattr(llm, "TURN_CAP_S", 0.0)
+    evs = list(llm.events(_body("Vòng 1 so với vòng đồ gá khác nhau thế nào?", "r1")))
+    assert evs[-1][0] == "error" and evs[-1][1]["code"] == "timeout"

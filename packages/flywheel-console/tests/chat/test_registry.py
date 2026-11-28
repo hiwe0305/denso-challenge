@@ -239,9 +239,8 @@ def test_round_report_opens_with_what_the_question_asks(idx: ConsolePaths) -> No
     # W3: no "best", the highest count only
     assert "Bản gốc M_BASE có số lượt thành công cao nhất, 12/60" in first("bản nào tốt nhất?")
     assert "tốt nhất" not in first("bản nào tốt nhất?")
-    assert "Lỗi nhiều nhất là đặt lệch vị trí (L-PLACE-POSE): 30 trong 48" in first(
-        "robot hỏng ở đâu?"
-    )
+    dom = "Lỗi nhiều nhất của M_BASE (bản gốc của vòng) là đặt lệch vị trí (L-PLACE-POSE): 30 trong"
+    assert dom in first("robot hỏng ở đâu?")
     assert "Chưa kết luận được" in first("vì sao kết quả chưa tốt lên?")
     assert "Train và serve của vòng: 50,00 CU thực đo" in first("vòng này tốn bao nhiêu?")
     cost = registry.call("round_report", {}, {"task": "box", "lang": "vi", "question": "chi phí"})
@@ -293,7 +292,8 @@ def test_round_report_covers_steps_comparison_and_diagnosis(idx: ConsolePaths) -
 
     assert "bản gốc M_BASE: 12/60" in ask("So sánh các bản model").split("\n")[2]
     assert "không cặp nào khác biệt chắc chắn" in ask("So sánh các bản model")
-    assert "Chẩn đoán chia lỗi của bản gốc thành 2 nhóm" in ask("Chẩn đoán ra những nhóm lỗi nào?")
+    diag = "Chẩn đoán chia lỗi của M_BASE (bản gốc của vòng) thành 2 nhóm"
+    assert diag in ask("Chẩn đoán ra những nhóm lỗi nào?")
     assert "PHƯƠNG ÁN" not in ask("So sánh các bản model")
 
 

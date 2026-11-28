@@ -745,14 +745,14 @@ def _pair_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str
         F["outcome"] = say(f"Trước vòng, {who(base)}: {_succ(say, b.get('successes'), n)}; sau vòng, {who(after)}: {_succ(say, a.get('successes'), n)}.",
                            f"Before the round {who(base)}: {_succ(say, b.get('successes'), n)}; after it {who(after)}: {_succ(say, a.get('successes'), n)}.")  # fmt: skip
     if lb.get("on_table_b") is not None:
-        F["strength"] = say(f"Điểm mạnh: robot mang được vật sang bàn đích trong {lb['on_table_b']}/{n} lượt. Điểm yếu: chỉ {b.get('successes')}/{n} lượt đặt đúng trong dung sai {tol} cm. Chỗ hỏng là độ chính xác lúc đặt, không phải lúc đi và mang.",
-                            f"Strength: the robot brings the object to the target table in {lb['on_table_b']}/{n} runs. Weakness: only {b.get('successes')}/{n} runs place it within the {tol} cm tolerance. The failure is precision at placing, not walking or carrying.")  # fmt: skip
+        F["strength"] = say(f"Điểm mạnh của {_base_name(say, rnd)}: robot mang được vật sang bàn đích trong {lb['on_table_b']}/{n} lượt. Điểm yếu: chỉ {b.get('successes')}/{n} lượt đặt đúng trong dung sai {tol} cm. Chỗ hỏng là độ chính xác lúc đặt, không phải lúc đi và mang.",
+                            f"Strength of {_base_name(say, rnd)}: the robot brings the object to the target table in {lb['on_table_b']}/{n} runs. Weakness: only {b.get('successes')}/{n} runs place it within the {tol} cm tolerance. The failure is precision at placing, not walking or carrying.")  # fmt: skip
     fails = sorted((b.get("failures") or {}).items(), key=lambda kv: -kv[1])
     failed = n - b.get("successes", 0) if n else 0
     if fails and failed:
         rest = ", ".join(f"{say.fail(k)} {v}" for k, v in fails[1:3])
-        F["dominant"] = say(f"Lỗi nhiều nhất là {say.fail(fails[0][0])}: {fails[0][1]} trong {failed} lượt hỏng của bản gốc. Sau đó là {rest}.",
-                            f"The most common failure is {say.fail(fails[0][0])}: {fails[0][1]} of the baseline's {failed} failed runs. Then {rest}.")  # fmt: skip
+        F["dominant"] = say(f"Lỗi nhiều nhất của {_base_name(say, rnd)} là {say.fail(fails[0][0])}: {fails[0][1]} trong {failed} lượt hỏng của {base}. Sau đó là {rest}.",
+                            f"The most common failure of {_base_name(say, rnd)} is {say.fail(fails[0][0])}: {fails[0][1]} of {base}'s {failed} failed runs. Then {rest}.")  # fmt: skip
     cl = R.get("clusters") or []
     dg = demo.get("diagnose") or {}
     ch = R.get("chain") or {}
@@ -760,8 +760,8 @@ def _pair_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str
     tickets = dg.get("tickets") or {}
     tk = ", ".join(tickets)
     if cl:
-        F["diag"] = say(f"Chẩn đoán chia lỗi của bản gốc thành {len(cl)} nhóm: {len(to_data)} nhóm thành đơn thu dữ liệu, {len(cl) - len(to_data)} nhóm là lỗi hệ thống nên thành phiếu sửa ({tk}).",
-                        f"The diagnosis split the baseline's failures into {len(cl)} groups: {len(to_data)} became data orders, {len(cl) - len(to_data)} were system issues and became tickets ({tk}).")  # fmt: skip
+        F["diag"] = say(f"Chẩn đoán chia lỗi của {_base_name(say, rnd)} thành {len(cl)} nhóm: {len(to_data)} nhóm thành đơn thu dữ liệu, {len(cl) - len(to_data)} nhóm là lỗi hệ thống nên thành phiếu sửa ({tk}).",
+                        f"The diagnosis split the failures of {_base_name(say, rnd)} into {len(cl)} groups: {len(to_data)} became data orders, {len(cl) - len(to_data)} were system issues and became tickets ({tk}).")  # fmt: skip
         big = max((c for c in cl if c.get("n")), key=lambda c: c.get("n", 0), default=None)
         if big:
             st = _stage_word(task, big.get("stage"), say)
@@ -827,8 +827,8 @@ def _pair_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str
     steps = b.get("step_pass") or {}
     if steps:
         st_txt = ", ".join(f"{_stage_word(task, k, say)} {100 * v:.0f}%" for k, v in steps.items())
-        F["steps"] = say(f"Tỉ lệ lượt thi của bản gốc qua được từng bước: {st_txt}. Tỉ lệ tụt mạnh nhất ở bước đặt.",
-                         f"Share of the baseline's test runs that pass each step: {st_txt}. The sharpest drop is at placing.")  # fmt: skip
+        F["steps"] = say(f"Tỉ lệ lượt thi của {_base_name(say, rnd)} qua được từng bước: {st_txt}. Tỉ lệ tụt mạnh nhất ở bước đặt.",
+                         f"Share of the test runs of {_base_name(say, rnd)} that pass each step: {st_txt}. The sharpest drop is at placing.")  # fmt: skip
     if nocmp:
         F["noclear"] = say(f"Trong {len(cmps)} phép so sánh đã định trước, không cặp nào khác biệt chắc chắn: mọi khoảng tin cậy đều chứa 0.",
                            f"Of the {len(cmps)} comparisons fixed in advance, none shows a sure difference: every interval includes 0.")  # fmt: skip
@@ -862,9 +862,11 @@ def _pair_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str
         "all": ("outcome", ["strength", "dominant", "near", "ci", "tickets", "diag", "order", "decision", "cost", "untested"]),
     }  # fmt: skip
     if held_here:  # no outcome to lead with: the question about the round gets the plain statement
-        PLAN["why"] = ("dominant", ["strength", "tickets", "withheld", "untested"])
-        PLAN["all"] = ("best", ["each", "strength", "dominant", "diag", "order", "withheld", "tickets", "cost", "untested"])
-        PLAN["next"] = (None, ["strength", "dominant", "tickets", "withheld"])
+        # W5 is said only when the question asks for the held result (focus "held"): unprompted,
+        # it draws attention to it (Website, 28/11/2026)
+        PLAN["why"] = ("dominant", ["strength", "tickets", "untested"])
+        PLAN["all"] = ("best", ["each", "strength", "dominant", "diag", "order", "tickets", "cost", "untested"])
+        PLAN["next"] = (None, ["strength", "dominant", "tickets"])
     first, more = _with_extra(PLAN, focus, extra or [])
     title = f"{say.name(task.get('name'))}, {say.name(rnd.get('title'))}"
     lines = [say(f"VÒNG {rnd.get('id')} ({title}). Mọi bản model thi cùng {n} lượt; một lượt chỉ thành công khi vật nằm trong {tol} cm quanh đích. Mọi số dưới đây thuộc vòng này.",
@@ -883,10 +885,17 @@ def _pair_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str
         lines.append("- " + F["source"])
     lines.append(_how(say, focus))
     if held_here:
-        lines.append(say(f"QUY TẮC: không viết rằng bản sau vòng chưa thi lại hay chưa có kết quả; nếu nhắc tới thì chỉ viết đúng câu: {WITHHELD[0]} Không xác nhận, không phủ nhận con số người hỏi đưa ra.",
-                         f"RULE: never write that the model after the round was not retested or has no result; if you mention it, write only: {WITHHELD[1]} Neither confirm nor deny a figure the user offers."))  # fmt: skip
+        lines.append(say(f"QUY TẮC: không nhắc tới bản sau vòng, việc thi lại hay kết quả thi lại khi người hỏi không hỏi; không viết rằng bản đó chưa thi lại hay chưa có kết quả. Chỉ khi được hỏi thì viết đúng câu: {WITHHELD[0]} Không xác nhận, không phủ nhận con số người hỏi đưa ra.",
+                         f"RULE: do not mention the model after the round, its retest or its result unless the user asks; never write that it was not retested or has no result. Only when asked, write exactly: {WITHHELD[1]} Neither confirm nor deny a figure the user offers."))  # fmt: skip
     ui = table("Round · " + say.name(rnd.get("title")), cols("model", "role", "train_set", "successes", "on_table_B", "within_7.5cm"), rows, link="#/report")
     return result(ui, "\n".join(lines))
+
+
+def _base_name(say: Say, rnd: dict[str, Any]) -> str:
+    """The round's baseline by its run id ("C_70 (bản gốc của vòng)"): the numbers of the baseline
+    are that run's own, so the answer names the run, never 'no number for C_70'."""
+    base = rnd.get("baseline")
+    return say(f"{base} (bản gốc của vòng)", f"{base} (the round's baseline)") if base else say("bản gốc", "the baseline")
 
 
 def _how(say: Say, focus: str) -> str:
@@ -986,7 +995,7 @@ def round_diagnosis(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         checks: list[Any] = d["step4"] if isinstance(d.get("step4"), list) else dg.get("checks") or []
         to_data = set(dg.get("to_data") or [])
         if clusters:
-            lines.append(say(f"Cụm lỗi của bản gốc ({len(clusters)} cụm):", f"Failure groups of the baseline ({len(clusters)} groups):"))
+            lines.append(say(f"Cụm lỗi của {_base_name(say, rnd)} ({len(clusters)} cụm):", f"Failure groups of {_base_name(say, rnd)} ({len(clusters)} groups):"))
             # a cluster's ticket lives on the step-4 check that covers it (story.diag shape)
             ticket_of = {str(x): c["ticket"] for c in map(_check_fields, checks) if c.get("ticket") for x in (c["clusters"] if isinstance(c["clusters"], list) else [])}
             for c in (_cluster_fields(x, to_data, not say.vi) for x in clusters):
