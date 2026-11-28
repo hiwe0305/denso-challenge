@@ -492,23 +492,28 @@ export function renderChatStudioPage() {
     return [panel];
   };
 
-  // "Quá trình suy luận": the ordered tool steps of one answer (readable label, rows, ms), built
-  // from the saved turn so a locked server shows it too (traces are refused there). Never the
+  // "Quá trình suy luận": the ordered tool steps of one answer (readable label, rows, ms), at the
+  // top of the answer like a thinking block. Built from the saved turn so a locked server shows
+  // it too (traces are refused there); a turn saved without steps shows nothing. Never the
   // system prompt, the tool instructions or the model's thinking. Open while the answer streams,
-  // closed once done, unless the reader opened or closed it (reasoningOpen keeps that choice).
+  // collapsed once it is done; a reader's toggle holds only within the phase it was made in.
   const renderReasoning = (tr, isRunning, tokMeta) => {
     const choice = reasoningOpen.get(tr.id);
     const box = el("details", { className: cls("analysis-activity", "reasoning-block") });
-    box.open = choice === undefined ? isRunning : choice;
-    const summary = el("summary", { text: t("analysis.reasoning", { count: formatNumber(tr.steps.length) }) });
-    summary.addEventListener("click", () => reasoningOpen.set(tr.id, !box.open));
+    box.open = choice && choice.running === isRunning ? choice.open : isRunning;
+    const count = formatNumber(tr.steps.length);
+    const checked = !isRunning && Number(tr.groundedCount) > 0 ? formatNumber(tr.groundedCount) : null;
+    const summary = el("summary", { text: checked
+      ? t("analysis.reasoningChecked", { count, checked })
+      : t("analysis.reasoning", { count }) });
+    summary.addEventListener("click", () => reasoningOpen.set(tr.id, { open: !box.open, running: isRunning }));
     const artifacts = getActiveSession().artifacts || [];
     box.append(summary, el("ol", { className: "reasoning-steps" }, tr.steps.map((st) => {
-      const rows = st.ms === null || st.ok === false ? null : stepRows(st.ui);
+      const rows = st.ms === null || st.ok === false ? null : Number.isFinite(st.rows) ? st.rows : stepRows(st.ui);
       return el("li", { className: "reasoning-step" }, [
         el("span", { className: cls("step-status-icon", st.ms === null && "running", st.ms !== null && !st.ok && "err"), "aria-hidden": "true" },
           [st.ms === null ? icon("dot") : st.ok ? "✓" : "!"]),
-        el("b", { className: "reasoning-label", text: chatToolLabel(st.name), title: st.name || "" }),
+        el("b", { className: "reasoning-label", text: st.label || chatToolLabel(st.name), title: st.name || "" }),
         st.ok === false && st.ms !== null
           ? el("span", { className: "reasoning-rows", text: t("analysis.stepFailed") })
           : rows !== null
@@ -578,6 +583,7 @@ export function renderChatStudioPage() {
           : null,
       ]),
 
+      (tr.steps || []).length > 0 ? renderReasoning(tr, isRunning, tokMeta) : null,
       tr.answer || isRunning ? mdZone : null,
       isRunning ? null : sourceChips(tr.sources),
       tr.steps?.some((step) => step.ok === false)
@@ -592,7 +598,6 @@ export function renderChatStudioPage() {
       tr.error ? el("div", { className: "missing-item", text: tr.error }) : null,
 
       ...renderResults(tr),
-      (tr.steps || []).length > 0 ? renderReasoning(tr, isRunning, tokMeta) : null,
 
       tr.navigate
         ? el(

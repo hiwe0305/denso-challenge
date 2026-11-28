@@ -4131,7 +4131,9 @@ body:has(.is-studio-route) { height: 100dvh; min-height: 0; }
 .analysis-activity { margin-block: 8px; }
 .analysis-activity summary { color: var(--soft); cursor: pointer; }
 /* "Quá trình suy luận" under each answer: ordered steps, label | rows | ms on one line */
-.reasoning-block > summary { font-size: 13px; }
+.reasoning-block { margin: 2px 0 10px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.reasoning-block > summary { font-size: 13px; color: var(--soft); cursor: pointer; }
+.reasoning-block[open] > summary { margin-bottom: 2px; }
 .reasoning-steps { list-style: none; counter-reset: step; margin: 8px 0 4px; padding: 0; display: grid; gap: 4px; max-height: 320px; overflow: auto; }
 .reasoning-step { counter-increment: step; display: grid; grid-template-columns: 22px 16px minmax(0, 1fr) auto auto auto; align-items: center; gap: 8px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13px; }
 .reasoning-step::before { content: counter(step) "."; color: var(--soft); font-variant-numeric: tabular-nums; text-align: right; }

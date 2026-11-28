@@ -1185,7 +1185,7 @@ export default {
   "home.timelineLatest": "Mới nhất: {round} · run {run}",
   "home.timelineLatestTag": "mới nhất",
   "base.noControls": "{round} không có nhánh đối chứng. Mở vòng có nhánh đối chứng:",
-  "analysis.reasoning": "Quá trình suy luận ({count} bước)",
+  "analysis.reasoning": "Quá trình suy luận · {count} bước",
   "analysis.stepRows": "{n} dòng",
   "analysis.stepRow": "{n} dòng",
   "analysis.stepFailed": "không lấy được",
@@ -1206,4 +1206,5 @@ export default {
   "exp.ladderNoteRepeats": "Các lượt lặp của M: {lo}–{hi}/{n}.",
   "exp.ladderChartTitle": "Thành công và nới theo ngưỡng",
   "exp.ladderChartSub": "Số lượt trên {n}, mỗi run một cột",
+  "analysis.reasoningChecked": "Quá trình suy luận · {count} bước · {checked} số đã đối chiếu",
 };
