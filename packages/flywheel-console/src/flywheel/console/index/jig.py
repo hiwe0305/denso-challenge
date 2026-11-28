@@ -79,11 +79,12 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-from flywheel.console.index import hidden
+from flywheel.console.index import colab, hidden
 from flywheel.console.index.tasks import Round, Run
 
 RESULTS = "results.json"
@@ -531,8 +532,12 @@ def compare60(
     }
 
 
-def live_eval_watchers(fw: Path) -> list[dict[str, Any]]:
-    """Eval watchers running on Colab (``colab/*eval*/watch.log``), last line of each."""
+def live_eval_watchers(fw: Path, now: float | None = None) -> list[dict[str, Any]]:
+    """Eval watchers on Colab (``colab/*eval*/watch.log``), last line of each. ``state`` is the
+    serve record's, else ``running``; a live state is kept only with a heartbeat (the serve
+    record's ``beat``, else the mtime of ``watch.log``) in the last ``colab.STALE_AFTER_S``,
+    else it is ``stale`` (``colab.live_state``)."""
+    now = time.time() if now is None else now
     watchers: list[dict[str, Any]] = []
     for wlog in sorted(fw.glob("colab/*eval*/watch.log")):
         try:
@@ -545,11 +550,18 @@ def live_eval_watchers(fw: Path) -> list[dict[str, Any]]:
         m = re.search(r"lanes=(\d+)\s+complete=(\d+)\s+rows=(\d+)", lines[-1])
         serve = list(wlog.parent.glob("*serve*.json"))
         sdoc = _dict(serve[0]) if serve else {}
+        beat = sdoc.get("beat")
+        if not isinstance(beat, (int, float)) or isinstance(beat, bool):
+            try:
+                beat = wlog.stat().st_mtime
+            except OSError:
+                beat = None
         watchers.append(
             {
                 "folder": wlog.parent.name,
                 "session": sdoc.get("name") or wlog.parent.name,
-                "state": sdoc.get("state") or "running",
+                "state": colab.live_state(sdoc.get("state") or "running", beat, now),
+                "beat": colab.beat_iso(beat),
                 "gpu": sdoc.get("gpu") or "L4",
                 "lanes": int(m.group(1)) if m else None,
                 "complete": int(m.group(2)) if m else None,
@@ -661,6 +673,7 @@ def build(
     cuts = {r.id: c for r in shown if (c := _cut(fw, r)) is not None}
     after = next((e for e in runs if after_id is not None and e.get("branch") == after_id), {})
     watchers = hidden.off_sessions(live_eval_watchers(fw), hide, "folder", "session")
+    watchers = [w for w in watchers if w.get("state") != "stale"]  # a dead watcher is not live
     running = [s for s in sessions if s.get("state") == "running"]
     return {
         "round": rnd.id,

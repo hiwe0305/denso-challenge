@@ -18,13 +18,14 @@ import csv
 import json
 import re
 import statistics
+import time
 from collections import Counter, defaultdict
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import yaml
-from flywheel.console.index import cited, demo, hidden, jig, tasks, timeline
+from flywheel.console.index import cited, colab, demo, hidden, jig, tasks, timeline
 from flywheel.console.paths import ConsolePaths
 
 _SERIES_CAP = 400
@@ -456,12 +457,15 @@ def _guards(fw: Path) -> Iterator[dict[str, Any]]:
         yield from _jl(g)
 
 
-def _colab(fw: Path) -> tuple[list[list[Any]], list[dict[str, Any]]]:
+def _colab(fw: Path, now: float | None = None) -> tuple[list[list[Any]], list[dict[str, Any]]]:
     """Colab balance points and sessions. Sessions come from every ``colab/batch-*`` folder
     (audit 02 P1-5: the newest folder alone may hold only a hidden run's session): one per
     session ``name`` (else the file stem up to its first dot, so ``da34-c70r1.attempt1.json`` is
     session ``da34-c70r1``), the record with the latest ``beat``, then the later folder and
-    the file without a suffix. ``batch`` names its folder."""
+    the file without a suffix. ``batch`` names its folder. ``state`` is ``stale`` for a
+    ``running``/``starting`` record without a heartbeat in the last ``colab.STALE_AFTER_S``
+    before ``now`` (the build time); ``beat`` is that heartbeat (UTC) or None."""
+    now = time.time() if now is None else now
     bal = sorted(
         [r["time"], round(_num(r["balance"]), 2)]
         for r in _guards(fw)
@@ -482,9 +486,10 @@ def _colab(fw: Path) -> tuple[list[list[Any]], list[dict[str, Any]]]:
             latest[name] = (rank, {
                 "session": name,
                 "gpu": j.get("gpu"),
-                "state": j.get("state"),
+                "state": colab.live_state(j.get("state"), beat, now),
                 "cap": j.get("cap"),
                 "batch": batch.name,
+                "beat": colab.beat_iso(beat),
             })  # fmt: skip
     sessions = sorted((v for _, v in latest.values()), key=lambda x: (x["batch"], x["session"]))
     return bal, sessions

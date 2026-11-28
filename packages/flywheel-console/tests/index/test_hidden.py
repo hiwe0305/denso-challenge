@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -66,9 +67,11 @@ def _fwdata(fw: ConsolePaths) -> None:
     _write(root / "colab/da50-eval-n-x/watch.log", "lanes=3 complete=8 rows=8\n")
     _write(root / "colab/da50-eval-n-x/da50-serve-n-1.json", {"name": "da50-serve-n-1"})
     _write(root / "colab/da47-eval-m-x/watch.log", "lanes=3 complete=60 rows=180\n")
-    _write(root / "colab/batch-1/da50-n.json", {"name": "da50-n", "state": "running", "gpu": "L4"})
+    _write(root / "colab/batch-1/da50-n.json",
+           {"name": "da50-n", "state": "running", "gpu": "L4", "beat": time.time()})
     _write(
-        root / "colab/batch-1/da48-m.json", {"name": "da48-m", "state": "running", "gpu": "A100"}
+        root / "colab/batch-1/da48-m.json",
+        {"name": "da48-m", "state": "running", "gpu": "A100", "beat": time.time()},
     )
     for case, run in (("jig-m-100k-a", "M"), ("jig-n-100k-a", "N")):
         cl = {"cluster": {"cluster_id": f"c-{run}", "run": run, "label": "L-PLACE-POSE"}}
