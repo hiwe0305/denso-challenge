@@ -639,13 +639,13 @@ def _pair_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str
         ec = (cost.get("eval_client") or {}).get("value") or {}
         if ec.get("hours") is not None:
             F["evalcost"] = say(f"Eval client chạy trên rtx3060: {say.num(ec['hours'])} giờ, {ec.get('cu', 0)} CU.", f"The eval client ran on rtx3060: {say.num(ec['hours'])} hours, {ec.get('cu', 0)} CU.")
-    gq = (s.get("diag") or {}).get("gen_qa_cost") if isinstance(s.get("diag"), dict) else None
-    if isinstance(gq, dict) and gq.get("cu") is not None:
+    gq = _gen_qa((s.get("diag") or {}).get("gen_qa_cost")) if isinstance(s.get("diag"), dict) else None
+    if gq is not None:
         hrs = [say(f"sinh {say.num(gq['gen_hours'], 2)} giờ", f"generation {say.num(gq['gen_hours'], 2)} h") if gq.get("gen_hours") is not None else "",
                say(f"QA {say.num(gq['qa_hours'], 2)} giờ", f"QA {say.num(gq['qa_hours'], 2)} h") if gq.get("qa_hours") is not None else ""]  # fmt: skip
         hrs_t = ", ".join(x for x in hrs if x)
-        F["gencost"] = say(f"Thu dữ liệu {gq['cu']} CU (sinh và QA trên {gq.get('host', 'rtx3060')}" + (f": {hrs_t}" if hrs_t else "") + ").",
-                           f"Collecting the data: {gq['cu']} CU (generation and QA on {gq.get('host', 'rtx3060')}" + (f": {hrs_t}" if hrs_t else "") + ").")  # fmt: skip
+        F["gencost"] = say(f"Thu dữ liệu {gq['cu']} CU (sinh và QA trên {gq['host']}" + (f": {hrs_t}" if hrs_t else "") + ").",
+                           f"Collecting the data: {gq['cu']} CU (generation and QA on {gq['host']}" + (f": {hrs_t}" if hrs_t else "") + ").")  # fmt: skip
     else:
         F["gencost"] = say("Chi phí sinh và QA dữ liệu chưa có trong index.", "The cost of generating and checking the data is not in the index yet.")
     if held_here:
@@ -735,10 +735,36 @@ def _pair_round_id() -> str:
 
 
 def _check_fields(c: dict[str, Any]) -> dict[str, Any]:
-    """A step-4 check as {id, clusters, result, ticket, goes_to}; accepts the demo.diagnose shape."""
+    """A step-4 check as {id, clusters, result, ticket, goes_to}. Accepts story.diag.step4 (``verdict``,
+    PR #258, docs/console/api-contract.md §2.2) and the demo.diagnose shape (``value``)."""
     v: dict[str, Any] = c["value"] if isinstance(c.get("value"), dict) else {}
-    return {"id": c.get("id"), "clusters": c.get("clusters", v.get("clusters")), "result": c.get("result", v.get("result")),
-            "ticket": c.get("ticket", v.get("ticket")), "goes_to": c.get("goes_to", v.get("goes_to")), "source": c.get("source")}  # fmt: skip
+    res = c.get("verdict", c.get("result", v.get("result")))
+    return {"id": c.get("id"), "clusters": c.get("clusters", v.get("clusters")), "result": res, "claim": c.get("claim"),
+            "ticket": c.get("ticket", v.get("ticket")), "goes_to": c.get("goes_to", v.get("goes_to")), "source": _src(c.get("source"))}  # fmt: skip
+
+
+def _src(v: Any) -> str:
+    return ", ".join(str(x) for x in v) if isinstance(v, list) else str(v or "")
+
+
+def _cluster_fields(c: dict[str, Any], to_data: set[str]) -> dict[str, Any]:
+    """A failure group as {id, stage, label, level, n, diagnosis, takes, intervention}; accepts
+    story.diag.clusters (``key``, ``n_fail``, ``gets_data``) and story.round.clusters."""
+    k: dict[str, Any] = c["key"] if isinstance(c.get("key"), dict) else {}
+    takes = c.get("gets_data", c.get("to_data"))
+    return {"id": c.get("id"), "stage": c.get("stage", k.get("step")), "label": c.get("label", k.get("label")),
+            "level": c.get("level", k.get("level")), "n": c.get("n", c.get("n_fail")), "diagnosis": c.get("diagnosis"),
+            "takes": (c.get("id") in to_data) if takes is None else bool(takes), "intervention": c.get("intervention")}  # fmt: skip
+
+
+def _gen_qa(gq: Any) -> dict[str, Any] | None:
+    """story.diag.gen_qa_cost as {cu, host, gen_hours, qa_hours}; None when absent or without CU."""
+    if not isinstance(gq, dict) or gq.get("cu") is None:
+        return None
+    g: dict[str, Any] = gq["generation"] if isinstance(gq.get("generation"), dict) else {}
+    q: dict[str, Any] = gq["qa"] if isinstance(gq.get("qa"), dict) else {}
+    return {"cu": gq["cu"], "host": gq.get("host") or "rtx3060",
+            "gen_hours": gq.get("gen_hours", g.get("hours")), "qa_hours": gq.get("qa_hours", q.get("hours"))}  # fmt: skip
 
 
 def round_diagnosis(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
@@ -776,13 +802,16 @@ def round_diagnosis(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
             d = {}
         R, dg = s.get("round") or {}, (s.get("demo") or {}).get("diagnose") or {}
         clusters = d.get("clusters") if isinstance(d.get("clusters"), list) else R.get("clusters") or []
-        checks = d.get("step4") if isinstance(d.get("step4"), list) else dg.get("checks") or []
+        checks: list[Any] = d["step4"] if isinstance(d.get("step4"), list) else dg.get("checks") or []
         to_data = set(dg.get("to_data") or [])
         if clusters:
             lines.append(say(f"Cụm lỗi của bản gốc ({len(clusters)} cụm):", f"Failure groups of the baseline ({len(clusters)} groups):"))
-            for c in clusters:
-                takes = c.get("to_data")
-                takes = (c.get("id") in to_data) if takes is None else bool(takes)
+            # a cluster's ticket lives on the step-4 check that covers it (story.diag shape)
+            ticket_of = {str(x): c["ticket"] for c in map(_check_fields, checks) if c.get("ticket") for x in (c["clusters"] if isinstance(c["clusters"], list) else [])}
+            for c in (_cluster_fields(x, to_data) for x in clusters):
+                takes = c["takes"]
+                if not takes and not c.get("intervention") and ticket_of.get(str(c.get("id"))):
+                    c["intervention"] = say(f"phiếu {ticket_of[str(c.get('id'))]}", f"ticket {ticket_of[str(c.get('id'))]}")
                 where = say(f"bước {say.step(str(c.get('stage')))}", f"step {say.step(str(c.get('stage')))}") if c.get("stage") not in (None, "—") else say("không gắn bước", "no step")
                 nn = say(f", {c.get('n')} lượt", f", {c.get('n')} runs") if c.get("n") else ""
                 goes = say("nhận dữ liệu", "gets data") if takes else (say(f"thành {c.get('intervention')}", f"becomes {c.get('intervention')}") if c.get("intervention") else say("không nhận dữ liệu", "gets no data"))
@@ -795,19 +824,21 @@ def round_diagnosis(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
             for c in map(_check_fields, checks):
                 cl_ = c["clusters"]
                 cl_t = ", ".join(cl_) if isinstance(cl_, list) else say("mọi cụm", "all groups") if cl_ == "all" else str(cl_ or "")
+                if c.get("claim"):
+                    cl_t += f"; {c['claim']}"
                 tail = say(f", thành phiếu {c['ticket']}", f", ticket {c['ticket']}") if c.get("ticket") else (say(", đọc là lỗi của policy, đi tiếp sang dữ liệu", ", read as a policy failure, goes on to data") if c.get("goes_to") == "data" else "")
                 res_t = RESULT_VI.get(str(c.get("result")), c.get("result")) if say.vi else c.get("result")
                 lines.append(f"- {c['id']} ({cl_t}): {res_t}{tail}" + (f" [{c['source']}]" if c.get("source") else "") + ".")
             lines.append(say("Phiếu không tiêu ngân sách dữ liệu: thu thêm dữ liệu không sửa được lỗi hệ thống.", "Tickets spend no data budget: more data cannot fix a system issue."))
         else:
             lines.append(say("Index chưa có kết quả bước 4 của vòng này.", "The index has no step-4 result for this round."))
-        gq = d.get("gen_qa_cost") if isinstance(d.get("gen_qa_cost"), dict) else None
-        if gq and gq.get("cu") is not None:
-            lines.append(say(f"Chi phí sinh và QA dữ liệu: {gq['cu']} CU trên {gq.get('host', 'rtx3060')}" + (f", sinh {say.num(gq['gen_hours'], 2)} giờ" if gq.get("gen_hours") is not None else "") + (f", QA {say.num(gq['qa_hours'], 2)} giờ" if gq.get("qa_hours") is not None else "") + ".",
-                             f"Cost of generating and checking the data: {gq['cu']} CU on {gq.get('host', 'rtx3060')}" + (f", generation {say.num(gq['gen_hours'], 2)} h" if gq.get("gen_hours") is not None else "") + (f", QA {say.num(gq['qa_hours'], 2)} h" if gq.get("qa_hours") is not None else "") + "."))  # fmt: skip
+        gq = _gen_qa(d.get("gen_qa_cost"))
+        if gq is not None:
+            lines.append(say(f"Chi phí sinh và QA dữ liệu: {gq['cu']} CU trên {gq['host']}" + (f", sinh {say.num(gq['gen_hours'], 2)} giờ" if gq.get("gen_hours") is not None else "") + (f", QA {say.num(gq['qa_hours'], 2)} giờ" if gq.get("qa_hours") is not None else "") + ".",
+                             f"Cost of generating and checking the data: {gq['cu']} CU on {gq['host']}" + (f", generation {say.num(gq['gen_hours'], 2)} h" if gq.get("gen_hours") is not None else "") + (f", QA {say.num(gq['qa_hours'], 2)} h" if gq.get("qa_hours") is not None else "") + "."))  # fmt: skip
         else:
             lines.append(say("Chi phí sinh và QA dữ liệu: chưa có trong index.", "Cost of generating and checking the data: not in the index yet."))
-        src = d.get("source") or dg.get("source") or rnd.get("doc") or ""
+        src = _src(d.get("source")) or _src(dg.get("source")) or rnd.get("doc") or ""
         lines.append(say(f"Nguồn: {src}.", f"Source: {src}."))
     lines.append(say("CÁCH TRẢ LỜI: trả lời đúng câu hỏi từ các dòng trên, nêu tên vòng, giữ nguyên chẩn đoán và mã phiếu; phần nào index chưa có thì nói chưa có dữ liệu, không suy diễn lý do.",
                      "HOW TO ANSWER: answer the question from the lines above, name the round, keep the diagnoses and ticket ids as written; where the index has nothing, say so and do not infer a reason."))  # fmt: skip
