@@ -1,3 +1,4 @@
+# ruff: noqa: E501  (expected rows stay on one line each)
 from __future__ import annotations
 
 from pathlib import Path
@@ -218,14 +219,31 @@ def test_round_report_writes_the_round_in_the_language_asked(idx: ConsolePaths) 
     vi = registry.call("round_report", {}, ctx)
     assert vi["ok"]
     t = vi["model"]
-    # roles in plain words, counts from the index, the near-miss reading (15-12 -> 16-6) computed
-    # W1: a count of runs is "lượt thành công", never "đạt"
-    assert "bản gốc M_BASE: 12/60 (20%) lượt thành công" in t and "bản sau vòng M_NEW" in t
-    assert "tăng từ 3 lên 10" in t and "từ -20.0 đến +3.0 điểm phần trăm" in t and "T-1" in t
-    assert "50,00 CU thực đo" in t and "ĐÃ LÀM RỒI" in t and " đạt 12" not in t
+    # roles in plain words, counts from the index, the near-miss counts (15-12 -> 16-6) computed
+    assert (
+        "RESULT | run=M_BASE | role=bản gốc | train_set=A | successes=12 | n=60 | rate=20,0 %" in t
+    )
+    assert (
+        "RESULT | run=M_NEW | role=bản sau vòng | train_set=B | successes=6 | n=60 | rate=10,0 %"
+        in t
+    )
+    assert "NEAR_MISS | band=ngoài 5 cm, trong 7,5 cm | before=3 | after=10" in t
+    assert (
+        "BEFORE_AFTER | diff_runs=-6 | n=60 | ci_pts=-20,0 → +3,0 | ci_includes_0=yes" in t
+        and "TICKET | id=T-1" in t
+    )
+    assert (
+        "COST | scope=train và serve | total_cu=50,00 | kind=thực đo" in t
+        and "ĐÃ LÀM RỒI" not in t
+        and " đạt 12" not in t
+    )
     assert vi["round"] == "box-r1"  # the numbers are tagged with their round (A2)
     en = registry.call("round_report", {}, {**ctx, "lang": "en", "question": "comment"})["model"]
-    assert "the baseline M_BASE: 12/60 (20%) successful runs" in en and "went from 3 to 10" in en
+    assert (
+        "RESULT | run=M_BASE | role=the baseline | train_set=A | successes=12 | n=60 | rate=20.0%"
+        in en
+        and "before=3 | after=10" in en
+    )
     assert "bản gốc" not in en
 
 
@@ -234,19 +252,33 @@ def test_round_report_opens_with_what_the_question_asks(idx: ConsolePaths) -> No
 
     def first(q: str) -> str:
         ctx = {"task": "box", "lang": "vi", "question": q}
-        return registry.call("round_report", {}, ctx)["model"].split("\n")[2]
+        return registry.call("round_report", {}, ctx)["model"].split("\n")[1]  # the row after ROUND
 
-    # W3: no "best", the highest count only
-    assert "Bản gốc M_BASE có số lượt thành công cao nhất, 12/60" in first("bản nào tốt nhất?")
-    assert "tốt nhất" not in first("bản nào tốt nhất?")
-    dom = "Lỗi nhiều nhất của M_BASE (bản gốc của vòng) là đặt lệch vị trí (L-PLACE-POSE): 30 trong"
-    assert dom in first("robot hỏng ở đâu?")
-    assert "Chưa kết luận được" in first("vì sao kết quả chưa tốt lên?")
-    assert "Train và serve của vòng: 50,00 CU thực đo" in first("vòng này tốn bao nhiêu?")
+    # W3: no "best", the results highest first, then the reading
+    assert first("bản nào tốt nhất?").startswith(
+        "RESULT | run=M_BASE | role=bản gốc | train_set=A | successes=12 | n=60"
+    )
+    best = registry.call(
+        "round_report", {}, {"task": "box", "lang": "vi", "question": "bản nào tốt nhất?"}
+    )["model"]
+    assert (
+        "READING | highest=M_BASE | highest_successes=12 | n=60 | decisive_comparisons=0 trên 1"
+        in best
+        and "tốt nhất" not in best
+    )
+    dom = "MOST_COMMON_FAILURE | run=M_BASE | role=bản gốc | failure=Đặt lệch | count=30 | of_failed=48"
+    assert first("robot hỏng ở đâu?").startswith(dom) and "L-PLACE-POSE" not in first(
+        "robot hỏng ở đâu?"
+    )
+    assert first("vì sao kết quả chưa tốt lên?").startswith("BEFORE_AFTER | diff_runs=-6")
+    assert (
+        first("vòng này tốn bao nhiêu?")
+        == "COST | scope=train và serve | total_cu=50,00 | kind=thực đo | usd=5,00"
+    )
     cost = registry.call("round_report", {}, {"task": "box", "lang": "vi", "question": "chi phí"})
     # N5: collecting the data apart from training; no cost per kept demonstration
-    assert "chưa có trong index" in cost["model"] and "CU cho mỗi bài" not in cost["model"]
-    assert "PHƯƠNG ÁN" not in cost["model"]  # no next steps
+    assert "missing=chưa có trong index" in cost["model"] and "CU cho mỗi bài" not in cost["model"]
+    assert "OPTION" not in cost["model"]  # no next steps
 
 
 def test_ego_summary_and_its_offer(idx: ConsolePaths) -> None:
@@ -259,7 +291,13 @@ def test_round_report_for_a_task_without_a_round(idx: ConsolePaths) -> None:
     # the task is named in the question; free text the model passes as "task" is ignored
     ctx = {"lang": "vi", "task": "box", "question": "Task mới đang ở đâu, thiếu gì?"}
     t = registry.call("round_report", {"task": "cái task mới ấy"}, ctx)["model"]
-    assert "chưa chạy vòng" in t and "6/10 (60%) lượt thành công" in t and "3 dạy model" in t
+    assert (
+        "TASK | id=new | name=Task mới | rounds=0" in t and "failure_to_data_round=chưa chạy" in t
+    )
+    assert (
+        "EVAL | label=bản của tác giả | model=của tác giả | successes=6 | n=10 | rate=60,0 %" in t
+        and "STAGES | without_result=3 dạy model" in t
+    )
     assert "M_BASE" not in t  # never another task's numbers
 
 
@@ -290,11 +328,17 @@ def test_round_report_covers_steps_comparison_and_diagnosis(idx: ConsolePaths) -
             "model"
         ]
 
-    assert "bản gốc M_BASE: 12/60" in ask("So sánh các bản model").split("\n")[2]
-    assert "không cặp nào khác biệt chắc chắn" in ask("So sánh các bản model")
-    diag = "Chẩn đoán chia lỗi của M_BASE (bản gốc của vòng) thành 2 nhóm"
+    assert (
+        ask("So sánh các bản model")
+        .split("\n")[1]
+        .startswith("RESULT | run=M_BASE | role=bản gốc | train_set=A | successes=12 | n=60")
+    )
+    assert "COMPARISONS | fixed_in_advance=1 | decisive=0 | all_ci_include_0=yes" in ask(
+        "So sánh các bản model"
+    )
+    diag = "DIAGNOSIS | run=M_BASE | groups=2 | to_data=1 | to_tickets=1 | tickets=T-1"
     assert diag in ask("Chẩn đoán ra những nhóm lỗi nào?")
-    assert "PHƯƠNG ÁN" not in ask("So sánh các bản model")
+    assert "OPTION" not in ask("So sánh các bản model")
 
 
 def test_withheld_result_is_never_given_to_the_model(idx: ConsolePaths) -> None:

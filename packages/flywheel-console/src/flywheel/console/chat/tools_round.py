@@ -1,14 +1,15 @@
 # ruff: noqa: E501  (one fact per line of the model text)
-"""``round_report`` and its two companions: the facts of one task's round, for analysis questions.
+"""``round_report`` and its companions: the facts of one task's round, for analysis questions.
 
 "What do you make of the results", "why did the round not help", "what next", "which model has
-the most successes", "what did the round cost" need the test results, the reading rules, the
+the most successes", "what did the round cost" need the test results, the reading marks, the
 diagnosis, the data order, the outcome and the cost side by side. The tools read them from the
 console index (``tasks.json`` for the task, its rounds and the role of each model, ``story.json``
-for the numbers) and write them as full sentences in the language of the question
-(``ctx["lang"]``: vi or en), because a small model that has to translate a fact gets it wrong.
-They also compute the points worth raising and the options that follow from them, so the model
-comments on what the pages show and cites nothing else.
+for the numbers) and return them as DATA: one labelled row per line, ``SECTION | key=value | ...``,
+after a ``ROUND`` header row. Values that are words are in the language of the question
+(``ctx["lang"]``: vi or en), numbers keep its decimal style. The section the question asks about
+comes first. The rows hold no prose to copy and no instruction: how to write the answer lives in
+the system prompt (``llm.SYSTEM``). Doc references go apart, in ``Result["sources"]``.
 
 A round reads its own block of the index: a round whose manifest lists ``story.jig`` (run M on
 the jig scene) reads ``story.jig`` and its reading rules; a round built on ``story.pair`` (DA-34)
@@ -52,13 +53,13 @@ ROLE = {
     "after_round": ("bản sau vòng", "the model after the round"),
     "control": ("bản đối chứng", "a control"),
 }
-# failure labels of the scorer, in plain words
+# failure labels of the scorer, in plain words (the codes never reach the model text)
 FAIL = {
-    "L-PLACE-POSE": ("đặt lệch vị trí", "placed off target"),
-    "L-TRAY-TILT": ("vật bị nghiêng", "object tilted"),
-    "L-TIMEOUT": ("hết giờ", "ran out of time"),
-    "L-ONE-HAND": ("chỉ cầm một tay", "held with one hand"),
-    "L-PART-DROP": ("rơi vật", "dropped a part"),
+    "L-PLACE-POSE": ("Đặt lệch", "Misplaced"),
+    "L-TRAY-TILT": ("Khay nghiêng", "Tray tilted"),
+    "L-TIMEOUT": ("Hết giờ", "Timed out"),
+    "L-PART-DROP": ("Rơi khay", "Tray dropped"),
+    "L-ONE-HAND": ("Chỉ cầm một tay", "One hand only"),
 }
 STEP = {
     "approach_a": ("tới bàn A", "reach table A"), "grasp": ("cầm", "grasp"), "lift": ("nhấc", "lift"),
@@ -181,17 +182,6 @@ def focuses_of(question: Any) -> list[str]:
     60 rollout" asks for the verdict and the comparison)."""
     q = str(question or "")
     return [k for k, rx in FOCUS if rx.search(q)]
-
-
-def _with_extra(plan: dict[str, tuple[str | None, list[str]]], focus: str, extra: list[str]) -> tuple[str | None, list[str]]:
-    """The facts of the main focus, then the lead and facts of each other focus of the question."""
-    first, more = plan.get(focus, plan["all"])
-    more = list(more)
-    for e in extra:
-        if e != focus and e in plan:
-            f2, m2 = plan[e]
-            more += ([f2] if f2 else []) + list(m2)
-    return first, list(dict.fromkeys(more))
 
 
 def manifest() -> dict[str, Any]:
@@ -323,9 +313,10 @@ class Say:
             return str((o.get("vi") if self.vi else o.get("en")) or o.get("vi") or o.get("en") or "")
         return str(o or "")
 
-    def fail(self, label: str) -> str:
-        w = FAIL.get(label)
-        return f"{w[0 if self.vi else 1]} ({label})" if w else label
+    def fail(self, label: Any) -> str:
+        """A failure label in plain words; an unknown code without its ``L-`` prefix."""
+        w = FAIL.get(str(label))
+        return w[0 if self.vi else 1] if w else re.sub(r"^L-", "", str(label)).replace("-", " ").lower()
 
     def step(self, s: str) -> str:
         w = STEP.get(s)
@@ -354,6 +345,28 @@ class Say:
         except (TypeError, ValueError):
             return str(p)
 
+    def rate(self, p: Any) -> str:
+        """A share 0..1 as a rate with its sign: "75,6 %" in Vietnamese, "75.6%" in English."""
+        return self.pct(p) + (" %" if self.vi else "%")
+
+    def frac(self, k: Any, n: Any) -> str | None:
+        """The rate of ``k`` successes out of ``n``; None without a count."""
+        if isinstance(k, (int, float)) and isinstance(n, (int, float)) and n:
+            return self.rate(k / n)
+        return None
+
+    @staticmethod
+    def yes(b: Any) -> str:
+        """A flag of a row: "yes" or "no" in every language (the system prompt reads them)."""
+        return "yes" if b else "no"
+
+    def scene(self, scene: Any) -> str:
+        """The scene of a round in words: "có đồ gá jig2" / "không đồ gá"."""
+        return self(f"có đồ gá {scene}", f"jig fixture {scene}") if scene else self("không đồ gá", "no jig fixture")
+
+    def scorer(self, v: Any) -> str:
+        return self(f"bản {v}", f"v{v}")
+
     def ci(self, ci: Any) -> str:
         lo, hi = (ci or [None, None])[:2]
         return f"{self.pct(lo)}–{self.pct(hi)}"
@@ -362,17 +375,196 @@ class Say:
         return COUNT_VI.get(n, str(n)) if self.vi else str(n)
 
 
-def _cap(s: str) -> str:
-    return s[:1].upper() + s[1:]
+def _v(v: Any) -> str:
+    """One value of a row: on one line, without the column separator."""
+    return re.sub(r"\s+", " ", str(v)).replace("|", "/").strip()
 
 
-def _pct(k: Any, n: Any) -> str:
-    return f"{k}/{n} ({100 * k / n:.0f}%)" if isinstance(k, int) and isinstance(n, int) and n else f"{k}/{n}"
+def _row(section: str, **kv: Any) -> str:
+    """One labelled data row, ``SECTION | key=value | ...``; empty values are left out."""
+    return " | ".join([section, *(f"{k}={_v(v)}" for k, v in kv.items() if v is not None and _v(v) != "")])
 
 
-def _succ(say: Say, k: Any, n: Any) -> str:
-    """W1: a count of runs is "lượt thành công", never "đạt"."""
-    return say(f"{_pct(k, n)} lượt thành công", f"{_pct(k, n)} successful runs")
+def _done(ui: dict[str, Any], lines: list[str], sources: list[Any], rid: Any = None) -> Result:
+    """A tool result whose model text is the rows, with its doc references apart (``sources``)."""
+    out = result(ui, "\n".join(ln for ln in lines if ln))
+    out["sources"] = list(dict.fromkeys(ref for s in sources if s for ref in _doc_refs(s)))
+    if rid:
+        out["round"] = str(rid)
+    return out
+
+
+def _doc_refs(v: Any) -> list[str]:
+    """The doc references of a source note ("docs/he/tray.md §20.3; clusters from story.round"
+    gives the doc part only): the parts that name a file under docs/ or seed/."""
+    parts = v if isinstance(v, list) else re.split(r";\s*", str(v))
+    return [str(p).strip() for p in parts if re.search(r"\b(docs|seed)/", str(p))]
+
+
+def _sections(plan: dict[str, list[str]], focus: str, extra: list[str]) -> list[str]:
+    """The sections of the main focus, then those of each other focus of the question."""
+    keys = list(plan.get(focus, plan["all"]))
+    for e in extra:
+        if e != focus and e in plan:
+            keys += plan[e]
+    return list(dict.fromkeys(keys))
+
+
+def _shown(entry: Any) -> bool:
+    """An index entry (timeline, next step, latest) that names no hidden or held run or story."""
+    if not isinstance(entry, dict):
+        return False
+    h = hidden_runs()
+    text = " ".join(str(v) for v in entry.values())
+    if h and (h.run(entry.get("run")) or h.story(entry.get("story")) or h.mentions(text)
+              or any(_word_in(x, text) for x in h.stories)):  # fmt: skip
+        return False
+    return not any(_word_in(x, text) for x in _held_names())
+
+
+def _say_text(say: Say, v: Any) -> str:
+    """A {vi, en} text of the index (or a plain string) in the user's language."""
+    return say.name(v) if isinstance(v, dict) else str(v or "")
+
+
+def _round_by_id(rid: Any) -> dict[str, Any] | None:
+    return next((r for r in _rounds() if str(r.get("id")) == str(rid)), None)
+
+
+def _scene_of(rnd: dict[str, Any]) -> Any:
+    if rnd.get("scene"):
+        return rnd["scene"]
+    if "story.jig" in (rnd.get("index") or []):
+        return (story().get("jig") or {}).get("scene")
+    return None
+
+
+def _scorer_of(rnd: dict[str, Any]) -> Any:
+    """The scorer version of a round; a round without one was scored before the scorer had
+    versions (bản 1: version 2 came with DA-42)."""
+    if rnd.get("scorer_version"):
+        return rnd["scorer_version"]
+    if "story.jig" in (rnd.get("index") or []):
+        v = (story().get("jig") or {}).get("scorer_version")
+        if v:
+            return v
+    return 1
+
+
+def _differs(say: Say, a: dict[str, Any], b: dict[str, Any], link: dict[str, Any] | None = None) -> list[str]:
+    """What sets two rounds apart, from the link of the index when it says, else from the rounds."""
+    link = link or {}
+    scene = link["scene_differs"] if "scene_differs" in link else _scene_of(a) != _scene_of(b)
+    scorer = link["scorer_differs"] if "scorer_differs" in link else str(_scorer_of(a)) != str(_scorer_of(b))
+    out = []
+    if scene:
+        out.append(say("cảnh", "scene"))
+        out.append(say("tập eval", "eval set"))  # another scene is another set of conditions
+    if scorer:
+        out.append(say("bộ chấm", "scorer"))
+    if a.get("max_steps") and b.get("max_steps") and a["max_steps"] != b["max_steps"]:
+        out.append(say("số bước train", "training steps"))
+    return out
+
+
+def _run_numbers(rnd: dict[str, Any], run: Any) -> dict[str, Any]:
+    """{successes, n} of a presented run of a round, from the round's own block of the index."""
+    held = set(held_runs())
+    if not run or run in held or hidden_runs().run(run):
+        return {}
+    s = story()
+    if "story.jig" in (rnd.get("index") or []):
+        j = s.get("jig") or {}
+        ev = next((e for e in j.get("evals") or [] if e.get("run") == run), None)
+        h = (ev or {}).get("headline") or {}
+        return {"successes": h.get("successes"), "n": h.get("n")} if h.get("n") else {}
+    r = next((x for x in (s.get("pair") or {}).get("runs") or [] if x.get("run") == run), None)
+    if not r:
+        return {}
+    lad = (((s.get("demo") or {}).get("ladder") or {}).get("runs") or {}).get(run) or {}
+    return {"successes": r.get("successes"), "n": r.get("n"), "carried": lad.get("on_table_b"), "placed": r.get("successes")}
+
+
+def _link(task: dict[str, Any], rnd: dict[str, Any], which: str) -> dict[str, Any] | None:
+    """The round before or after this one (``rounds[].links.prev|next`` of the index; else the
+    neighbour in the task's list of rounds, with its baseline run's numbers). None without one,
+    or when its run is not presented."""
+    held = set(held_runs())
+    links: dict[str, Any] = rnd["links"] if isinstance(rnd.get("links"), dict) else {}
+    ln = links.get(which)
+    if isinstance(ln, dict) and ln.get("round"):
+        return None if (ln.get("run") in held or hidden_runs().run(ln.get("run"))) else ln
+    ids = [str(x) for x in task.get("rounds") or []]
+    rid = str(rnd.get("id"))
+    if rid not in ids:
+        return None
+    i = ids.index(rid) + (-1 if which == "prev" else 1)
+    other = _round_by_id(ids[i]) if 0 <= i < len(ids) else None
+    if other is None:
+        return None
+    run = other.get("baseline")
+    nums = _run_numbers(other, run)
+    if not nums:
+        return None
+    a, b = (other, rnd) if which == "prev" else (rnd, other)
+    return {"round": other.get("id"), "run": run, **nums, "scene_differs": _scene_of(a) != _scene_of(b),
+            "scorer_differs": str(_scorer_of(a)) != str(_scorer_of(b))}  # fmt: skip
+
+
+def _next_steps(say: Say, rid: str, sources: list[Any]) -> list[str] | None:
+    """OPTION rows from ``story.next_steps`` for this round: written in the docs, never one marked
+    ``historical`` (work already done, e.g. DA-38 closed 6/11). None when the index has no
+    ``next_steps``."""
+    steps = story().get("next_steps")
+    if not isinstance(steps, list):
+        return None
+    past = _historical_tickets(say, story())
+    out = []
+    for e in steps:
+        if not _shown(e) or str(e.get("round") or "") != rid or e.get("historical") or e.get("closed") or e.get("handled_by"):
+            continue
+        if any(_word_in(t, " ".join(str(v) for v in e.values())) for t in past):
+            continue  # work already closed or handled elsewhere (DA-38, DA-37)
+        out.append(_row("OPTION", text=_say_text(say, e.get("text"))))
+        sources.append(e.get("doc"))
+    return out
+
+
+def _past_state(say: Say, c: dict[str, Any]) -> str:
+    """The state of an intervention marked ``historical``: closed on a date (DA-38, 6/11), or
+    handled by later work (``handled_by``: DA-42, the scorer of version 2)."""
+    if c.get("handled_by"):
+        return say(f"đã xử lý ở {c['handled_by']}", f"handled by {c['handled_by']}")
+    if c.get("closed"):
+        return say(f"đã đóng {c['closed']}", f"closed {c['closed']}")
+    return say("đã xong", "done")
+
+
+def _historical_tickets(say: Say, s: dict[str, Any]) -> dict[str, str]:
+    """Tickets of an intervention marked ``historical`` (index PR #266: ``closed`` or
+    ``handled_by``), with their state; such work is never offered as a next step."""
+    out: dict[str, str] = {}
+    d: dict[str, Any] = s["diag"] if isinstance(s.get("diag"), dict) else {}
+    dg = (s.get("demo") or {}).get("diagnose") or {}
+    items = [*((s.get("round") or {}).get("clusters") or []), *(d.get("clusters") or []), *(d.get("step4") or []), *(dg.get("checks") or [])]
+    for c in items:
+        if isinstance(c, dict) and c.get("historical"):
+            v = c["value"] if isinstance(c.get("value"), dict) else {}
+            found = [str(c.get("ticket") or v.get("ticket") or "")] + re.findall(r"\b[A-Z]{2,}-\d+\b", str(c.get("intervention") or ""))
+            for t in found:
+                if t:
+                    out.setdefault(t, _past_state(say, c))
+    for t in dg.get("historical") or []:
+        out.setdefault(str(t), say("đã xong", "done"))
+    return out
+
+
+def _latest(say: Say) -> dict[str, Any]:
+    """{latest, latest_date} from ``story.latest``; {missing} when the index has none."""
+    lt = story().get("latest")
+    if isinstance(lt, dict) and lt.get("run") and _shown(lt):
+        return {"latest": lt.get("run"), "latest_round": lt.get("round"), "latest_date": lt.get("date")}
+    return {"missing": say("kết quả mới nhất", "latest result")}
 
 
 def _pick(args: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
@@ -409,46 +601,30 @@ def _stage_word(task: dict[str, Any], sid: Any, say: Say) -> str:
 
 
 def _no_round(task: dict[str, Any], say: Say) -> Result:
-    name = say.name(task.get("name"))
+    """A task without a round: what it has so far, as rows."""
     eps = sum(v.get("episodes") or 0 for k, v in (task.get("catalog_totals") or {}).items() if k != "all" and isinstance(v, dict))
-    lines = [say("CÂU TRẢ LỜI THẲNG (mở đầu bằng câu này):", "DIRECT ANSWER (open with this sentence):"),
-             say(f"- Task {name} mới đi được phần đầu của dây chuyền: có {eps} bài mẫu trong kho và kết quả thi của model tác giả, chưa có model do đội dạy và chưa chạy vòng Lỗi → Dữ liệu nào.",
-                 f"- The task {name} has gone through the first part of the pipeline only: {eps} demonstrations in the store and a test of the authors' model; no model trained by the team and no Failure → Data round yet.")]  # fmt: skip
-    lines.append(say("SỐ LIỆU:", "NUMBERS:"))
+    lines = [_row("TASK", id=task.get("id"), name=say.name(task.get("name")), rounds=0, demonstrations=eps,
+                  team_model=say("chưa có", "none yet"), failure_to_data_round=say("chưa chạy", "not run yet"))]  # fmt: skip
     for k, v in (task.get("catalog_totals") or {}).items():
         if k != "all" and isinstance(v, dict):
-            lines.append(say(f"- Dữ liệu {k} trong kho: {v.get('episodes')} bài mẫu.", f"- {k} data in the store: {v.get('episodes')} demonstrations."))
+            lines.append(_row("DATA", group=k, episodes=v.get("episodes")))
     for e in task.get("evals") or []:
         if e.get("n") is not None:
-            lines.append(say(f"- Lượt thi ({say.name(e.get('label'))}): {_succ(say, e.get('successes'), e.get('n'))}. Đây là model của tác giả, chưa phải model đội dạy.",
-                             f"- Test ({say.name(e.get('label'))}): {_succ(say, e.get('successes'), e.get('n'))}. This is the authors' model, not one the team trained."))  # fmt: skip
+            lines.append(_row("EVAL", label=say.name(e.get("label")), model=say("của tác giả", "the authors'"),
+                              successes=e.get("successes"), n=e.get("n"), rate=say.frac(e.get("successes"), e.get("n"))))  # fmt: skip
     cl = task.get("clusters") or {}
     items = (cl.get("items") if isinstance(cl, dict) else []) or []
     for c in items:
-        st = _stage_word(task, c.get("stage"), say)
-        lines.append(say(f"- Nhóm lỗi {c.get('id')}: {c.get('members')} lượt hỏng ở bước {st}.", f"- Failure group {c.get('id')}: {c.get('members')} failed runs at step {st}."))
+        lines.append(_row("FAILURE_GROUP", id=c.get("id"), failed_runs=c.get("members"), step=_stage_word(task, c.get("stage"), say)))
     if items:
-        lines.append(say("- Chẩn đoán của các nhóm lỗi: chưa rõ, vì còn một kiểm tra hệ thống chưa được chấm nên chưa được phép nêu nguyên nhân.",
-                         "- Diagnosis of the failure groups: unknown, because one system check is not judged yet, so no cause may be named."))  # fmt: skip
+        lines.append(_row("DIAGNOSIS", state=say("chưa rõ", "unknown"), why=say("còn một kiểm tra hệ thống chưa chấm", "one system check is not judged yet")))
     have = set(task.get("index") or []) | {"catalog"}
     done = ({"4"} if task.get("evals") else set()) | ({"5"} if items else set())
     todo = [n for n, p in sorted((task.get("process") or {}).items()) if n != "0" and n not in done
             and isinstance(p, dict) and not all(k in have for k in p.get("needs") or [])]  # fmt: skip
-    lines.append(say("ĐIỂM ĐÁNG NÓI:", "POINTS TO RAISE:"))
     if todo:
-        lines.append(say("- Các bước chưa có kết quả: " + ", ".join(say.stage(n) for n in todo) + ". Task mới đi được một phần dây chuyền.",
-                         "- Stages without a result yet: " + ", ".join(say.stage(n) for n in todo) + ". The task has gone through part of the pipeline only."))  # fmt: skip
-    lines.append(say("- Kết quả thi hiện có chỉ cho biết model của tác giả làm được đến đâu, chưa nói gì về dữ liệu của đội.",
-                     "- The test result so far shows how far the authors' model gets; it says nothing about the team's data yet."))  # fmt: skip
-    lines.append(say("PHƯƠNG ÁN BƯỚC TIẾP (đề xuất, chưa phải quyết định):", "OPTIONS FOR NEXT STEPS (proposals, not decisions):"))
-    if todo:
-        lines.append(say(f"- Chạy bước {say.stage(todo[0])} cho task này trước.", f"- Run stage {say.stage(todo[0])} for this task first."))
-    if items:
-        lines.append(say("- Chấm xong kiểm tra hệ thống còn treo, để các nhóm lỗi có chẩn đoán rồi mới đặt đơn dữ liệu.",
-                         "- Settle the open system check so the failure groups get a diagnosis before a data order is placed."))  # fmt: skip
-    lines.append(_how(say, "all"))
-    text = "\n".join(lines)
-    return result({"type": "text", "text": text}, text)
+        lines.append(_row("STAGES", without_result=", ".join(say.stage(n) for n in todo)))
+    return _done({"type": "text", "text": "\n".join(lines)}, lines, [])
 
 
 def _held_answer(out: Result, say: Say) -> Result:
@@ -470,67 +646,47 @@ def round_report(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         focus = "all"  # a deep analysis reads the whole round: marks, failures, controls, limits
     if focus == "held":
         # the sentence alone; the tool reads no number of any round for it
-        text = say("CÂU TRẢ LỜI THẲNG: " + WITHHELD[0], "DIRECT ANSWER: " + WITHHELD[1])
-        out = result({"type": "text", "text": text}, text)
-        out["round"] = str(rnd.get("id"))
+        text = _row("ROUND", id=rnd.get("id"), result=say(*WITHHELD))
+        out = _done({"type": "text", "text": say(*WITHHELD)}, [text], [], rnd.get("id"))
         return _held_answer(out, say)
     if "story.jig" in (rnd.get("index") or []):
         out = _jig_report(task, rnd, say, focus, extra)
     else:
         out = _pair_report(task, rnd, say, focus, extra)
     if out.get("ok") and focus == "best" and LOSS_RX.search(str(ctx.get("question") or "")):
-        out["model"] = _with_fact(out["model"], say("Loss train không phải thước đo kết quả: kết quả của một run là số lượt thành công khi thi.",
-                                                    "Training loss is not a measure of the result: a run's result is its number of successful test runs."))  # fmt: skip
+        out["model"] = out["model"] + "\n" + _row("READING", result_measure=say("số lượt thành công khi thi", "successful test runs"),
+                                                  training_loss=say("không phải thước đo kết quả", "not a measure of the result"))  # fmt: skip
     out["round"] = str(rnd.get("id"))
     return out
 
 
-def _with_fact(text: str, fact: str) -> str:
-    """``text`` with one more fact line before its HOW TO ANSWER line."""
-    lines = text.splitlines()
-    at = next((i for i, ln in enumerate(lines) if ln.startswith(("CÁCH TRẢ LỜI", "HOW TO ANSWER"))), len(lines))
-    return "\n".join([*lines[:at], "- " + fact, *lines[at:]])
-
-
 def rounds_side_by_side(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
-    """Two or more rounds the question names, each read by ``round_report`` under its own title,
-    with the W6 sentence first: they are placed side by side, never compared as a result."""
+    """Two or more rounds the question names, each read by ``round_report`` under its own ROUND
+    row, after one row that says they are not comparable and why (W6)."""
     say = Say(ctx.get("lang"))
     want = [str(x) for x in args.get("rounds") or [] if x] or rounds_named(ctx.get("question"))
     cur = str(ctx.get("round") or "")
     want = sorted(dict.fromkeys(want), key=lambda r: r != cur)  # the selected round first
     if len(want) < 2:
         return round_report(args, ctx)
-    parts = [say("CÂU TRẢ LỜI THẲNG (mở đầu bằng câu này): " + SIDE_BY_SIDE[0],
-                 "DIRECT ANSWER (open with this sentence): " + SIDE_BY_SIDE[1])]  # fmt: skip
+    known = [r for r in (_round_by_id(x) for x in want) if r is not None]
+    why: list[str] = []
+    for a in known[1:]:
+        why += _differs(say, known[0], a)
+    why = list(dict.fromkeys(why))
+    parts = [_row("SIDE_BY_SIDE", rounds=", ".join(want), comparable=say.yes(not why), why=say("khác ", "different ") + ", ".join(why) if why else None)]
+    sources: list[Any] = []
     for rid in want:
         res = round_report({}, {**ctx, "round": rid, "question": "", "deep": False})
-        if res.get("round") != rid:
-            parts.append(say(f"VÒNG {rid}: index chưa có số liệu của vòng này.", f"ROUND {rid}: the index has no numbers for this round."))
+        if res.get("round") != rid or not res.get("ok"):
+            parts.append(_row("ROUND", id=rid, missing=say("số liệu của vòng trong index", "the round's numbers in the index")))
             continue
-        how = _how(say, "all")
-        body, opts = [], False
-        for ln in str(res["model"]).splitlines():
-            # next-step options are not part of a side-by-side; they would push the closing
-            # instructions past the model text cap
-            if ln.startswith(("PHƯƠNG ÁN BƯỚC TIẾP", "OPTIONS FOR NEXT STEPS")):
-                opts = True
-                continue
-            if opts and (ln.startswith("- ") and not ln.startswith(("- Nguồn", "- Source"))):
-                continue
-            opts = False
-            if ln.startswith(("ĐÃ LÀM RỒI", "ALREADY DONE")) or not ln.strip() or ln == how:
-                continue
-            body.append(ln)
-        # each round's own "direct answer" is one of its points here; the answer opens with W6
-        body = [re.sub(r"^(CÂU TRẢ LỜI THẲNG|DIRECT ANSWER)\b[^:]*:", say("Ý CHÍNH CỦA VÒNG NÀY:", "KEY POINT OF THIS ROUND:"), ln) for ln in body]
-        parts.append("\n".join(body))
-    parts.append(say("CÁCH TRẢ LỜI: câu trả lời thẳng ở trên, rồi với mỗi vòng một hoặc hai câu (kết quả, chỗ hỏng, chi phí), nêu tên vòng và run cho mọi số; giữ số của mỗi vòng dưới tên vòng đó.",
-                     "HOW TO ANSWER: the direct answer above, then one or two sentences per round (result, where it fails, cost), naming the round and run for every number; keep each round's numbers under its own name."))  # fmt: skip
-    text = "\n\n".join(parts)
-    out = result({"type": "text", "text": text}, text)
+        # next-step options are not part of a side-by-side
+        parts.append("\n".join(ln for ln in str(res["model"]).splitlines() if ln.strip() and not ln.startswith(("OPTION", "NEXT_ROUND"))))
+        sources += res.get("sources") or []
+    text = "\n".join(parts)
+    out = _done({"type": "text", "text": text}, parts, sources, want[0])
     out["model"] = cap(text, len(want) * MODEL_CHARS)  # one round's room per round
-    out["round"] = want[0]  # the selected round; the others are named in the text
     out["rounds"] = want
     return out
 
@@ -554,35 +710,40 @@ def _reading(ev: dict[str, Any], scope: str, level: Any = None) -> dict[str, Any
     return {}
 
 
-def _verdict(say: Say, reading: dict[str, Any], thr: Any, what: str) -> str:
-    """Reading rules 1-3 of tray-jig.md §2 as the index wrote them (``readings[].verdict``: "met",
-    "not_met", or None with ``why``). The chat never computes a verdict itself, so it cannot
-    disagree with the pages (the index reads "at or above" the mark, after rounding)."""
+
+def _mark(say: Say, reading: dict[str, Any], thr: Any) -> dict[str, str]:
+    """A reading of tray-jig.md §2 as the index wrote it (``readings[].verdict``: "met",
+    "not_met", or None with ``why``), as {mark, verdict}. The chat never computes a verdict
+    itself, so it cannot disagree with the pages (the index reads "at or above" the mark)."""
     t = say.pct(reading.get("threshold", thr)).replace(",0", "").replace(".0", "")
     v = reading.get("verdict")
-    if v not in ("met", "not_met"):
-        if reading.get("why") == "blocked":
-            return say(f"chưa đọc theo mốc {t} % vì tập eval chưa khớp luật đọc", f"not read against the {t}% mark: the eval set does not match the reading rules")
-        if not reading:
-            return say(f"index chưa ghi kết quả đọc theo mốc {t} %", f"the index has no reading against the {t}% mark")
-        return say(f"chưa có CI nên chưa đọc theo mốc {t} %", f"no CI yet, so not read against the {t}% mark")
-    met = v == "met"
-    return say(f"đạt mốc {t} %", f"meets the {t}% mark") if met else say(f"chưa đạt mốc {t} %", f"below the {t}% mark")
+    if v == "met":
+        verdict = say("đạt", "met")
+    elif v == "not_met":
+        verdict = say("chưa đạt", "not met")
+    elif reading.get("why") == "blocked":
+        verdict = say("chưa đọc: tập eval chưa khớp luật đọc", "not read: the eval set does not match the reading rules")
+    elif not reading:
+        verdict = say("index chưa ghi kết quả đọc", "no reading in the index")
+    else:
+        verdict = say("chưa đọc: chưa có CI", "not read: no CI yet")
+    return {"mark": t + (" %" if say.vi else "%"), "verdict": verdict}
 
 
 KIND_WORD = {"measured": ("thực đo", "measured"), "estimated": ("ước tính", "estimated")}
 PART_WORD = {"train": ("train", "training"), "eval": ("eval", "evaluation")}
 
 
-def _jig_cost(say: Say, c: dict[str, Any]) -> str:
-    """``story.jig.cost`` (PR #258): each part with its CU, its ``measure_kind`` and its ledger
-    story, then the total; a part without ``measure_kind`` is said as unlabelled."""
-    def cu(x: Any) -> str:  # 56,15 and 6,8 as the doc writes them, never 6,80
-        t = say.num(x, 2)
-        return t.rstrip("0").rstrip(",.") if ("," in t or "." in t) else t
+def _cu(say: Say, x: Any) -> str:
+    """56,15 and 6,8 as the docs write them, never 6,80."""
+    t = say.num(x, 2)
+    return t.rstrip("0").rstrip(",.") if ("," in t or "." in t) else t
 
-    parts = []
-    kinds = set()
+
+def _jig_cost(say: Say, c: dict[str, Any]) -> list[str]:
+    """``story.jig.cost`` (PR #258): one row per part with its CU, ``measure_kind`` and ledger
+    story, then the total; a part without ``measure_kind`` is said as unlabelled."""
+    rows, kinds = [], set()
     for key, v in c.items():
         if not isinstance(v, dict) or v.get("cu") is None:
             continue
@@ -590,12 +751,9 @@ def _jig_cost(say: Say, c: dict[str, Any]) -> str:
         kinds.add(kind)
         kw = KIND_WORD.get(str(kind), (say("chưa ghi thực đo hay ước tính", "not marked measured or estimated"),) * 2)[0 if say.vi else 1]
         pw = PART_WORD.get(str(key), (str(key), str(key)))[0 if say.vi else 1]
-        story_id = f", {v['story']}" if v.get("story") else ""
-        parts.append(f"{pw} {cu(v['cu'])} CU ({kw}{story_id})")
-    total = cu(c["total_cu"])
-    tk = KIND_WORD.get(str(next(iter(kinds))), ("", ""))[0 if say.vi else 1] if len(kinds) == 1 else ""
-    head = say(f"Chi phí của vòng: {total} CU" + (f" {tk}" if tk else ""), f"Cost of the round: {total} CU" + (f" {tk}" if tk else ""))
-    return head + (say(", gồm ", ", made of ") + say(" và ", " and ").join(parts) if parts else "") + "."
+        rows.append(_row("COST", part=pw, cu=_cu(say, v["cu"]), kind=kw, story=v.get("story")))
+    tk = KIND_WORD.get(str(next(iter(kinds))), ("", ""))[0 if say.vi else 1] if len(kinds) == 1 else None
+    return [_row("COST", scope=say("cả vòng", "whole round"), total_cu=_cu(say, c["total_cu"]), kind=tk), *rows]
 
 
 def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str, extra: list[str] | None = None) -> Result:
@@ -607,129 +765,148 @@ def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str,
     ev = next((e for e in j.get("evals") or [] if e.get("run") not in held and (e.get("headline") or {}).get("n")), None)
     if ev is None:
         return fail(f"The index has no test result for round {rnd.get('id')} (run: fw console index).")
+    rid = str(rnd.get("id"))
     run = str(ev.get("run"))
     h = ev.get("headline") or {}
     rules = j.get("rules") or rnd.get("rules") or {}
     meta: dict[str, Any] = next((r for r in j.get("runs") or [] if r.get("branch") == run), {})
-    ckpt = meta.get("ckpt_step")
     out_m: dict[str, Any] = next((o for o in j.get("outcomes") or [] if o.get("run") == run), {})
     n, k = h.get("n"), h.get("successes")
     lv = ev.get("levels") or {}
-    F: dict[str, str] = {}
-    src = j.get("doc") or rnd.get("doc") or ""
-    F["headline"] = say(f"Run {run}: cả task {say.pct(h.get('p'))} % ({k}/{n} lượt thành công), CI {say.ci(h.get('ci'))}: {_verdict(say, _reading(ev, 'whole_task'), rules.get('whole_task', 0.8), 'task')} (đọc ở cận dưới của CI, luật 1).",
-                        f"Run {run}: whole task {say.pct(h.get('p'))}% ({k}/{n} successful runs), CI {say.ci(h.get('ci'))}: {_verdict(say, _reading(ev, 'whole_task'), rules.get('whole_task', 0.8), 'task')} (read at the CI lower bound, rule 1).")  # fmt: skip
-    lvl_txt = []
-    for key in sorted(lv):
-        x = lv[key] or {}
-        lvl_txt.append(say(f"mức {key}: {say.pct(x.get('p'))} % ({x.get('successes')}/{x.get('n')}), CI {say.ci(x.get('ci'))}, {_verdict(say, _reading(ev, 'level', key), rules.get('per_level', 0.7), 'level')}",
-                           f"level {key}: {say.pct(x.get('p'))}% ({x.get('successes')}/{x.get('n')}), CI {say.ci(x.get('ci'))}, {_verdict(say, _reading(ev, 'level', key), rules.get('per_level', 0.7), 'level')}"))  # fmt: skip
-    if lvl_txt:
-        # one sentence per level, each with its own verdict, so a shortened answer cannot carry one
-        # verdict over both levels ("mức 1 …, mức 2 …, chưa đạt mốc 70 %"; Website, 28/11/2026). How
-        # to keep them apart is a rule of the system prompt, never words of the facts.
-        F["levels"] = say("Từng mức (luật 2): ", "Per level (rule 2): ") + " ".join(_cap(t) + "." for t in lvl_txt)
+    sources: list[Any] = [j.get("doc") or rnd.get("doc")]
+    src_of: dict[str, list[Any]] = {}  # the doc references of a section, given when it is shown
+    whole = _mark(say, _reading(ev, "whole_task"), rules.get("whole_task", 0.8))
+    lvl_mark = {key: _mark(say, _reading(ev, "level", key), rules.get("per_level", 0.7)) for key in sorted(lv)}
+    F: dict[str, list[str]] = {}
+    F["result"] = [_row("RESULT", run=run, scope=say("cả task", "whole task"), successes=k, n=n, rate=say.rate(h.get("p")),
+                        ci=say.ci(h.get("ci")), **whole, read_at=say("cận dưới CI", "CI lower bound"))]  # fmt: skip
+    F["levels"] = [_row("LEVEL", run=run, level=key, successes=(lv[key] or {}).get("successes"), n=(lv[key] or {}).get("n"),
+                        rate=say.rate((lv[key] or {}).get("p")), ci=say.ci((lv[key] or {}).get("ci")), **lvl_mark[key]) for key in sorted(lv)]  # fmt: skip
     pl = ev.get("place") or {}
     if pl.get("n"):
-        ci_txt = say(f", CI {say.ci(pl['ci'])}", f", CI {say.ci(pl['ci'])}") if pl.get("ci") else ""
-        F["place"] = say(f"Bước đặt (luật 3): {say.pct(pl.get('p'))} % ({pl.get('successes')}/{pl.get('n')} lượt qua bước đặt){ci_txt}, {_verdict(say, _reading(ev, 'place'), rules.get('place', 0.5), 'place')}.",
-                         f"Placing step (rule 3): {say.pct(pl.get('p'))}% ({pl.get('successes')}/{pl.get('n')} runs pass the placing step){ci_txt}, {_verdict(say, _reading(ev, 'place'), rules.get('place', 0.5), 'place')}.")  # fmt: skip
+        F["place"] = [_row("PLACE_STEP", run=run, passed=pl.get("successes"), n=pl.get("n"), rate=say.rate(pl.get("p")),
+                           ci=say.ci(pl["ci"]) if pl.get("ci") else None, **_mark(say, _reading(ev, "place"), rules.get("place", 0.5)))]  # fmt: skip
     if h.get("wilson"):
-        F["wilson"] = say(f"Khoảng Wilson 95 % ({say.ci(h['wilson'])}) chỉ để mô tả; CI để đọc luật là bootstrap theo điều kiện.",
-                          f"The Wilson 95% interval ({say.ci(h['wilson'])}) is descriptive only; the CI used by the rules is a bootstrap over conditions.")  # fmt: skip
+        F["interval"] = [_row("INTERVAL", run=run, wilson_95=say.ci(h["wilson"]), use=say("chỉ mô tả", "descriptive only"),
+                              marks_read_on=say("CI bootstrap theo điều kiện", "bootstrap CI over conditions"))]  # fmt: skip
     fails = sorted((h.get("failures") or {}).items(), key=lambda kv: -kv[1])
     failed = (n or 0) - (k or 0)
-    if fails and failed:
-        per = []
-        for lab, v in fails:
-            by = [f"{say('mức', 'level')} {key} {((lv.get(key) or {}).get('failures') or {}).get(lab, 0)}" for key in sorted(lv)]
-            per.append(f"{say.fail(lab)} {v}" + (f" ({', '.join(by)})" if by else ""))
-        F["fails"] = say(f"Nhãn lỗi của {failed} lượt hỏng: " + "; ".join(per) + ".", f"Failure labels of the {failed} failed runs: " + "; ".join(per) + ".")
-        F["dominant"] = say(f"Lỗi nhiều nhất là {say.fail(fails[0][0])}: {fails[0][1]} trong {failed} lượt hỏng.",
-                            f"The most common failure is {say.fail(fails[0][0])}: {fails[0][1]} of {failed} failed runs.")  # fmt: skip
     weak = min(lv, key=lambda key: (lv[key] or {}).get("p", 1)) if lv else None
+    if fails and failed:
+        F["fails"] = [_row("FAILURES", run=run, scope=say("cả task", "whole task"), failed=failed, n=n, **{say.fail(lab): v for lab, v in fails})]
+        for key in sorted(lv):
+            x = lv[key] or {}
+            lf = sorted((x.get("failures") or {}).items(), key=lambda kv: -kv[1])
+            if lf and x.get("n"):
+                F["fails"].append(_row("FAILURES", run=run, scope=say(f"mức {key}", f"level {key}"), failed=(x.get("n") or 0) - (x.get("successes") or 0),
+                                       n=x.get("n"), **{say.fail(lab): v for lab, v in lf}))  # fmt: skip
+        top = fails[0][0]
+        F["dominant"] = [_row("MOST_COMMON_FAILURE", run=run, failure=say.fail(top), count=fails[0][1], of_failed=failed,
+                              **{say(f"mức_{key}", f"level_{key}"): ((lv.get(key) or {}).get("failures") or {}).get(top, 0) for key in sorted(lv)})]  # fmt: skip
     sp = h.get("step_pass") or {}
     if sp:
-        st = ", ".join(f"{say.step(s)} {say.pct(v)} %" for s, v in sp.items())
         drop = min(zip(list(sp)[1:], [b - a for a, b in zip(list(sp.values()), list(sp.values())[1:])]), key=lambda kv: kv[1], default=None)
-        F["steps"] = say(f"Tỉ lệ lượt qua từng bước: {st}." + (f" Tụt mạnh nhất ở bước {say.step(drop[0])}." if drop else ""),
-                         f"Share of runs passing each step: {st}." + (f" The sharpest drop is at {say.step(drop[0])}." if drop else ""))  # fmt: skip
+        F["steps"] = [_row("STEP_PASS", run=run, step=say.step(s), rate=say.rate(v)) for s, v in sp.items()]
+        if drop:
+            F["steps"].append(_row("STEP_PASS", run=run, sharpest_drop=say.step(drop[0])))
     rel = out_m.get("relaxed") or {}
     tol = next((t for t in sorted(rel, key=float) if rel[t] == k), None)
     more = [(t, v) for t, v in sorted(rel.items(), key=lambda kv: float(kv[0])) if tol and float(t) > float(tol)][:2]
     if tol and more:
-        F["near"] = say(f"Nới dung sai đặt (chuẩn {say.num(tol)} cm): " + ", ".join(f"{v}/{n} lượt trong {say.num(t)} cm" for t, v in more) + ". Phần lớn lượt đặt lệch nằm gần đích.",
-                        f"Relaxing the placing tolerance ({say.num(tol, 1)} cm standard): " + ", ".join(f"{v}/{n} runs within {say.num(t)} cm" for t, v in more) + ". Most off-target placements land near the target.")  # fmt: skip
+        F["near"] = [_row("NEAR_MISS", run=run, standard_cm=say.num(tol), n=n, **{f"within_{say.num(t)}_cm": v for t, v in more})]
     reps = [r for r in out_m.get("repeats") or [] if r.get("n")]
     if reps:
-        F["repeats"] = say("Ba lượt lặp của cùng tập điều kiện: " + ", ".join(f"{r.get('successes')}/{r.get('n')}" for r in reps) + ".",
-                           "The repeats over the same conditions: " + ", ".join(f"{r.get('successes')}/{r.get('n')}" for r in reps) + ".")  # fmt: skip
+        F["repeats"] = [_row("REPEATS", run=run, n_each=reps[0].get("n"), successes=", ".join(str(r.get("successes")) for r in reps))]
+    # the runs of earlier rounds, side by side: never ranked against this round's run (W6)
     c60 = j.get("compare60") or {}
-    earlier = [e for e in c60.get("earlier") or [] if e.get("run") not in held]
-    if c60.get("n") and earlier:
-        side = ", ".join(f"{e.get('run')} {e.get('successes')}/{e.get('n')}" for e in sorted(earlier, key=lambda e: -(e.get("successes") or 0)))
-        F["compare60"] = say(f"Đặt cạnh các run của DA-34 trên 60 rollout: {c60.get('run', run)} {c60.get('successes')}/{c60.get('n')} (lượt lặp {c60.get('repeat', 0)}); {side}. Khác cảnh, tập eval, bộ chấm và số bước, nên chỉ đặt cạnh nhau (luật 4).",
-                             f"Next to the DA-34 runs on 60 rollouts: {c60.get('run', run)} {c60.get('successes')}/{c60.get('n')} (repeat {c60.get('repeat', 0)}); {side}. Different scene, eval set, scorer and number of steps, so side by side only (rule 4).")  # fmt: skip
-    runs_here = [x.get("id") for x in rnd.get("runs") or []]
-    if len(runs_here) <= 1:
-        F["rule5"] = say(f"Chưa có run đối chứng K trên cùng tập điều kiện, nên không quy kết quả của run {run} cho dữ liệu bước đặt (luật 5): run {run} đổi cùng lúc cảnh, dữ liệu và số bước.",
-                         f"There is no control run K on the same conditions, so run {run}'s result is not credited to the placing data (rule 5): run {run} changed scene, data and number of steps at once.")  # fmt: skip
-    F["limits"] = say("Giới hạn: số liệu sơ bộ; một seed train, một lần train, chạy trong mô phỏng.", "Limits: one training seed, one training run, in simulation; the numbers are preliminary.")
-    if ckpt:
-        F["what"] = say(f"Số chính là của checkpoint {ckpt} (luật 6).", f"The main numbers are those of checkpoint {ckpt} (rule 6).")
-    F["untested"] = say("Chưa xem video các lượt hỏng; mọi lý do nêu cho lỗi lúc này là phỏng đoán.", "The failed runs have not been reviewed on video; any reason given for a failure now is a guess.")
-    F["cost"] = say("Index chưa có chi phí theo CU của vòng này; xem trang Chi phí.", "The index has no CU cost for this round yet; see the Cost page.")
+    prev = _link(task, rnd, "prev")
+    prev_rnd = _round_by_id((prev or {}).get("round")) or _round_by_id(_pair_round_id()) or {}
+    scene, ver = _scene_of(rnd), _scorer_of(rnd)
+    side = [_row("SIDE_BY_SIDE", run=run, round=rid, scene=say.scene(scene), scorer=say.scorer(ver), successes=k, n=n, rate=say.frac(k, n),
+                 on_60_rollouts=f"{c60.get('successes')}/{c60.get('n')}" if c60.get("n") and c60.get("run", run) == run else None)]  # fmt: skip
+    earlier = [e for e in c60.get("earlier") or [] if e.get("run") not in held and e.get("n")]
+    if not earlier and prev:
+        earlier = [prev]
+    for e in sorted(earlier, key=lambda e: -(e.get("successes") or 0)):
+        side.append(_row("SIDE_BY_SIDE", run=e.get("run"), round=(prev or {}).get("round") or prev_rnd.get("id"), scene=say.scene(_scene_of(prev_rnd) if prev_rnd else None),
+                         scorer=say.scorer(_scorer_of(prev_rnd) if prev_rnd else 1), successes=e.get("successes"), n=e.get("n"), rate=say.frac(e.get("successes"), e.get("n"))))  # fmt: skip
+    if len(side) > 1:
+        F["side"] = side
+        if c60.get("earlier_doc"):
+            src_of["side"] = [c60["earlier_doc"]]
+    why = _differs(say, prev_rnd, rnd, prev) if prev_rnd else []
+    if why:
+        F["comparable"] = [_row("LIMITS", comparable="no", with_round=prev_rnd.get("id"), why=say("khác ", "different ") + ", ".join(why))]
+    # best: the highest rate of the presented runs, and the latest result
+    rates = [(run, (k or 0) / n if n else 0.0)] + [(str(e.get("run")), (e.get("successes") or 0) / e["n"]) for e in earlier if e.get("n")]
+    F["reading"] = [_row("READING", highest=max(rates, key=lambda x: x[1])[0], **_latest(say), runs_in_round=len(rnd.get("runs") or []))]
+    # where the run comes from: the earlier round's carry and place, then the steps of this round
+    origin = []
+    if prev:
+        origin.append(_row("ORIGIN", round=prev.get("round"), run=prev.get("run"), successes=prev.get("successes"), n=prev.get("n"),
+                           carried_to_table_b=prev.get("carried"), placed=prev.get("placed")))  # fmt: skip
+    tl = story().get("timeline")
+    steps_tl = [e for e in tl if _shown(e) and str(e.get("round") or "") == rid] if isinstance(tl, list) else []
+    for e in steps_tl:
+        origin.append(_row("ORIGIN_STEP", date=e.get("date"), story=e.get("story"), title=_say_text(say, e.get("title")), result=_say_text(say, e.get("result")) or None))
+        src_of.setdefault("origin", []).append(e.get("doc"))
+    if not steps_tl:
+        origin.append(_row("ORIGIN_STEP", run=run, train_steps=meta.get("max_steps") or rnd.get("max_steps"), train_episodes=meta.get("episodes"),
+                           missing=say("diễn tiến của vòng (timeline)", "the round's timeline")))  # fmt: skip
+    F["origin"] = origin
+    if len(rnd.get("runs") or []) <= 1:
+        F["control"] = [_row("LIMITS", control_run=say("chưa có run đối chứng K trên cùng tập điều kiện", "no control run K on the same conditions"),
+                             effect=say("chưa tách được phần do đồ gá và phần do dữ liệu bước đặt", "the share of the jig and of the placing data cannot be told apart"))]  # fmt: skip
+    F["limits"] = [_row("LIMITS", numbers=say("sơ bộ", "preliminary"), train_seeds=1, train_runs=1, where=say("mô phỏng", "simulation"))]
+    F["untested"] = [_row("LIMITS", failed_runs_video=say("chưa xem", "not reviewed"), failure_reasons=say("phỏng đoán", "guesses"))]
     if isinstance(j.get("cost"), dict) and j["cost"].get("total_cu") is not None:
         F["cost"] = _jig_cost(say, j["cost"])
-    F["source"] = say(f"Nguồn: {src}; index story.jig.", f"Source: {src}; index story.jig.")
-    opts: list[str] = []
-    if weak and len(lv) > 1:
-        wf = sorted(((lv[weak] or {}).get("failures") or {}).items(), key=lambda kv: -kv[1])
-        wtxt = say(f", nơi {say.fail(wf[0][0])} chiếm {wf[0][1]} lượt hỏng", f", where {say.fail(wf[0][0])} accounts for {wf[0][1]} failed runs") if wf else ""
-        opts.append(say(f"Nhắm dữ liệu tiếp theo vào vài centimet cuối lúc đặt ở mức {weak}{wtxt}.", f"Aim the next data at the last centimetres of placing at level {weak}{wtxt}."))
-    if "rule5" in F:
-        opts.append(say("Train run K trên cùng tập điều kiện nếu muốn biết dữ liệu bước đặt có giúp không (luật 5).", "Train run K on the same conditions to learn whether the placing data helps (rule 5)."))
-    opts.append(say("Thêm seed train, vì số hiện tại đến từ một seed.", "Add training seeds, since the numbers come from one seed."))
-    if len(rnd.get("runs") or []) == 1:
-        F["only"] = say(f"Run {run} là run duy nhất của vòng này trên cảnh {j.get('scene', '')} với bộ chấm bản {j.get('scorer_version', '')}, nên trong vòng không có run nào để xếp hạng; các run của vòng tray-r1 khác cảnh và bộ chấm, nên chỉ đặt cạnh nhau.",
-                        f"Run {run} is the only run of this round on scene {j.get('scene', '')} with scorer v{j.get('scorer_version', '')}, so there is nothing to rank within the round; the runs of round tray-r1 differ in scene and scorer, so they are only placed side by side.")  # fmt: skip
+    else:
+        F["cost"] = [_row("COST", missing=say("chi phí CU của vòng", "the round's CU cost"))]
+    # what is still weak, for "what next": the levels and the task below their mark, the main failure
+    weak_rows = []
+    for key in sorted(lv):
+        x = lv[key] or {}
+        name = "WEAK" if lvl_mark[key]["verdict"] != say("đạt", "met") else "LEVEL"
+        weak_rows.append(_row(name, run=run, level=key, successes=x.get("successes"), n=x.get("n"), rate=say.rate(x.get("p")), **lvl_mark[key]))
+    if fails and failed:
+        top = fails[0][0]
+        at = ((lv.get(weak) or {}).get("failures") or {}).get(top) if weak else None
+        weak_rows.append(_row("WEAK", run=run, failure=say.fail(top), count=fails[0][1], of_failed=failed, **({say(f"ở_mức_{weak}", f"at_level_{weak}"): at} if at is not None else {})))
+    if whole["verdict"] != say("đạt", "met"):
+        lo = (h.get("ci") or [None])[0]
+        weak_rows.append(_row("WEAK", run=run, scope=say("cả task", "whole task"), rate=say.rate(h.get("p")), ci_lower=say.rate(lo) if lo is not None else None, **whole))
+    F["weak"] = weak_rows
+    opts = _next_steps(say, rid, src_of.setdefault("options", []))
+    F["options"] = opts if opts else [_row("OPTION", missing=say("việc tiếp theo ghi trong tài liệu", "next steps written in the docs"))]
     PLAN = {
-        "verdict": ("headline", ["levels", "place", "wilson", "limits"]),
-        "best": ("only" if "only" in F else "headline", ["headline", "levels", "place", "compare60", "rule5"]),
-        "compare": ("compare60", ["headline", "levels", "rule5", "limits"]),
-        "fail": ("dominant", ["fails", "steps", "near", "untested"]),
-        "why": ("dominant", ["fails", "levels", "near", "untested", "rule5"]),
-        "next": (None, ["headline", "levels", "fails", "rule5"]),
-        "cost": ("cost", ["headline"]),
-        "steps": ("steps", ["place", "dominant"]),
-        "diag": ("fails", ["dominant", "untested"]),
-        "data": ("rule5", ["headline"]),
-        "qa": ("headline", ["fails"]),
-        "all": ("headline", ["levels", "place", "fails", "near", "compare60", "rule5", "wilson", "limits"]),
-    }  # fmt: skip
-    first, more_k = _with_extra(PLAN, focus, extra or [])
-    title = f"{say.name(task.get('name'))}, {say.name(rnd.get('title'))}"
+        "verdict": ["result", "levels", "place", "interval", "limits"],
+        "best": ["result", "place", "side", "reading", "origin", "comparable", "control"],
+        "compare": ["side", "repeats", "result", "levels", "comparable", "control"],
+        "fail": ["dominant", "fails", "steps", "near", "untested"],
+        "why": ["dominant", "fails", "levels", "near", "untested", "control"],
+        "next": ["weak", "options", "control"],
+        "cost": ["cost", "result"],
+        "steps": ["steps", "place", "dominant"],
+        "diag": ["fails", "dominant", "untested"],
+        "data": ["origin", "control", "result"],
+        "qa": ["result", "fails"],
+        "all": ["result", "levels", "place", "fails", "near", "side", "comparable", "control", "interval", "limits"],
+    }
     conds = h.get("conditions")
-    lines = [say(f"VÒNG {rnd.get('id')} ({title}). Run {run}" + (f", checkpoint {ckpt}" if ckpt else "") + f", cảnh {j.get('scene', '')}, bộ chấm bản {j.get('scorer_version', '')}: {n} rollout" + (f" ({conds} điều kiện × {n // conds} lượt)" if conds and n else "") + ". Mọi số dưới đây thuộc vòng này; đơn vị thống kê là điều kiện.",
-                 f"ROUND {rnd.get('id')} ({title}). Run {run}" + (f", checkpoint {ckpt}" if ckpt else "") + f", scene {j.get('scene', '')}, scorer v{j.get('scorer_version', '')}: {n} rollouts" + (f" ({conds} conditions × {n // conds} repeats)" if conds and n else "") + ". Every number below belongs to this round; the statistical unit is the condition.")]  # fmt: skip
-    if first and F.get(first):
-        lines += [say("CÂU TRẢ LỜI THẲNG (mở đầu bằng câu này):", "DIRECT ANSWER (open with this sentence):"), "- " + _cap(F[first])]
-    lines.append(say("SỐ LIỆU VÀ NHẬN XÉT LIÊN QUAN:", "RELATED NUMBERS AND READINGS:"))
-    lines += ["- " + _cap(F[x]) for x in more_k if F.get(x) and x != first]
-    if focus in ("next", "why", "all", "fail"):
-        lines.append(say("PHƯƠNG ÁN BƯỚC TIẾP (đề xuất, chưa phải quyết định):", "OPTIONS FOR NEXT STEPS (proposals, not decisions):"))
-        lines += ["- " + o for o in (opts if focus in ("next", "all") else opts[:1])]
-    lines.append("- " + F["source"])
-    lines.append(_how(say, focus))
-    lines.append(say("QUY TẮC: không gắn số của vòng tray-r1 (DA-34) cho vòng này; không viết 'tốt hơn' hay 'tăng' so với DA-34.",
-                     "RULE: never give the numbers of round tray-r1 (DA-34) for this round; never write 'better' or 'up' against DA-34."))  # fmt: skip
-    rows = [{"run": run, "scope": say("cả task", "whole task"), "successes": f"{k}/{n}", "ci": say.ci(h.get("ci")), "reading": _verdict(say, _reading(ev, "whole_task"), rules.get("whole_task", 0.8), "task")}]
+    lines = [_row("ROUND", id=rid, title=f"{say.name(task.get('name'))}, {say.name(rnd.get('title'))}", task=task.get("id"), scene=scene or say("không đồ gá", "none"),
+                  scorer=say.scorer(ver), run=run, checkpoint=meta.get("ckpt_step"), n=n, conditions=conds,
+                  repeats=n // conds if conds and n else None, unit=say("điều kiện", "condition"))]  # fmt: skip
+    for key in _sections(PLAN, focus, extra or []):
+        lines += F.get(key) or []
+        sources += src_of.get(key, []) if F.get(key) else []
+    rows = [{"run": run, "scope": say("cả task", "whole task"), "successes": f"{k}/{n}", "ci": say.ci(h.get("ci")), "reading": f"{whole['verdict']} {whole['mark']}"}]
     for key in sorted(lv):
         x = lv[key] or {}
         rows.append({"run": run, "scope": say(f"mức {key}", f"level {key}"), "successes": f"{x.get('successes')}/{x.get('n')}", "ci": say.ci(x.get("ci")),
-                     "reading": _verdict(say, _reading(ev, "level", key), rules.get("per_level", 0.7), "level")})  # fmt: skip
+                     "reading": f"{lvl_mark[key]['verdict']} {lvl_mark[key]['mark']}"})  # fmt: skip
     ui = table(say.name(rnd.get("title")), cols("run", "scope", "successes", "ci", "reading"), rows, link="#/eval")
-    return result(ui, "\n".join(lines))
+    return _done(ui, lines, sources)
 
 
 # ------------------------------------------------------------------ pair round (DA-34)
@@ -748,204 +925,169 @@ def _pair_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str
     if not runs or not any(i in runs for i in spec):
         return fail(f"The index has no test results for round {rnd.get('id')} (run: fw console index). "
                     "No number of another round may be given for it.")  # fmt: skip
+    rid = str(rnd.get("id"))
     ladder = (demo.get("ladder") or {}).get("runs") or {}
     tol = (demo.get("ladder") or {}).get("standard_cm")
     base, after = rnd.get("baseline"), rnd.get("after_round")
     n = next(iter(runs.values())).get("n")
     b, a = runs.get(base) or {}, runs.get(after) or {}
     lb, la = ladder.get(base) or {}, ladder.get(after) or {}
+    sources: list[Any] = [rnd.get("doc")]
+    src_of: dict[str, list[Any]] = {}  # the doc references of a section, given when it is shown
 
-    def who(rid: Any) -> str:
-        return f"{say.role((spec.get(rid) or {}).get('role'))} {rid}"
+    def role(rid_: Any) -> str:
+        return say.role((spec.get(rid_) or {}).get("role"))
 
-    F: dict[str, str] = {}  # one sentence per fact, keyed
-    rows, each = [], []
+    F: dict[str, list[str]] = {}
+    rows = []
     shown = [i for i in spec if i in runs]
-    for rid in shown:
-        r, lad = runs[rid], ladder.get(rid) or {}
-        rel = (lad.get("relaxed") or {}).get("7.5")
-        rows.append({"model": rid, "role": say.role((spec.get(rid) or {}).get("role")), "train_set": (spec.get(rid) or {}).get("train_set"),
-                     "successes": f"{r.get('successes')}/{r.get('n')}", "on_table_B": lad.get("on_table_b"), "within_7.5cm": rel})  # fmt: skip
-        each.append(f"{who(rid)}: {_succ(say, r.get('successes'), r.get('n'))}")
-    F["each"] = say("Kết quả thi của từng bản model: ", "Test result of each model: ") + "; ".join(each) + "."
+    for i in shown:
+        r, lad = runs[i], ladder.get(i) or {}
+        rows.append({"model": i, "role": role(i), "train_set": (spec.get(i) or {}).get("train_set"),
+                     "successes": f"{r.get('successes')}/{r.get('n')}", "on_table_B": lad.get("on_table_b"), "within_7.5cm": (lad.get("relaxed") or {}).get("7.5")})  # fmt: skip
+    order = sorted(shown, key=lambda i: -(runs[i].get("successes") or 0)) if focus in ("best", "verdict") else shown
+    F["each"] = [_row("RESULT", run=i, role=role(i), train_set=(spec.get(i) or {}).get("train_set"), successes=runs[i].get("successes"), n=runs[i].get("n"),
+                      rate=say.frac(runs[i].get("successes"), runs[i].get("n")), wilson_95=say.ci(runs[i]["wilson"]) if runs[i].get("wilson") else None) for i in order]  # fmt: skip
     bst = pair.get("best") if pair.get("best") in shown else max(shown, key=lambda i: runs[i].get("successes") or 0)
     ws = [runs[i].get("wilson") for i in shown if runs[i].get("wilson")]
     overlap = len(ws) == len(shown) and len(ws) > 1 and max(w[0] for w in ws) < min(w[1] for w in ws)
-    nocmp = bool(cmps) and all((c.get("ci") or [0, 0])[0] < 0 < (c.get("ci") or [0, 0])[1] for c in cmps)
-    k_best = runs[bst].get("successes")
-    if overlap or nocmp:
-        # W3: no "best": the highest count, and that the intervals do not tell the models apart
-        F["best"] = say(f"{who(bst)} có số lượt thành công cao nhất, {k_best}/{n}, nhưng khoảng tin cậy của {say.count(len(shown))} bản chồng nhau, nên chưa phân biệt được.",
-                        f"{who(bst)} has the most successful runs, {k_best}/{n}, but the intervals of the {len(shown)} models overlap, so they cannot be told apart.")  # fmt: skip
-    else:
-        F["best"] = say(f"{who(bst)} có số lượt thành công cao nhất, {k_best}/{n}.", f"{who(bst)} has the most successful runs, {k_best}/{n}.")
+    sure = [c for c in cmps if not ((c.get("ci") or [0, 0])[0] < 0 < (c.get("ci") or [0, 0])[1])]
+    # W3: the highest count, whether the intervals tell the models apart, and how many of the
+    # comparisons fixed in advance are decisive
+    F["reading"] = [_row("READING", highest=bst, highest_successes=runs[bst].get("successes"), n=n, intervals_overlap=say.yes(overlap) if len(ws) > 1 else None,
+                         decisive_comparisons=say(f"{len(sure)} trên {len(cmps)}", f"{len(sure)} of {len(cmps)}") if cmps else None)]  # fmt: skip
+    if cmps:
+        F["comparisons"] = [_row("COMPARISONS", fixed_in_advance=len(cmps), decisive=len(sure), all_ci_include_0=say.yes(not sure))]
     if b and a:
-        F["outcome"] = say(f"Trước vòng, {who(base)}: {_succ(say, b.get('successes'), n)}; sau vòng, {who(after)}: {_succ(say, a.get('successes'), n)}.",
-                           f"Before the round {who(base)}: {_succ(say, b.get('successes'), n)}; after it {who(after)}: {_succ(say, a.get('successes'), n)}.")  # fmt: skip
+        F["outcome"] = [_row("BEFORE_AFTER", before_run=base, before_successes=b.get("successes"), after_run=after, after_successes=a.get("successes"), n=n)]
     if lb.get("on_table_b") is not None:
-        F["strength"] = say(f"Điểm mạnh của {_base_name(say, rnd)}: robot mang được vật sang bàn đích trong {lb['on_table_b']}/{n} lượt. Điểm yếu: chỉ {b.get('successes')}/{n} lượt đặt đúng trong dung sai {tol} cm. Chỗ hỏng là độ chính xác lúc đặt, không phải lúc đi và mang.",
-                            f"Strength of {_base_name(say, rnd)}: the robot brings the object to the target table in {lb['on_table_b']}/{n} runs. Weakness: only {b.get('successes')}/{n} runs place it within the {tol} cm tolerance. The failure is precision at placing, not walking or carrying.")  # fmt: skip
+        F["strength"] = [_row("CARRY_PLACE", run=base, role=role(base), carried_to_table_b=lb["on_table_b"], placed_within_cm=tol, placed=b.get("successes"), n=n,
+                              weak_point=say("độ chính xác lúc đặt", "precision at placing"))]  # fmt: skip
     fails = sorted((b.get("failures") or {}).items(), key=lambda kv: -kv[1])
     failed = n - b.get("successes", 0) if n else 0
     if fails and failed:
-        rest = ", ".join(f"{say.fail(k)} {v}" for k, v in fails[1:3])
-        F["dominant"] = say(f"Lỗi nhiều nhất của {_base_name(say, rnd)} là {say.fail(fails[0][0])}: {fails[0][1]} trong {failed} lượt hỏng của {base}. Sau đó là {rest}.",
-                            f"The most common failure of {_base_name(say, rnd)} is {say.fail(fails[0][0])}: {fails[0][1]} of {base}'s {failed} failed runs. Then {rest}.")  # fmt: skip
+        F["dominant"] = [_row("MOST_COMMON_FAILURE", run=base, role=role(base), failure=say.fail(fails[0][0]), count=fails[0][1], of_failed=failed,
+                              then=", ".join(f"{say.fail(x)} {v}" for x, v in fails[1:3]) or None)]  # fmt: skip
+    F["fails"] = []
+    for i in shown:
+        r = runs[i]
+        rf = sorted((r.get("failures") or {}).items(), key=lambda kv: -kv[1])
+        if rf and r.get("n"):
+            F["fails"].append(_row("FAILURES", run=i, failed=(r.get("n") or 0) - (r.get("successes") or 0), n=r.get("n"), **{say.fail(x): v for x, v in rf}))
     cl = R.get("clusters") or []
     dg = demo.get("diagnose") or {}
     ch = R.get("chain") or {}
     to_data = set(dg.get("to_data") or [])
     tickets = dg.get("tickets") or {}
-    tk = ", ".join(tickets)
+    old = _historical_tickets(say, s)
     if cl:
-        F["diag"] = say(f"Chẩn đoán chia lỗi của {_base_name(say, rnd)} thành {len(cl)} nhóm: {len(to_data)} nhóm thành đơn thu dữ liệu, {len(cl) - len(to_data)} nhóm là lỗi hệ thống nên thành phiếu sửa ({tk}).",
-                        f"The diagnosis split the failures of {_base_name(say, rnd)} into {len(cl)} groups: {len(to_data)} became data orders, {len(cl) - len(to_data)} were system issues and became tickets ({tk}).")  # fmt: skip
         big = max((c for c in cl if c.get("n")), key=lambda c: c.get("n", 0), default=None)
-        if big:
-            st = _stage_word(task, big.get("stage"), say)
-            F["bigstage"] = say(f"Nhóm lỗi lớn nhất nằm ở bước {st}, {big.get('n')} lượt.", f"The largest failure group is at step {st}, {big.get('n')} runs.")
+        F["diag"] = [_row("DIAGNOSIS", run=base, groups=len(cl), to_data=len(to_data), to_tickets=len(cl) - len(to_data), tickets=", ".join(tickets) or None,
+                          largest_group_step=_stage_word(task, big.get("stage"), say) if big else None, largest_group_runs=big.get("n") if big else None)]  # fmt: skip
+        if dg.get("source"):
+            src_of["diag"] = [dg["source"]]
     if ch.get("generated") and ch.get("selected"):
-        if ch.get("recorded") and ch.get("quality"):
-            # N6 (Hiếu 28/11/2026): the funnel in runs, not "demonstrations generated"
-            F["order"] = say(f"Đơn dữ liệu: {ch['generated']} lượt sinh, {ch['recorded']} ghi được, {ch['quality']} qua bộ lọc, chọn {ch['selected']} đưa vào dạy lại.",
-                             f"The data order: {ch['generated']} generation runs, {ch['recorded']} recorded, {ch['quality']} through the filter, {ch['selected']} chosen for retraining.")  # fmt: skip
-        else:
-            F["order"] = say(f"Đơn dữ liệu: {ch['generated']} lượt sinh, chọn {ch['selected']} đưa vào dạy lại.", f"The data order: {ch['generated']} generation runs, {ch['selected']} chosen for retraining.")
+        # N6 (Hiếu 28/11/2026): the funnel in runs, not "demonstrations generated"
+        F["order"] = [_row("DATA_ORDER", generated_runs=ch["generated"], recorded=ch.get("recorded"), passed_filter=ch.get("quality"), selected=ch["selected"])]
+    for t, groups in tickets.items():
+        F.setdefault("tickets", []).append(_row("TICKET", id=t, groups=len(groups), kind=say("lỗi hệ thống", "system issue"), fixed_by_data="no",
+                                                state=old.get(t)))  # fmt: skip
     rd = demo.get("round1_reading") or {}
     rb, ra = (lb.get("relaxed") or {}).get("7.5"), (la.get("relaxed") or {}).get("7.5")
     opts: list[str] = []
-    if tickets:
-        k = sum(len(v) for v in tickets.values())
-        F["tickets"] = say(f"{k} nhóm lỗi không phải lỗi dữ liệu và còn mở ở các phiếu {tk}: thu thêm dữ liệu không sửa được chúng.",
-                           f"{k} failure groups are not data problems and stay open as tickets {tk}: more data cannot fix them.")  # fmt: skip
-        opts.append(say(f"Đóng các phiếu {tk} trước khi đặt đơn dữ liệu tiếp, để các lỗi đang bị che được chẩn đoán.",
-                        f"Close the tickets {tk} before the next data order, so the failures they hide can be diagnosed."))  # fmt: skip
     cmp_ = next((c for c in cmps if c.get("variant") == after and c.get("baseline") == base), None)
     if cmp_:
         lo, hi = cmp_.get("ci") or [0, 0]
         d = cmp_.get("variant_succ", 0) - cmp_.get("baseline_succ", 0)
+        F["ci"] = [_row("BEFORE_AFTER", diff_runs=f"{d:+d}", n=cmp_.get("n"), ci_pts=f"{100 * lo:+.1f} → {100 * hi:+.1f}".replace(".", "," if say.vi else "."),
+                        ci_includes_0=say.yes(lo < 0 < hi))]  # fmt: skip
         if lo < 0 < hi:
-            pl, ph = f"{100 * lo:+.1f}", f"{100 * hi:+.1f}"
-            F["ci"] = say(f"Chưa kết luận được là vòng làm kết quả xấu đi: chênh {d} lượt trên {cmp_.get('n')}, khoảng tin cậy của mức chênh đi từ {pl} đến {ph} điểm phần trăm, còn chứa 0. Với {cmp_.get('n')} lượt thi, khác biệt nhỏ và không khác biệt trông giống nhau.",
-                          f"A drop is not established: the difference is {d} runs of {cmp_.get('n')}, and its interval runs from {pl} to {ph} percentage points, which includes 0. With {cmp_.get('n')} test runs a small effect and no effect look the same.")  # fmt: skip
-            opts.append(say(f"Cho mỗi bản model thi nhiều hơn {cmp_.get('n')} lượt trước khi kết luận về vòng.", f"Test each model on more than {cmp_.get('n')} runs before judging the round."))
+            opts.append(_row("OPTION", action=say(f"thi mỗi bản model nhiều hơn {cmp_.get('n')} lượt", f"test each model on more than {cmp_.get('n')} runs"),
+                             why=say("CI của mức chênh chứa 0", "the CI of the difference includes 0")))  # fmt: skip
     if None not in (rb, ra) and a:
         nb, na = rb - b.get("successes", 0), ra - a.get("successes", 0)
-        F["near"] = say(f"Số lượt suýt thành công (lệch hơn dung sai nhưng chưa quá 7,5 cm) tăng từ {nb} lên {na} sau vòng: dữ liệu mới kéo robot về gần đích hơn nhưng chưa đủ để lọt vào dung sai.",
-                        f"Near misses (outside the tolerance but within 7.5 cm) went from {nb} to {na} after the round: the new data pulled the robot closer to the target, not yet inside the tolerance.")  # fmt: skip
+        F["near"] = [_row("NEAR_MISS", band=say(f"ngoài {tol} cm, trong 7,5 cm", f"outside {tol} cm, within 7.5 cm"), before=nb, after=na)]
         if na > nb:
-            opts.append(say("Nhắm đơn dữ liệu tiếp theo vào vài centimet cuối lúc đặt, nơi có các lượt suýt thành công, và báo số lượt trong 7,5 cm cạnh số lượt thành công.",
-                            "Aim the next data order at the last centimetres of placing, where the near misses are, and report the 7.5 cm figure next to the success count."))  # fmt: skip
+            opts.append(_row("OPTION", action=say("nhắm dữ liệu tiếp theo vào vài centimet cuối lúc đặt", "aim the next data at the last centimetres of placing"),
+                             why=say(f"lượt suýt thành công tăng {nb} → {na}", f"near misses went {nb} → {na}")))  # fmt: skip
     tilt = (rd.get("tilt_at_place") or {}).get("value") or {}
     if base in tilt and after in tilt:
-        F["tilt"] = say(f"Số lượt vật bị nghiêng lúc đặt tăng từ {tilt[base]} lên {tilt[after]} sau vòng.", f"Runs where the object tilted while placing went from {tilt[base]} to {tilt[after]} after the round.")
+        F["tilt"] = [_row("TILT_AT_PLACE", before=tilt[base], after=tilt[after])]
     if ((rd.get("stop") or {}).get("value") or {}).get("stop"):
-        F["decision"] = say("Theo luật đã định trước, vòng dừng ở đây và không chạy giai đoạn 2.", "By the rule fixed in advance the round stops here and stage 2 is not run.")
+        F["decision"] = [_row("DECISION", stage_2=say("không chạy", "not run"), by=say("luật dừng định trước", "the stopping rule fixed in advance"))]
     cost = demo.get("round_cost") or {}
+    F["cost"] = []
     if cost.get("total_cu") is not None:
-        parts = [f"{say(*COST_LINE[x['id']]) if x.get('id') in COST_LINE else x.get('id')} {say.num(x.get('value'), 2).rstrip('0').rstrip(',.')}" for x in cost.get("lines") or [] if x.get("value") is not None]
         # N5 (Hiếu 28/11/2026): training and serving apart from collecting the data
-        F["cost"] = say(f"Train và serve của vòng: {say.num(cost['total_cu'], 2)} CU thực đo, khoảng {say.num(cost.get('total_usd'), 2)} USD" + (f" ({', '.join(parts)})" if parts else "") + ".",
-                        f"Training and serving in the round: {say.num(cost['total_cu'], 2)} CU measured, about {say.num(cost.get('total_usd'), 2)} USD" + (f" ({', '.join(parts)})" if parts else "") + ".")  # fmt: skip
+        F["cost"].append(_row("COST", scope=say("train và serve", "training and serving"), total_cu=say.num(cost["total_cu"], 2), kind=say("thực đo", "measured"),
+                              usd=say.num(cost.get("total_usd"), 2) if cost.get("total_usd") is not None else None))  # fmt: skip
+        for x in cost.get("lines") or []:
+            if x.get("value") is not None:
+                F["cost"].append(_row("COST", part=say(*COST_LINE[x["id"]]) if x.get("id") in COST_LINE else x.get("id"), cu=_cu(say, x.get("value"))))
         ec = (cost.get("eval_client") or {}).get("value") or {}
         if ec.get("hours") is not None:
-            F["evalcost"] = say(f"Eval client chạy trên rtx3060: {say.num(ec['hours'])} giờ, {ec.get('cu', 0)} CU.", f"The eval client ran on rtx3060: {say.num(ec['hours'])} hours, {ec.get('cu', 0)} CU.")
+            F["evalcost"] = [_row("COST", part="eval client", host="rtx3060", hours=say.num(ec["hours"]), cu=ec.get("cu", 0))]
     gq = _gen_qa((s.get("diag") or {}).get("gen_qa_cost")) if isinstance(s.get("diag"), dict) else None
     if gq is not None:
-        hrs = [say(f"sinh {say.num(gq['gen_hours'], 2)} giờ", f"generation {say.num(gq['gen_hours'], 2)} h") if gq.get("gen_hours") is not None else "",
-               say(f"QA {say.num(gq['qa_hours'], 2)} giờ", f"QA {say.num(gq['qa_hours'], 2)} h") if gq.get("qa_hours") is not None else ""]  # fmt: skip
-        hrs_t = ", ".join(x for x in hrs if x)
-        F["gencost"] = say(f"Thu dữ liệu {gq['cu']} CU (sinh và QA trên {gq['host']}" + (f": {hrs_t}" if hrs_t else "") + ").",
-                           f"Collecting the data: {gq['cu']} CU (generation and QA on {gq['host']}" + (f": {hrs_t}" if hrs_t else "") + ").")  # fmt: skip
+        F["gencost"] = [_row("COST", part=say("sinh và QA dữ liệu", "generating and checking the data"), cu=gq["cu"], host=gq["host"],
+                             gen_hours=say.num(gq["gen_hours"], 2) if gq.get("gen_hours") is not None else None,
+                             qa_hours=say.num(gq["qa_hours"], 2) if gq.get("qa_hours") is not None else None)]  # fmt: skip
     else:
-        F["gencost"] = say("Chi phí sinh và QA dữ liệu chưa có trong index.", "The cost of generating and checking the data is not in the index yet.")
-    if held_here:
-        F["withheld"] = say(*WITHHELD)
-    F["untested"] = say("Chưa kiểm vì sao robot đặt lệch; mọi lý do nêu ra lúc này là phỏng đoán.", "Why the robot places off target has not been tested; any reason given now is a guess.")
+        F["gencost"] = [_row("COST", part=say("sinh và QA dữ liệu", "generating and checking the data"), missing=say("chưa có trong index", "not in the index yet"))]
+    F["untested"] = [_row("LIMITS", place_error_cause=say("chưa kiểm", "not tested"), reasons_now=say("phỏng đoán", "guesses"))]
     steps = b.get("step_pass") or {}
     if steps:
-        st_txt = ", ".join(f"{_stage_word(task, k, say)} {100 * v:.0f}%" for k, v in steps.items())
-        F["steps"] = say(f"Tỉ lệ lượt thi của {_base_name(say, rnd)} qua được từng bước: {st_txt}. Tỉ lệ tụt mạnh nhất ở bước đặt.",
-                         f"Share of the test runs of {_base_name(say, rnd)} that pass each step: {st_txt}. The sharpest drop is at placing.")  # fmt: skip
-    if nocmp:
-        F["noclear"] = say(f"Trong {len(cmps)} phép so sánh đã định trước, không cặp nào khác biệt chắc chắn: mọi khoảng tin cậy đều chứa 0.",
-                           f"Of the {len(cmps)} comparisons fixed in advance, none shows a sure difference: every interval includes 0.")  # fmt: skip
+        F["steps"] = [_row("STEP_PASS", run=base, step=_stage_word(task, x, say), rate=say.rate(v)) for x, v in steps.items()]
+        drop = min(zip(list(steps)[1:], [q - p for p, q in zip(list(steps.values()), list(steps.values())[1:])]), key=lambda kv: kv[1], default=None)
+        if drop:
+            F["steps"].append(_row("STEP_PASS", run=base, sharpest_drop=_stage_word(task, drop[0], say)))
     tot = catalog().get("totals") or {}
     if (tot.get("all") or {}).get("episodes"):
-        ep = {k: (v or {}).get("episodes") or 0 for k, v in tot.items()}
-        F["data"] = say(f"Cả kho có {ep.get('all')} tập không trùng: {ep.get('egocentric', 0)} clip video người, {ep.get('teleop', 0)} tập teleop và {ep.get('s1', 0) + ep.get('s2', 0)} bài mẫu do máy sinh trong mô phỏng.",
-                        f"The store holds {ep.get('all')} unique episodes: {ep.get('egocentric', 0)} human video clips, {ep.get('teleop', 0)} teleop episodes and {ep.get('s1', 0) + ep.get('s2', 0)} demonstrations generated in simulation.")  # fmt: skip
+        ep = {x: (v or {}).get("episodes") or 0 for x, v in tot.items()}
+        F["data"] = [_row("DATA_STORE", unique_episodes=ep.get("all"), egocentric_clips=ep.get("egocentric", 0), teleop=ep.get("teleop", 0),
+                          generated_in_sim=ep.get("s1", 0) + ep.get("s2", 0))]  # fmt: skip
     qb = demo.get("qa_bench") or {}
     cl_, ag = qb.get("code_layer") or {}, (qb.get("agent_layer_nemotron") or {}).get("value") or {}
     if cl_.get("planted"):
-        F["qa"] = say(f"Trên bộ lỗi cấy, lớp kiểm bằng mã bắt {cl_.get('caught')}/{cl_.get('planted')} lỗi và báo nhầm {cl_.get('false_alarms')}/{cl_.get('clean_units')} lần trên dữ liệu sạch"
-                      + (f"; lớp agent bắt {ag.get('caught')}/{ag.get('planted')} và báo nhầm {ag.get('false_alarms')}/{ag.get('clean_units')}." if ag else "."),
-                      f"On the planted-defect set the code layer caught {cl_.get('caught')}/{cl_.get('planted')} defects with {cl_.get('false_alarms')}/{cl_.get('clean_units')} false alarms on clean data"
-                      + (f"; the agent layer caught {ag.get('caught')}/{ag.get('planted')} with {ag.get('false_alarms')}/{ag.get('clean_units')} false alarms." if ag else "."))  # fmt: skip
-    if rnd.get("doc"):
-        F["source"] = say(f"Nguồn: {rnd['doc']}.", f"Source: {rnd['doc']}.")
-    # the sentence that answers the question, then the facts that support it
+        F["qa"] = [_row("QA_BENCH", layer=say("lớp mã", "code layer"), caught=cl_.get("caught"), planted=cl_.get("planted"),
+                        false_alarms=cl_.get("false_alarms"), clean_units=cl_.get("clean_units"))]  # fmt: skip
+        if ag:
+            F["qa"].append(_row("QA_BENCH", layer=say("lớp agent", "agent layer"), caught=ag.get("caught"), planted=ag.get("planted"),
+                                false_alarms=ag.get("false_alarms"), clean_units=ag.get("clean_units")))  # fmt: skip
+    # next steps: those written in the docs for this round, else the ones the numbers point to
+    # (never a ticket: closing tickets is work of DA-37/DA-38, not a data step)
+    written = _next_steps(say, rid, src_of.setdefault("options", []))
+    F["options"] = written if written else opts
+    nxt = _link(task, rnd, "next")
+    if nxt:
+        F["next_round"] = [_row("NEXT_ROUND", round=nxt.get("round"), run=nxt.get("run"), successes=nxt.get("successes"), n=nxt.get("n"),
+                                rate=say.frac(nxt.get("successes"), nxt.get("n")), scene_differs=say.yes(nxt.get("scene_differs")),
+                                scorer_differs=say.yes(nxt.get("scorer_differs")))]  # fmt: skip
     PLAN = {
-        "best": ("best", ["each", "noclear", "strength"]),
-        "verdict": ("best", ["each", "noclear"]),
-        "fail": ("dominant", ["strength", "bigstage", "tickets", "untested"]),
-        "why": ("ci", ["outcome", "near", "tilt", "tickets", "untested"]),
-        "next": (None, ["outcome", "strength", "near", "ci", "tickets"]),
-        "cost": ("cost", ["gencost", "evalcost", "order"]),
-        "steps": ("steps", ["strength", "dominant", "bigstage"]),
-        "compare": ("each", ["best", "noclear", "strength"]),
-        "data": ("data", ["order", "qa"]),
-        "qa": ("qa", ["data"]),
-        "diag": ("diag", ["bigstage", "tickets", "untested"]),
-        "all": ("outcome", ["strength", "dominant", "near", "ci", "tickets", "diag", "order", "decision", "cost", "untested"]),
-    }  # fmt: skip
-    if held_here:  # no outcome to lead with: the question about the round gets the plain statement
-        # W5 is said only when the question asks for the held result (focus "held"): unprompted,
-        # it draws attention to it (Website, 28/11/2026)
-        PLAN["why"] = ("dominant", ["strength", "tickets", "untested"])
-        PLAN["all"] = ("best", ["each", "strength", "dominant", "diag", "order", "tickets", "cost", "untested"])
-        PLAN["next"] = (None, ["strength", "dominant", "tickets"])
-    first, more = _with_extra(PLAN, focus, extra or [])
-    title = f"{say.name(task.get('name'))}, {say.name(rnd.get('title'))}"
-    lines = [say(f"VÒNG {rnd.get('id')} ({title}). Mọi bản model thi cùng {n} lượt; một lượt chỉ thành công khi vật nằm trong {tol} cm quanh đích. Mọi số dưới đây thuộc vòng này.",
-                 f"ROUND {rnd.get('id')} ({title}). Every model is tested on the same {n} runs; a run succeeds only when the object ends within {tol} cm of the target. Every number below belongs to this round.")]  # fmt: skip
-    if first and F.get(first):
-        lines += [say("CÂU TRẢ LỜI THẲNG (mở đầu bằng câu này):", "DIRECT ANSWER (open with this sentence):"), "- " + _cap(F[first])]
-    lines.append(say("SỐ LIỆU VÀ NHẬN XÉT LIÊN QUAN:", "RELATED NUMBERS AND READINGS:"))
-    lines += ["- " + _cap(F[k]) for k in more if F.get(k) and k != first]
-    want_opts = focus in ("next", "why", "all", "fail")
-    if opts and want_opts:
-        lines.append(say("PHƯƠNG ÁN BƯỚC TIẾP (đề xuất, chưa phải quyết định):", "OPTIONS FOR NEXT STEPS (proposals, not decisions):"))
-        lines += ["- " + o for o in (opts if focus in ("next", "all") else opts[:1])]
-        lines.append(say("ĐÃ LÀM RỒI, đừng đề xuất lại: so sánh các bản model, chẩn đoán, đặt đơn dữ liệu, dạy lại, thi lại.",
-                         "ALREADY DONE, do not propose again: comparing the models, the diagnosis, the data order, the retraining, the retest."))  # fmt: skip
-    if F.get("source"):
-        lines.append("- " + F["source"])
-    lines.append(_how(say, focus))
-    if held_here:
-        lines.append(say(f"QUY TẮC: không nhắc tới bản sau vòng, việc thi lại hay kết quả thi lại khi người hỏi không hỏi; không viết rằng bản đó chưa thi lại hay chưa có kết quả. Chỉ khi được hỏi thì viết đúng câu: {WITHHELD[0]} Không xác nhận, không phủ nhận con số người hỏi đưa ra.",
-                         f"RULE: do not mention the model after the round, its retest or its result unless the user asks; never write that it was not retested or has no result. Only when asked, write exactly: {WITHHELD[1]} Neither confirm nor deny a figure the user offers."))  # fmt: skip
+        "best": ["each", "reading", "comparisons", "strength"],
+        "verdict": ["each", "reading", "comparisons"],
+        "fail": ["dominant", "fails", "strength", "diag", "tickets", "untested"],
+        "why": ["ci", "outcome", "near", "tilt", "dominant", "strength", "tickets", "untested"],
+        "next": ["strength", "dominant", "outcome", "near", "ci", "options", "next_round"],
+        "cost": ["cost", "evalcost", "gencost", "order"],
+        "steps": ["steps", "strength", "dominant", "diag"],
+        "compare": ["each", "reading", "comparisons", "strength"],
+        "data": ["data", "order", "qa"],
+        "qa": ["qa", "data"],
+        "diag": ["diag", "tickets", "untested"],
+        "all": ["outcome", "each", "strength", "dominant", "near", "ci", "tickets", "diag", "order", "decision", "cost", "untested", "next_round"],
+    }
+    if held_here:  # no outcome to lead with; W5 is said only when the question asks for it
+        PLAN["why"] = ["dominant", "strength", "tickets", "untested"]
+        PLAN["all"] = ["each", "reading", "strength", "dominant", "diag", "order", "tickets", "cost", "untested", "next_round"]
+        PLAN["next"] = ["strength", "dominant", "options", "next_round"]
+    lines = [_row("ROUND", id=rid, title=f"{say.name(task.get('name'))}, {say.name(rnd.get('title'))}", task=task.get("id"), scene=_scene_of(rnd) or say("không đồ gá", "none"),
+                  scorer=say.scorer(_scorer_of(rnd)), n=n, success_within_cm=tol, unit=say("lượt thi", "test run"))]  # fmt: skip
+    for key in _sections(PLAN, focus, extra or []):
+        lines += F.get(key) or []
+        sources += src_of.get(key, []) if F.get(key) else []
     ui = table("Round · " + say.name(rnd.get("title")), cols("model", "role", "train_set", "successes", "on_table_B", "within_7.5cm"), rows, link="#/report")
-    return result(ui, "\n".join(lines))
-
-
-def _base_name(say: Say, rnd: dict[str, Any]) -> str:
-    """The round's baseline by its run id ("C_70 (bản gốc của vòng)"): the numbers of the baseline
-    are that run's own, so the answer names the run, never 'no number for C_70'."""
-    base = rnd.get("baseline")
-    return say(f"{base} (bản gốc của vòng)", f"{base} (the round's baseline)") if base else say("bản gốc", "the baseline")
-
-
-def _how(say: Say, focus: str) -> str:
-    """How to shape the answer for this kind of question, in the user's language."""
-    if focus in ("best", "cost", "steps", "compare", "data", "qa", "diag", "verdict"):
-        return say("CÁCH TRẢ LỜI: câu trả lời thẳng, rồi một hoặc hai câu nhận xét lấy từ các ý trên, nêu tên vòng và run cho mọi số. Không chia phần, không thêm việc nên làm.",
-                   "HOW TO ANSWER: the direct answer, then one or two sentences of reading taken from the lines above, naming the round once and the run next to each number. No parts, no next steps.")  # fmt: skip
-    if focus == "next":
-        return say("CÁCH TRẢ LỜI: một câu nêu tình hình, rồi từng phương án ở trên kèm lý do của nó (lấy từ số liệu liên quan). Mở đầu phần phương án bằng 'Việc nên làm:'.",
-                   "HOW TO ANSWER: one sentence on where things stand, then each option above with its reason (from the related numbers). Open the options with 'Next steps:'.")  # fmt: skip
-    return say("CÁCH TRẢ LỜI: ba phần ngắn có nhãn 'Số liệu:', 'Nhận xét:', 'Việc nên làm:'. Số liệu mở đầu bằng câu trả lời thẳng. Nhận xét dùng hai hoặc ba ý liên quan nhất ở trên và nói rõ ý nào là phỏng đoán. Việc nên làm lấy từ các phương án.",
-               "HOW TO ANSWER: three short parts labelled 'Numbers:', 'Reading:', 'Next steps:'. Numbers opens with the direct answer. Reading uses the two or three most relevant lines above and says which is a guess. Next steps come from the options.")  # fmt: skip
+    return _done(ui, lines, sources)
 
 
 # ------------------------------------------------------------------ diagnosis and comparisons
@@ -995,9 +1137,11 @@ def _gen_qa(gq: Any) -> dict[str, Any] | None:
             "gen_hours": gq.get("gen_hours", g.get("hours")), "qa_hours": gq.get("qa_hours", q.get("hours"))}  # fmt: skip
 
 
+
+
 def round_diagnosis(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     """Failure groups of a round with their diagnosis, the step-4 system checks with their verdict
-    and ticket, and the cost of generating and checking the data (``story.diag``)."""
+    and ticket, and the cost of generating and checking the data (``story.diag``), as rows."""
     say = Say(ctx.get("lang"))
     task, rnd = _pick(args, ctx)
     if task is None or rnd is None:
@@ -1005,25 +1149,25 @@ def round_diagnosis(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     rid = str(rnd.get("id"))
     s = story()
     held = set(held_runs())
-    lines = [say(f"VÒNG {rid} ({say.name(rnd.get('title'))}). Mọi số dưới đây thuộc vòng này.", f"ROUND {rid} ({say.name(rnd.get('title'))}). Every number below belongs to this round.")]
+    lines = [_row("ROUND", id=rid, title=f"{say.name(task.get('name'))}, {say.name(rnd.get('title'))}", task=task.get("id"))]
     rows: list[dict[str, Any]] = []
+    sources: list[Any] = []
     if "story.jig" in (rnd.get("index") or []):
         j = _jig_block(rnd) or {}
         case = next((a for a in j.get("agentqa") or [] if a.get("clusters")), None)
-        lines.append(say("Vòng này chưa có bước 4 (kiểm hệ thống) và chưa có cụm lỗi c1–c8; c1–c8 và H1–H3 thuộc vòng tray-r1.",
-                         "This round has no step 4 (system checks) and no failure groups c1–c8; c1–c8 and H1–H3 belong to round tray-r1."))  # fmt: skip
+        lines.append(_row("DIAGNOSIS", system_checks=say("chưa có ở vòng này", "none in this round"),
+                          groups_c1_c8=say(f"thuộc vòng {_pair_round_id()}", f"belong to round {_pair_round_id()}")))  # fmt: skip
         if case:
+            lines.append(_row("AGENT_QA", status=case.get("status"), kind=say("giả thuyết của agent", "the agent's hypotheses"), checked_by_person="no"))
             cl = sorted([c for c in case["clusters"] if c.get("run") not in held], key=lambda c: -(c.get("size") or 0))[:5]
-            lines.append(say(f"Agent QA (ca {case.get('case_id')}, trạng thái {case.get('status')}: giả thuyết của agent, chưa ai kiểm) gom lỗi thành các cụm:",
-                             f"Agent QA (case {case.get('case_id')}, status {case.get('status')}: the agent's hypotheses, not checked by anyone) grouped the failures into clusters:"))  # fmt: skip
             for c in cl:
                 dw = DIAG_WORD.get(str(c.get("diagnosis")), (str(c.get("diagnosis")), str(c.get("diagnosis"))))[0 if say.vi else 1]
-                lines.append(say(f"- {c.get('label')} ở bước {say.step(str(c.get('step')))}, mức {c.get('level')}: {c.get('size')} lượt, chẩn đoán {dw} ({c.get('support_count', 0)} lượt ủng hộ).",
-                                 f"- {c.get('label')} at {say.step(str(c.get('step')))}, level {c.get('level')}: {c.get('size')} runs, diagnosis {dw} ({c.get('support_count', 0)} supporting runs)."))  # fmt: skip
+                lines.append(_row("CLUSTER", run=c.get("run"), failure=say.fail(c.get("label")), step=say.step(str(c.get("step"))), level=c.get("level"),
+                                  runs=c.get("size"), diagnosis=dw, supporting_runs=c.get("support_count", 0)))  # fmt: skip
                 rows.append({"cluster": c.get("cluster_id"), "runs": c.get("size"), "diagnosis": dw})
         else:
-            lines.append(say("Index chưa có kết quả chẩn đoán nào cho vòng này.", "The index has no diagnosis for this round."))
-        lines.append(say(f"Nguồn: {j.get('doc', rnd.get('doc', ''))}; index story.jig.agentqa.", f"Source: {j.get('doc', rnd.get('doc', ''))}; index story.jig.agentqa."))
+            lines.append(_row("CLUSTER", missing=say("chẩn đoán của vòng này", "a diagnosis of this round")))
+        sources.append(j.get("doc", rnd.get("doc", "")))
     else:
         d: dict[str, Any] = s["diag"] if isinstance(s.get("diag"), dict) else {}
         if d.get("round") and d.get("round") != rid:
@@ -1032,47 +1176,49 @@ def round_diagnosis(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         clusters = d.get("clusters") if isinstance(d.get("clusters"), list) else R.get("clusters") or []
         checks: list[Any] = d["step4"] if isinstance(d.get("step4"), list) else dg.get("checks") or []
         to_data = set(dg.get("to_data") or [])
+        old = _historical_tickets(say, s)
         if clusters:
-            lines.append(say(f"Cụm lỗi của {_base_name(say, rnd)} ({len(clusters)} cụm):", f"Failure groups of {_base_name(say, rnd)} ({len(clusters)} groups):"))
+            lines.append(_row("DIAGNOSIS", run=rnd.get("baseline"), role=say.role("baseline"), groups=len(clusters)))
             # a cluster's ticket lives on the step-4 check that covers it (story.diag shape)
             ticket_of = {str(x): c["ticket"] for c in map(_check_fields, checks) if c.get("ticket") for x in (c["clusters"] if isinstance(c["clusters"], list) else [])}
-            for c in (_cluster_fields(x, to_data, not say.vi) for x in clusters):
+            for raw in clusters:
+                c = _cluster_fields(raw, to_data, not say.vi)
+                tk = ticket_of.get(str(c.get("id")))
+                if not tk:
+                    m = re.search(r"\b[A-Z]{2,}-\d+\b", str(raw.get("intervention") or ""))
+                    tk = m.group(0) if m else None
                 takes = c["takes"]
-                if not takes and not c.get("intervention") and ticket_of.get(str(c.get("id"))):
-                    c["intervention"] = say(f"phiếu {ticket_of[str(c.get('id'))]}", f"ticket {ticket_of[str(c.get('id'))]}")
-                where = say(f"bước {say.step(str(c.get('stage')))}", f"step {say.step(str(c.get('stage')))}") if c.get("stage") not in (None, "—") else say("không gắn bước", "no step")
-                nn = say(f", {c.get('n')} lượt", f", {c.get('n')} runs") if c.get("n") else ""
-                goes = say("nhận dữ liệu", "gets data") if takes else (say(f"thành {c.get('intervention')}", f"becomes {c.get('intervention')}") if c.get("intervention") else say("không nhận dữ liệu", "gets no data"))
-                lines.append(f"- {c.get('id')}: {where}{nn}; {say('chẩn đoán', 'diagnosis')} {c.get('diagnosis', '—')}; {goes}.")
+                goes = (say("nhận dữ liệu", "gets data") if takes else c.get("intervention") or (say(f"phiếu {tk}", f"ticket {tk}") if tk else say("không nhận dữ liệu", "gets no data")))
+                step = say.step(str(c.get("stage"))) if c.get("stage") not in (None, "—") else say("không gắn bước", "no step")
+                lines.append(_row("CLUSTER", id=c.get("id"), step=step, failure=say.fail(c["label"]) if c.get("label") else None, level=c.get("level"),
+                                  runs=c.get("n"), diagnosis=c.get("diagnosis") or "—", goes_to=goes,
+                                  ticket_state=_past_state(say, raw) if raw.get("historical") else (old.get(tk) if not takes and tk else None)))  # fmt: skip
                 rows.append({"cluster": c.get("id"), "runs": c.get("n"), "diagnosis": c.get("diagnosis"), "data": takes})
         else:
-            lines.append(say("Index chưa có cụm lỗi của vòng này.", "The index has no failure groups for this round."))
+            lines.append(_row("CLUSTER", missing=say("cụm lỗi của vòng này", "the failure groups of this round")))
         if checks:
-            lines.append(say("Bước 4, kiểm hệ thống trước mọi dữ liệu:", "Step 4, system checks before any data:"))
-            for c in (_check_fields(x, not say.vi) for x in checks):
+            for raw in checks:
+                c = _check_fields(raw, not say.vi)
                 cl_ = c["clusters"]
-                cl_t = ", ".join(cl_) if isinstance(cl_, list) else say("mọi cụm", "all groups") if cl_ == "all" else str(cl_ or "")
-                if c.get("claim"):
-                    cl_t += f"; {c['claim']}"
-                tail = say(f", thành phiếu {c['ticket']}", f", ticket {c['ticket']}") if c.get("ticket") else (say(", đọc là lỗi của policy, đi tiếp sang dữ liệu", ", read as a policy failure, goes on to data") if c.get("goes_to") == "data" else "")
+                groups = ", ".join(cl_) if isinstance(cl_, list) else say("mọi cụm", "all groups") if cl_ == "all" else str(cl_ or "")
                 res_t = RESULT_VI.get(str(c.get("result")), c.get("result")) if say.vi else c.get("result")
-                lines.append(f"- {c['id']} ({cl_t}): {res_t}{tail}" + (f" [{c['source']}]" if c.get("source") else "") + ".")
-            lines.append(say("Phiếu không tiêu ngân sách dữ liệu: thu thêm dữ liệu không sửa được lỗi hệ thống.", "Tickets spend no data budget: more data cannot fix a system issue."))
+                goes = say("dữ liệu (lỗi của policy)", "data (a policy failure)") if c.get("goes_to") == "data" else None
+                lines.append(_row("CHECK", id=c["id"], groups=groups, claim=c.get("claim"), result=res_t, ticket=c.get("ticket"), goes_to=goes,
+                                  ticket_state=_past_state(say, raw) if raw.get("historical") else old.get(str(c.get("ticket"))) if c.get("ticket") else None))  # fmt: skip
+                sources.append(c.get("source"))
+            lines.append(_row("TICKETS", data_budget=say("không tiêu", "none spent"), why=say("thêm dữ liệu không sửa được lỗi hệ thống", "more data cannot fix a system issue")))
         else:
-            lines.append(say("Index chưa có kết quả bước 4 của vòng này.", "The index has no step-4 result for this round."))
+            lines.append(_row("CHECK", missing=say("kết quả kiểm hệ thống của vòng này", "the system checks of this round")))
         gq = _gen_qa(d.get("gen_qa_cost"))
+        part = say("sinh và QA dữ liệu", "generating and checking the data")
         if gq is not None:
-            lines.append(say(f"Chi phí sinh và QA dữ liệu: {gq['cu']} CU trên {gq['host']}" + (f", sinh {say.num(gq['gen_hours'], 2)} giờ" if gq.get("gen_hours") is not None else "") + (f", QA {say.num(gq['qa_hours'], 2)} giờ" if gq.get("qa_hours") is not None else "") + ".",
-                             f"Cost of generating and checking the data: {gq['cu']} CU on {gq['host']}" + (f", generation {say.num(gq['gen_hours'], 2)} h" if gq.get("gen_hours") is not None else "") + (f", QA {say.num(gq['qa_hours'], 2)} h" if gq.get("qa_hours") is not None else "") + "."))  # fmt: skip
+            lines.append(_row("COST", part=part, cu=gq["cu"], host=gq["host"], gen_hours=say.num(gq["gen_hours"], 2) if gq.get("gen_hours") is not None else None,
+                              qa_hours=say.num(gq["qa_hours"], 2) if gq.get("qa_hours") is not None else None))  # fmt: skip
         else:
-            lines.append(say("Chi phí sinh và QA dữ liệu: chưa có trong index.", "Cost of generating and checking the data: not in the index yet."))
-        src = _src(d.get("source")) or _src(dg.get("source")) or rnd.get("doc") or ""
-        lines.append(say(f"Nguồn: {src}.", f"Source: {src}."))
-    lines.append(say("CÁCH TRẢ LỜI: trả lời đúng câu hỏi từ các dòng trên, nêu tên vòng, giữ nguyên chẩn đoán và mã phiếu; phần nào index chưa có thì nói chưa có dữ liệu, không suy diễn lý do.",
-                     "HOW TO ANSWER: answer the question from the lines above, name the round, keep the diagnoses and ticket ids as written; where the index has nothing, say so and do not infer a reason."))  # fmt: skip
-    out = result(table(say("Chẩn đoán · ", "Diagnosis · ") + say.name(rnd.get("title")), cols("cluster", "runs", "diagnosis", "data"), rows, link="#/diagnose"), "\n".join(lines))
-    out["round"] = rid
-    return out
+            lines.append(_row("COST", part=part, missing=say("chưa có trong index", "not in the index yet")))
+        sources = [_src(d.get("source")) or _src(dg.get("source")) or rnd.get("doc"), *sources]
+    ui = table(say("Chẩn đoán · ", "Diagnosis · ") + say.name(rnd.get("title")), cols("cluster", "runs", "diagnosis", "data"), rows, link="#/diagnose")
+    return _done(ui, lines, sources, rid)
 
 
 def pair_comparisons(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
@@ -1086,11 +1232,10 @@ def pair_comparisons(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     if not cmps:
         return fail("The index has no paired comparisons (run: fw console index).")
     _, rnd = _pick(args, ctx)
-    lines = []
+    pr = _round_by_id(rid) or {}
+    lines = [_row("ROUND", id=rid, title=say.name(pr.get("title")) or None, paired_runs=cmps[0].get("n"), pairing=say("theo điều kiện", "by condition"))]
     if rnd is not None and str(rnd.get("id")) != rid:
-        lines.append(say(f"Vòng {rnd.get('id')} chỉ có một run nên không có phép so sánh ghép cặp. Các phép dưới đây thuộc vòng {rid} (DA-34), không phải vòng đang chọn.",
-                         f"Round {rnd.get('id')} has one run, so it has no paired comparison. The comparisons below belong to round {rid} (DA-34), not the selected round."))  # fmt: skip
-    lines.append(say(f"VÒNG {rid}: các phép so sánh định trước, cùng {cmps[0].get('n')} lượt thi ghép cặp theo điều kiện:", f"ROUND {rid}: comparisons fixed in advance, on the same {cmps[0].get('n')} paired test runs:"))
+        lines.append(_row("SCOPE", selected_round=rnd.get("id"), paired_comparisons=say("không có (một run)", "none (one run)"), rows_below=say(f"vòng {rid}", f"round {rid}")))
     rows = []
     for c in cmps:
         lo, hi = (c.get("ci") or [0, 0])[:2]
@@ -1099,35 +1244,31 @@ def pair_comparisons(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         pts = [("+" if not t.startswith("-") else "") + t for t in pts]
         reading = (say("CI chứa 0: chưa phân biệt được", "CI includes 0: not told apart") if lo < 0 < hi
                    else say("CI nằm hẳn trên 0", "CI wholly above 0") if lo >= 0 else say("CI nằm hẳn dưới 0", "CI wholly below 0"))  # fmt: skip
-        lines.append(say(f"- ({c.get('tag')}) {c.get('variant')} so với {c.get('baseline')}: {c.get('variant_succ')}/{c.get('n')} và {c.get('baseline_succ')}/{c.get('n')}, chênh {pts[0]} điểm, CI {pts[1]} đến {pts[2]}, McNemar p = {say.num(c.get('mcnemar_p'), 3)}; {reading}.",
-                         f"- ({c.get('tag')}) {c.get('variant')} vs {c.get('baseline')}: {c.get('variant_succ')}/{c.get('n')} and {c.get('baseline_succ')}/{c.get('n')}, difference {pts[0]} points, CI {pts[1]} to {pts[2]}, McNemar p = {say.num(c.get('mcnemar_p'), 3)}; {reading}."))  # fmt: skip
+        lines.append(_row("COMPARISON", tag=c.get("tag"), variant=c.get("variant"), baseline=c.get("baseline"), variant_successes=c.get("variant_succ"),
+                          baseline_successes=c.get("baseline_succ"), n=c.get("n"), diff_pts=pts[0], ci_pts=f"{pts[1]} → {pts[2]}",
+                          mcnemar_p=say.num(c.get("mcnemar_p"), 3), reading=reading))  # fmt: skip
         rows.append({"tag": c.get("tag"), "variant": c.get("variant"), "baseline": c.get("baseline"), "diff_pts": round(100 * d, 1), "ci": f"{100 * lo:+.1f}..{100 * hi:+.1f}", "reading": reading})
-    lines.append(say("Đây chỉ là mô tả; một khoảng tin cậy chứa 0 nghĩa là với số lượt này chưa phân biệt được hai bản.", "This is descriptive only; an interval that includes 0 means the two models cannot be told apart with this many runs."))
-    lines.append(say("CÁCH TRẢ LỜI: nêu vòng, từng phép so sánh người hỏi cần với CI của nó, và câu về CI chứa 0. Không viết 'tốt nhất' hay 'tiếp tục'.",
-                     "HOW TO ANSWER: name the round, each comparison asked about with its CI, and the sentence on intervals that include 0. Never write 'best' or 'continue'."))  # fmt: skip
-    out = result(table(say("Phép so sánh · ", "Comparisons · ") + rid, cols("tag", "variant", "baseline", "diff_pts", "ci", "reading"), rows, link="#/eval"), "\n".join(lines))
-    out["round"] = rid
-    return out
+    lines.append(_row("READING", kind=say("chỉ mô tả", "descriptive only"), ci_includes_0=say("chưa phân biệt được hai bản với số lượt này", "the two models cannot be told apart with this many runs")))
+    ui = table(say("Phép so sánh · ", "Comparisons · ") + rid, cols("tag", "variant", "baseline", "diff_pts", "ci", "reading"), rows, link="#/eval")
+    return _done(ui, lines, [pr.get("doc")], rid)
 
 
 def round_context(task_id: Any, round_id: Any, question: Any = None) -> str:
-    """One line on the round the user is looking at, for the system prompt (A14)."""
+    """One row on the round the user is looking at, for the system prompt (A14)."""
     rid = round_named(question, round_id)
-    rnd = next((r for r in _rounds() if r["id"] == rid), None)
+    rnd = _round_by_id(rid)
     if rnd is None:
         return ""
     held = set(held_runs())
     runs = [str(x.get("id")) for x in rnd.get("runs") or [] if x.get("id") not in held]
-    txt = f"Selected round: {rid} ({Say('en').name(rnd.get('title'))}); runs shown: {', '.join(runs) or '-'}"
+    kv: dict[str, Any] = {"id": rid, "title": Say("en").name(rnd.get("title")), "runs_shown": ", ".join(runs) or "-"}
     if set(rnd.get("withhold_eval") or []) & {x.get("id") for x in rnd.get("runs") or []}:
-        txt += "; the re-test result of the model after the round is not presented"
+        kv["after_round_retest"] = "not presented"
     rules = rnd.get("rules") or {}
     if rules:
-        txt += (f"; reading rules: whole task {round(100 * rules.get('whole_task', 0))}%, each level {round(100 * rules.get('per_level', 0))}%, "
-                f"placing {round(100 * rules.get('place', 0))}%, read at the CI lower bound")  # fmt: skip
-    if rnd.get("doc"):
-        txt += f"; doc {rnd['doc']}"
-    return txt + "."
+        kv |= {"whole_task_mark": f"{round(100 * rules.get('whole_task', 0))}%", "level_mark": f"{round(100 * rules.get('per_level', 0))}%",
+               "placing_mark": f"{round(100 * rules.get('place', 0))}%", "read_at": "CI lower bound"}  # fmt: skip
+    return _row("SELECTED_ROUND", **kv)
 
 
 # ------------------------------------------------------------------ egocentric
@@ -1141,6 +1282,7 @@ QA_REASON = {
 }
 
 
+
 def ego_summary(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     """The egocentric (human video) pipeline in numbers: clips in, exported, rejected, why."""
     say = Say(ctx.get("lang"))
@@ -1149,20 +1291,12 @@ def ego_summary(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         return fail("The index has no egocentric export summary (run: fw console index).")
     d, q = h.get("decisions") or {}, h.get("qa") or {}
     why = sorted((h.get("qa_reasons") or {}).items(), key=lambda kv: -kv[1])[:3]
-    wt = ", ".join(f"{QA_REASON.get(k, (k, k))[0 if say.vi else 1]} {v}" for k, v in why)
     lines = [
-        say("CÂU TRẢ LỜI THẲNG (mở đầu bằng câu này):", "DIRECT ANSWER (open with this sentence):"),
-        say(f"- Dây chuyền video người nhận {h.get('clips')} clip: xuất ra {d.get('exported')} episode, kiểm định loại {d.get('rejected_qa')} clip, để ngoài {d.get('excluded')} clip.",
-            f"- The human-video pipeline took in {h.get('clips')} clips: {d.get('exported')} episodes exported, {d.get('rejected_qa')} clips rejected by the checks, {d.get('excluded')} left out."),  # fmt: skip
-        say("SỐ LIỆU VÀ NHẬN XÉT LIÊN QUAN:", "RELATED NUMBERS AND READINGS:"),
-        say(f"- Kết quả kiểm định trên {h.get('clips')} clip: {q.get('pass')} đạt, {q.get('flag')} gắn cờ (vẫn dùng được, có ghi chú), {q.get('reject')} loại.",
-            f"- Check results on the {h.get('clips')} clips: {q.get('pass')} pass, {q.get('flag')} flagged (usable, with a note), {q.get('reject')} rejected."),  # fmt: skip
-        say(f"- Lý do bị gắn cờ hoặc loại nhiều nhất: {wt}.", f"- Most common reasons for a flag or a reject: {wt}."),
-        say(f"- Bản xuất dài {60 * (h.get('exported_hours') or 0):.0f} phút; {100 * (h.get('exported_hands_visible_ge_95') or 0):.0f}% số episode thấy tay trong hơn 95% số khung hình.",
-            f"- The export is {60 * (h.get('exported_hours') or 0):.0f} minutes long; {100 * (h.get('exported_hands_visible_ge_95') or 0):.0f}% of its episodes show the hands in over 95% of frames."),  # fmt: skip
-        say("- Phần lớn clip bị gắn cờ chứ không đạt hẳn, chủ yếu vì luật cắt đoạn không chắc lúc tay nắm và buông; đây là chỗ cần người duyệt hoặc model gợi ý ranh giới.",
-            "- Most clips are flagged rather than passed, mainly because the cutting rule is unsure when the hand grasps and releases; this is where a reviewer or a boundary-suggesting model is needed."),  # fmt: skip
-        say("CÁCH TRẢ LỜI: câu trả lời thẳng, rồi một hoặc hai câu nhận xét lấy từ các ý trên.", "HOW TO ANSWER: the direct answer, then one or two sentences of reading taken from the lines above."),
+        _row("EGO_PIPELINE", clips_in=h.get("clips"), exported_episodes=d.get("exported"), rejected_by_checks=d.get("rejected_qa"), left_out=d.get("excluded")),
+        _row("EGO_QA", clips=h.get("clips"), passed=q.get("pass"), flagged=q.get("flag"), rejected=q.get("reject"),
+             flagged_means=say("vẫn dùng được, có ghi chú", "usable, with a note")),  # fmt: skip
+        *(_row("EGO_QA_REASON", reason=QA_REASON.get(k, (k, k))[0 if say.vi else 1], clips=v) for k, v in why),
+        _row("EGO_EXPORT", minutes=f"{60 * (h.get('exported_hours') or 0):.0f}",
+             episodes_hands_visible_over_95_pct_frames=f"{100 * (h.get('exported_hands_visible_ge_95') or 0):.0f}" + (" %" if say.vi else "%")),  # fmt: skip
     ]
-    text = "\n".join(lines)
-    return result({"type": "text", "text": text}, text)
+    return _done({"type": "text", "text": "\n".join(lines)}, lines, [h.get("source")] if isinstance(h.get("source"), str) else [])

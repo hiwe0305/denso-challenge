@@ -33,15 +33,38 @@ def _two_rounds(idx: ConsolePaths, jig: bool = True) -> None:
                  "diff": -0.1, "ci": [-0.2167, 0.0167], "mcnemar_p": 0.146}],
         },
         "round": {"clusters": [{"id": "c1", "stage": "place", "n": 14, "diagnosis": "KỸ NĂNG YẾU 5/5"},
-                               {"id": "c6", "stage": "approach_a", "diagnosis": "ngưỡng bộ chấm", "intervention": "phiếu DA-37"}],
+                               {"id": "c4", "stage": "—", "diagnosis": "thiếu tín hiệu đo", "intervention": "phiếu DA-38", "historical": True, "closed": "2026-11-06"},
+                               {"id": "c6", "stage": "approach_a", "diagnosis": "ngưỡng bộ chấm", "intervention": "phiếu DA-37",
+                                "historical": True, "closed": None, "handled_by": "DA-42"}],
                   "chain": {"generated": 290, "recorded": 262, "quality": 204, "selected": 181}},
         "demo": {
             "ladder": {"standard_cm": "5", "runs": {"C_70": {"on_table_b": 50, "relaxed": {"7.5": 15}}}},
-            "diagnose": {"to_data": ["c1"], "tickets": {"DA-37": ["c6"]},
-                         "checks": [{"id": "H1", "value": {"clusters": ["c6"], "result": "unclear (scorer threshold)", "ticket": "DA-37"}}]},
+            "diagnose": {"to_data": ["c1"], "tickets": {"DA-38": ["c4"], "DA-37": ["c6"]},
+                         "checks": [{"id": "H1", "value": {"clusters": ["c6"], "result": "unclear (scorer threshold)", "ticket": "DA-37"},
+                                     "historical": True, "closed": None, "handled_by": "DA-42"}]},
             "round_cost": {"total_cu": 109.22, "total_usd": 10.91, "lines": [{"id": "train_1", "value": 8.55}]},
             "round1_reading": {"stop": {"value": {"stop": True}}},
         },
+        # the index keys of the answer-shape contract (fix-index, 28/11/2026)
+        "timeline": [
+            {"date": "25/11/2026", "story": "DA-46", "title": {"vi": "Bản cắt đoạn đặt", "en": "Placing-step cuts"},
+             "result": {"vi": "539 bản cắt", "en": "539 cuts"}, "doc": "docs/he/tray-jig.md §1", "round": "jig-r1"},
+            {"date": "26/11/2026", "story": "DA-48", "title": {"vi": "Train run M 100 000 bước", "en": "Train run M, 100,000 steps"},
+             "result": None, "doc": "docs/he/tray-jig.md §4", "round": "jig-r1"},
+            {"date": "28/11/2026", "story": "DA-50", "title": {"vi": "Run N", "en": "Run N"}, "result": None, "doc": "docs/he/tray-jig.md §6", "round": "jig-r1"},
+        ],
+        "latest": {"round": "jig-r1", "run": "M", "date": "26/11/2026"},
+        "next_steps": [
+            {"text": {"vi": "Train run đối chứng K: 498 episode đầy đủ trên cùng cảnh, không có bản cắt.",
+                      "en": "Train the control run K: 498 full episodes on the same scene, no cuts."},
+             "doc": "docs/he/tray-jig.md §1", "round": "jig-r1"},
+            {"text": {"vi": "Đóng phiếu DA-38 trước khi đặt đơn dữ liệu tiếp.", "en": "Close ticket DA-38 before the next data order."},
+             "doc": "docs/he/tray.md §20.11", "round": "r1", "historical": True, "closed": "2026-11-06"},
+            {"text": {"vi": "Sửa ngưỡng bộ chấm của phiếu DA-37.", "en": "Fix the scorer threshold of ticket DA-37."},
+             "doc": "docs/he/tray.md §20.11", "round": "r1", "historical": True, "closed": None, "handled_by": "DA-42"},
+            {"text": {"vi": "Đóng phiếu DA-37 trước vòng sau.", "en": "Close ticket DA-37 before the next round."},
+             "doc": "docs/he/tray.md §20.11", "round": "r1"},
+        ],
     }  # fmt: skip
     if jig:
         lv = lambda k, n, p, ci, f: {"n": n, "successes": k, "p": p, "ci": ci, "failures": f}  # noqa: E731
@@ -67,16 +90,19 @@ def _two_rounds(idx: ConsolePaths, jig: bool = True) -> None:
                                       {"run": "C70_R1", "n": 60, "successes": 4}]},
         }  # fmt: skip
     tasks = {
-        "tasks": [{"id": "tray", "name": {"vi": "Bê khay", "en": "Carry the tray"}, "rounds": ["r1", "jig-r1"]}],
+        "tasks": [{"id": "tray", "name": {"vi": "Bê khay", "en": "Carry the tray"}, "rounds": ["r1", "jig-r1"], "default_round": "jig-r1"}],
         "rounds": [
             {"id": "r1", "task": "tray", "number": 1, "title": {"vi": "Vòng 1", "en": "Round 1"}, "doc": "docs/he/tray.md §20",
              "baseline": "C_70", "after_round": "C70_R1", "withhold_eval": ["C70_R1"],
              "runs": [{"id": "C_ALL", "role": "control", "train_set": "ALL"}, {"id": "C_70", "role": "baseline", "train_set": "S70"},
                       {"id": "C70_R1", "role": "after_round", "train_set": "R181"}],
+             "links": {"prev": None, "next": {"round": "jig-r1", "run": "M", "successes": 136, "n": 180, "scene_differs": True, "scorer_differs": True}},
              "index": ["story.pair", "story.round", "story.demo"]},
             {"id": "jig-r1", "task": "tray", "number": 2, "scene": "jig2", "title": {"vi": "Vòng đồ gá: run M", "en": "Jig round: run M"},
              "doc": "docs/he/tray-jig.md §2, §5", "baseline": "M", "runs": [{"id": "M", "role": "baseline", "train_set": "M"}],
-             "rules": {"whole_task": 0.8, "per_level": 0.7, "place": 0.5}, "index": ["story.jig"]},
+             "rules": {"whole_task": 0.8, "per_level": 0.7, "place": 0.5}, "index": ["story.jig"],
+             "links": {"prev": {"round": "r1", "run": "C_70", "successes": 10, "n": 60, "carried": 50, "placed": 10,
+                                "scene_differs": True, "scorer_differs": True}, "next": None}},
         ],
     }  # fmt: skip
     (idx.index / "story.json").write_text(json.dumps(story), encoding="utf-8")
@@ -93,19 +119,22 @@ def test_jig_round_reads_story_jig_with_its_reading_rules(idx: ConsolePaths) -> 
     res = ask("Phân tích kết quả vòng này", "jig-r1")
     t = res["model"]
     assert res["ok"] and res["round"] == "jig-r1"
-    # W6 / W1: the rule-1 sentence, read at the CI lower bound
-    assert "cả task 75,6 % (136/180 lượt thành công), CI 70,0–81,1: chưa đạt mốc 80 %" in t
-    assert "Mức 1: 85,6 % (77/90), CI 78,9–92,2, đạt mốc 70 %." in t
-    assert "Mức 2: 65,6 % (59/90), CI 55,6–75,6, chưa đạt mốc 70 %." in t
-    assert "chưa có CI nên chưa đọc theo mốc 50 %" in t  # no CI of the placing step in the index
-    # rule 4 and rule 5, the limits, and the descriptive Wilson interval
-    assert "M 47/60" in t and "chỉ đặt cạnh nhau" in t and "C_70 10/60" in t
-    assert "luật 5" in t and "một seed train" in t and "chỉ để mô tả" in t
+    assert t.splitlines()[0].startswith("ROUND | id=jig-r1 | title=Bê khay, Vòng đồ gá: run M | task=tray | scene=jig2 | scorer=bản 2 | run=M")
+    # W6 / W1: the whole-task reading, at the CI lower bound
+    assert "RESULT | run=M | scope=cả task | successes=136 | n=180 | rate=75,6 % | ci=70,0–81,1 | mark=80 % | verdict=chưa đạt | read_at=cận dưới CI" in t
+    assert "LEVEL | run=M | level=1 | successes=77 | n=90 | rate=85,6 % | ci=78,9–92,2 | mark=70 % | verdict=đạt" in t
+    assert "LEVEL | run=M | level=2 | successes=59 | n=90 | rate=65,6 % | ci=55,6–75,6 | mark=70 % | verdict=chưa đạt" in t
+    assert "PLACE_STEP | run=M | passed=161 | n=180 | rate=89,4 % | mark=50 % | verdict=chưa đọc: chưa có CI" in t  # no CI of the placing step
+    # side by side only, the limits, and the descriptive Wilson interval
+    assert "on_60_rollouts=47/60" in t and "SIDE_BY_SIDE | run=C_70 | round=r1 | scene=không đồ gá | scorer=bản 1 | successes=10 | n=60 | rate=16,7 %" in t
+    assert "LIMITS | comparable=no | with_round=r1 | why=khác cảnh, tập eval, bộ chấm" in t
+    assert "control_run=" in t and "train_seeds=1" in t and "use=chỉ mô tả" in t
+    assert res["sources"] == ["docs/he/tray-jig.md §2, §5"]
     # never the pair round's facts, and never the held run's figure from the 60-rollout table
-    for other in ("109", "290", "DA-37", "C70_R1", "4/60", "vòng dừng"):
+    for other in ("109", "290", "DA-37", "C70_R1", "successes=4 ", "DECISION"):
         assert other not in t, other
     en = ask("Analyse this round", "jig-r1", "en")["model"]
-    assert "whole task 75.6% (136/180 successful runs), CI 70.0–81.1: below the 80% mark" in en
+    assert "RESULT | run=M | scope=whole task | successes=136 | n=180 | rate=75.6% | ci=70.0–81.1 | mark=80% | verdict=not met" in en
 
 
 def test_a_round_without_its_numbers_fails_instead_of_borrowing(idx: ConsolePaths) -> None:
@@ -137,20 +166,20 @@ def test_the_question_picks_the_round(idx: ConsolePaths) -> None:
 def test_pair_round_wording_and_held_runs_on_every_round(idx: ConsolePaths) -> None:
     _two_rounds(idx)
     t = ask("bản nào tốt nhất?", "r1")["model"]
-    assert "Bản gốc C_70 có số lượt thành công cao nhất, 10/60, nhưng khoảng tin cậy của hai bản chồng nhau" in t
-    assert "tốt nhất" not in t and "4/60" not in t
+    assert "READING | highest=C_70 | highest_successes=10 | n=60 | intervals_overlap=yes | decisive_comparisons=0 trên 1" in t
+    assert "tốt nhất" not in t and "successes=4 " not in t and "C70_R1" not in t
     allr = ask("Phân tích kết quả vòng này", "r1")["model"]
-    assert "290 lượt sinh, 262 ghi được, 204 qua bộ lọc, chọn 181" in allr
-    assert "vòng dừng" not in allr  # read from the held result: never shown (A11)
-    # W5 is not a point of an answer nobody asked for; only the rule line names it, for when asked
-    assert "- Kết quả thi lại của lượt này không trình bày ở bản demo." not in allr
-    assert "Chỉ khi được hỏi thì viết đúng câu: Kết quả thi lại của lượt này không trình bày ở bản demo." in allr
+    assert "DATA_ORDER | generated_runs=290 | recorded=262 | passed_filter=204 | selected=181" in allr
+    assert "DECISION" not in allr  # read from the held result: never shown (A11)
+    # W5 is not a point of an answer nobody asked for, and no rule line names it either
+    assert tools_round.WITHHELD[0] not in allr and "C70_R1" not in allr
     cost = ask("Chi phí của vòng", "r1")["model"]
-    assert "Train và serve của vòng: 109,22 CU thực đo" in cost and "chưa có trong index" in cost
+    assert "COST | scope=train và serve | total_cu=109,22 | kind=thực đo | usd=10,91" in cost and "missing=chưa có trong index" in cost
     cmp_ = ask("khoảng tin cậy của các phép so sánh", "r1", tool="pair_comparisons")
-    assert cmp_["round"] == "r1" and "C70_R1" not in cmp_["model"] and "CI chứa 0" in cmp_["model"]
+    assert cmp_["round"] == "r1" and "C70_R1" not in cmp_["model"] and "reading=CI chứa 0: chưa phân biệt được" in cmp_["model"]
+    assert "COMPARISON | tag=g | variant=C_70 | baseline=C_ALL | variant_successes=10 | baseline_successes=5 | n=60 | diff_pts=+8,3 | ci_pts=-1,7 → +18,3 | mcnemar_p=0,227" in cmp_["model"]
     on_jig = ask("khoảng tin cậy", "jig-r1", tool="pair_comparisons")
-    assert on_jig["round"] == "r1" and "không phải vòng đang chọn" in on_jig["model"]
+    assert on_jig["round"] == "r1" and "SCOPE | selected_round=jig-r1 | paired_comparisons=không có (một run) | rows_below=vòng r1" in on_jig["model"]
 
 
 def test_offered_figure_about_a_held_run_gets_the_fixed_sentence(idx: ConsolePaths) -> None:
@@ -167,8 +196,12 @@ def test_offered_figure_about_a_held_run_gets_the_fixed_sentence(idx: ConsolePat
 def test_round_diagnosis_reads_story_diag_and_says_what_is_missing(idx: ConsolePaths) -> None:
     _two_rounds(idx)
     t = ask("Lỗi hệ thống nào đã loại trừ?", "r1", tool="round_diagnosis")["model"]
-    assert "c1: bước đặt, 14 lượt" in t and "H1 (c6): CHƯA RÕ (ngưỡng bộ chấm), thành phiếu DA-37" in t
-    assert "Chi phí sinh và QA dữ liệu: chưa có trong index" in t
+    assert "CLUSTER | id=c1 | step=đặt | runs=14 | diagnosis=KỸ NĂNG YẾU 5/5 | goes_to=nhận dữ liệu" in t
+    assert "CHECK | id=H1 | groups=c6 | result=CHƯA RÕ (ngưỡng bộ chấm) | ticket=DA-37 | ticket_state=đã xử lý ở DA-42" in t
+    # closed work (DA-38, 6/11) and work handled later (DA-37 by DA-42) are marked, never left as open tickets
+    assert "CLUSTER | id=c4 | step=không gắn bước | diagnosis=thiếu tín hiệu đo | goes_to=phiếu DA-38 | ticket_state=đã đóng 2026-11-06" in t
+    assert "CLUSTER | id=c6 | step=tới bàn A | diagnosis=ngưỡng bộ chấm | goes_to=phiếu DA-37 | ticket_state=đã xử lý ở DA-42" in t
+    assert "COST | part=sinh và QA dữ liệu | missing=chưa có trong index" in t
     p = idx.index / "story.json"
     s = json.loads(p.read_text(encoding="utf-8"))
     # the shape of PR #258 (docs/console/api-contract.md §2.2, docs/console/api-samples/data_story.json)
@@ -184,13 +217,16 @@ def test_round_diagnosis_reads_story_diag_and_says_what_is_missing(idx: ConsoleP
                         "qa": {"hours": 0.67, "qa_pass": 261, "quality": 204}, "selected": 181, "source": ["docs/he/tray.md §20.16"]},
     }  # fmt: skip
     p.write_text(json.dumps(s), encoding="utf-8")
-    t = ask("Lỗi hệ thống nào đã loại trừ?", "r1", tool="round_diagnosis")["model"]
-    assert "c1: bước đặt, 14 lượt; chẩn đoán KỸ NĂNG YẾU 5/5; nhận dữ liệu" in t
-    assert "c6:" in t and "thành phiếu DA-37" in t and "chuỗi bước gãy ở approach_a" in t
-    assert "0 CU trên rtx3060, sinh 1,16 giờ, QA 0,67 giờ" in t and "§20.16 (seed/cited.yaml)" in t
-    assert "Thu dữ liệu 0 CU (sinh và QA trên rtx3060" in ask("chi phí", "r1")["model"]
+    res = ask("Lỗi hệ thống nào đã loại trừ?", "r1", tool="round_diagnosis")
+    t = res["model"]
+    assert "CLUSTER | id=c1 | step=đặt | failure=Đặt lệch | level=1 | runs=14 | diagnosis=KỸ NĂNG YẾU 5/5 | goes_to=nhận dữ liệu" in t
+    assert "CLUSTER | id=c6 | step=tới bàn A | failure=approach | level=1 | runs=6 | diagnosis=ngưỡng bộ chấm | goes_to=phiếu DA-37" in t
+    assert "CHECK | id=H1 | groups=c6 | claim=chuỗi bước gãy ở approach_a | result=CHƯA RÕ (ngưỡng bộ chấm) | ticket=DA-37" in t
+    assert "COST | part=sinh và QA dữ liệu | cu=0 | host=rtx3060 | gen_hours=1,16 | qa_hours=0,67" in t
+    assert res["sources"][0] == "docs/he/tray.md §20.2, §20.11, §20.16 (seed/cited.yaml)" and "docs/he/tray.md §20.11" in res["sources"]
+    assert "COST | part=sinh và QA dữ liệu | cu=0 | host=rtx3060" in ask("chi phí", "r1")["model"]
     jig = ask("chẩn đoán", "jig-r1", tool="round_diagnosis")["model"]
-    assert "chưa có bước 4" in jig
+    assert "DIAGNOSIS | system_checks=chưa có ở vòng này | groups_c1_c8=thuộc vòng r1" in jig
 
 
 # ------------------------------------------------------------------ A5: the guard
@@ -339,16 +375,16 @@ def test_deep_analysis_always_starts_from_the_round_report(idx: ConsolePaths, mo
     tr = llm.get_trace(evs[-1][1]["turn_id"])
     assert tr is not None
     text = next(n["model_text"] for n in tr["nodes"] if n.get("name") == "round_report")
-    assert "chưa đạt mốc 80 %" in text and "L-PLACE-POSE" in text
+    assert "mark=80 % | verdict=chưa đạt" in text and "Đặt lệch=28" in text and "L-PLACE-POSE" not in text
 
 
 def test_round_context_goes_into_the_system_prompt(idx: ConsolePaths) -> None:
     _two_rounds(idx)
     msgs, _ = llm.build_messages(_body("Nhận xét vòng này", "jig-r1"), _body("x", "jig-r1")["context"])
     sys = msgs[0]["content"]
-    assert "Selected round: jig-r1" in sys and "80%" in sys and "Name the round once at the start and the run next to each number" in sys
+    assert "SELECTED_ROUND | id=jig-r1 | title=Jig round: run M | runs_shown=M | whole_task_mark=80% | level_mark=70% | placing_mark=50%" in sys
     msgs, _ = llm.build_messages(_body("x", "r1"), _body("x", "r1")["context"])
-    assert "C70_R1" not in msgs[0]["content"] and "not presented" in msgs[0]["content"]
+    assert "C70_R1" not in msgs[0]["content"] and "after_round_retest=not presented" in msgs[0]["content"]
 
 
 # ------------------------------------------------------------------ A8, A12
@@ -418,7 +454,7 @@ def test_a_question_naming_several_rounds_keeps_the_round_that_covers_its_runs(i
     assert tools_round.round_named("Chi phí vòng 1 bao nhiêu?", "jig-r1") == "r1"
     assert tools_round.round_named("Phân tích vòng jig-r1", "r1") == "jig-r1"  # "r1" inside "jig-r1" is not round r1
     t = ask(q, "jig-r1")
-    assert t["round"] == "jig-r1" and "cả task 75,6 %" in t["model"] and "chỉ đặt cạnh nhau" in t["model"]
+    assert t["round"] == "jig-r1" and "scope=cả task | successes=136 | n=180 | rate=75,6 %" in t["model"] and "LIMITS | comparable=no" in t["model"]
 
 
 def test_the_60_rollout_table_is_shown_with_the_verdict(idx: ConsolePaths) -> None:
@@ -427,9 +463,10 @@ def test_the_60_rollout_table_is_shown_with_the_verdict(idx: ConsolePaths) -> No
     assert not tools_round.asks_held(q)
     assert tools_round.focuses_of(q)[:2] == ["verdict", "compare"]
     t = ask(q, "jig-r1")["model"]
-    assert "chưa đạt mốc 80 %" in t  # the verdict leads
-    assert "M 47/60" in t and "C_70 10/60" in t and "chỉ đặt cạnh nhau" in t  # and the table follows
-    assert "C70_R1" not in t and "4/60" not in t and WITHHELD_VI not in t
+    assert t.splitlines()[1].startswith("RESULT | run=M") and "mark=80 % | verdict=chưa đạt" in t.splitlines()[1]  # the verdict leads
+    assert t.index("RESULT |") < t.index("SIDE_BY_SIDE |")  # and the table follows
+    assert "on_60_rollouts=47/60" in t and "SIDE_BY_SIDE | run=C_70 | round=r1" in t and "LIMITS | comparable=no" in t
+    assert "C70_R1" not in t and "successes=4 " not in t and WITHHELD_VI not in t
 
 
 WITHHELD_VI = tools_round.WITHHELD[0]
@@ -493,11 +530,11 @@ def test_the_rule_verdicts_are_quoted_from_the_index_never_recomputed(idx: Conso
     ev["readings"][1]["verdict"] = "not_met"  # whatever the CI, the chat says what the index says
     _edit_story(idx, jig=s["jig"])
     t = ask("M có đạt mốc 80% không?", "jig-r1")["model"]
-    assert "lượt qua bước đặt), CI 50,0–60,0, đạt mốc 50 %" in t
-    assert "Mức 1: 85,6 % (77/90), CI 78,9–92,2, chưa đạt mốc 70 %" in t
+    assert "PLACE_STEP | run=M | passed=161 | n=180 | rate=89,4 % | ci=50,0–60,0 | mark=50 % | verdict=đạt" in t
+    assert "LEVEL | run=M | level=1 | successes=77 | n=90 | rate=85,6 % | ci=78,9–92,2 | mark=70 % | verdict=chưa đạt" in t
     ev.pop("readings")
     _edit_story(idx, jig=s["jig"])
-    assert "index chưa ghi kết quả đọc theo mốc 80 %" in ask("M có đạt mốc 80% không?", "jig-r1")["model"]
+    assert "mark=80 % | verdict=index chưa ghi kết quả đọc" in ask("M có đạt mốc 80% không?", "jig-r1")["model"]
 
 
 def test_the_jig_cost_names_each_part_measured_or_estimated(idx: ConsolePaths) -> None:
@@ -510,12 +547,12 @@ def test_the_jig_cost_names_each_part_measured_or_estimated(idx: ConsolePaths) -
     }  # fmt: skip
     _edit_story(idx, jig=s["jig"])
     t = ask("Chi phí vòng đồ gá bao nhiêu?", "jig-r1")["model"]
-    assert "Chi phí của vòng: 62,95 CU thực đo, gồm train 56,15 CU (thực đo, DA-48) và eval 6,8 CU (thực đo, DA-47)." in t
+    assert "COST | scope=cả vòng | total_cu=62,95 | kind=thực đo\nCOST | part=train | cu=56,15 | kind=thực đo | story=DA-48\nCOST | part=eval | cu=6,8 | kind=thực đo | story=DA-47" in t
     s["jig"]["cost"]["eval"]["measure_kind"] = "estimated"
     _edit_story(idx, jig=s["jig"])
     en = ask("What did the jig round cost?", "jig-r1", "en")["model"]
-    assert "Cost of the round: 62.95 CU, made of training 56.15 CU (measured, DA-48) and evaluation 6.8 CU (estimated, DA-47)." in en
-    assert "CU ." not in t + en
+    assert "COST | scope=whole round | total_cu=62.95\nCOST | part=training | cu=56.15 | kind=measured | story=DA-48\nCOST | part=evaluation | cu=6.8 | kind=estimated | story=DA-47" in en
+    assert "cu=6,80" not in t and "cu=6.80" not in en
 
 
 def test_an_english_diagnosis_reads_the_english_seed_values(idx: ConsolePaths) -> None:
@@ -530,11 +567,11 @@ def test_an_english_diagnosis_reads_the_english_seed_values(idx: ConsolePaths) -
     }  # fmt: skip
     _edit_story(idx, diag=diag)
     en = ask("Which system issues were ruled out?", "r1", "en", tool="round_diagnosis")["model"]
-    assert "diagnosis WEAK SKILL 5/5" in en and "H1 (c6; the step chain breaks at approach_a): UNCLEAR (scorer threshold), ticket DA-37" in en
+    assert "diagnosis=WEAK SKILL 5/5" in en and "CHECK | id=H1 | groups=c6 | claim=the step chain breaks at approach_a | result=UNCLEAR (scorer threshold) | ticket=DA-37" in en
     assert "KỸ NĂNG" not in en and "CHƯA RÕ" not in en and "chuỗi bước" not in en
-    assert "c3: step" in en and "diagnosis lỗi của policy" in en  # no English value yet: the Vietnamese one
+    assert "CLUSTER | id=c3 | step=reach table A" in en and "diagnosis=lỗi của policy" in en  # no English value yet: the Vietnamese one
     vi = ask("Lỗi hệ thống nào đã loại trừ?", "r1", tool="round_diagnosis")["model"]
-    assert "chẩn đoán KỸ NĂNG YẾU 5/5" in vi and "CHƯA RÕ (ngưỡng bộ chấm)" in vi and "WEAK" not in vi
+    assert "diagnosis=KỸ NĂNG YẾU 5/5" in vi and "result=CHƯA RÕ (ngưỡng bộ chấm)" in vi and "WEAK" not in vi
     assert tools_round.RESULT_VI["pass"] == "qua"
 
 
@@ -598,7 +635,7 @@ def test_a_round_run_asked_why_it_fails_reads_the_round_and_its_diagnosis_never_
     tools, msgs = _turn_tools(monkeypatch, q)
     assert tools == ["round_report", "round_diagnosis"]
     given = "\n".join(str(m.get("content")) for m in msgs if m.get("role") == "tool")
-    assert "50/60" in given and "10/60" in given and "c1" in given  # the run's own numbers and the diagnosis
+    assert "carried_to_table_b=50" in given and "placed=10" in given and "id=c1" in given  # the run's own numbers and the diagnosis
     assert "147" not in given and "68" not in given  # never the eval of policy C at 40k
     # the earlier eval, when a page asks for it, is labelled as before the round, not C_70's own
     fails = registry.call("eval_failures", {}, {"lang": "vi"})["model"]
@@ -612,12 +649,15 @@ def test_two_rounds_named_are_placed_side_by_side_with_the_w6_sentence(idx: Cons
     res = registry.call("rounds_side_by_side", {}, {"task": "tray", "round": "r1", "lang": "vi", "question": q})
     t = res["model"]
     assert res["ok"] and res["round"] == "r1" and res["rounds"] == ["r1", "jig-r1"]
-    assert t.startswith("CÂU TRẢ LỜI THẲNG (mở đầu bằng câu này): " + tools_round.SIDE_BY_SIDE[0])
-    assert "VÒNG r1" in t and "VÒNG jig-r1" in t and "10/60" in t and "136/180" in t
-    assert t.index("VÒNG r1") < t.index("VÒNG jig-r1")  # the selected round first
-    assert t.count("CÂU TRẢ LỜI THẲNG") == 1 and "4/60" not in t  # one direct answer; no held figure
+    # W6 as data: the rounds are not comparable, and why
+    assert t.startswith("SIDE_BY_SIDE | rounds=r1, jig-r1 | comparable=no | why=khác cảnh, tập eval, bộ chấm\n")
+    assert "ROUND | id=r1" in t and "ROUND | id=jig-r1" in t and "run=C_70 | role=bản gốc | train_set=S70 | successes=10 | n=60" in t and "successes=136 | n=180" in t
+    assert t.index("ROUND | id=r1") < t.index("ROUND | id=jig-r1")  # the selected round first
+    assert t.count("SIDE_BY_SIDE | rounds=") == 1 and "C70_R1" not in t and "successes=4 " not in t  # no held figure
+    assert "OPTION" not in t and "NEXT_ROUND" not in t
+    assert res["sources"] == ["docs/he/tray.md §20", "docs/he/tray-jig.md §2, §5"]
     en = registry.call("rounds_side_by_side", {}, {"task": "tray", "round": "jig-r1", "lang": "en", "question": "Round 1 vs the jig round?"})
-    assert en["rounds"] == ["jig-r1", "r1"] and tools_round.SIDE_BY_SIDE[1] in en["model"]
+    assert en["rounds"] == ["jig-r1", "r1"] and en["model"].startswith("SIDE_BY_SIDE | rounds=jig-r1, r1 | comparable=no | why=different scene, eval set, scorer")
     tools, _ = _turn_tools(monkeypatch, q)
     assert tools == ["rounds_side_by_side"]
 
@@ -665,17 +705,16 @@ def test_a_hidden_run_or_story_gets_the_scoped_sentence_neither_confirmed_nor_de
 def test_the_round_report_names_the_baseline_run_and_says_w5_only_when_asked(idx: ConsolePaths) -> None:
     _two_rounds(idx)
     why = ask("Vì sao run C_70 hỏng nhiều ở bước đặt?", "r1")["model"]
-    assert "C_70 (bản gốc của vòng)" in why and "lượt hỏng của C_70" in why
-    assert "lượt hỏng của bản gốc" not in why
+    assert "MOST_COMMON_FAILURE | run=C_70 | role=bản gốc | failure=Đặt lệch | count=30 | of_failed=50 | then=Khay nghiêng 9" in why
     en = ask("Why does C_70 fail so often at placing?", "r1", "en")["model"]
-    assert "C_70 (the round's baseline)" in en
+    assert "MOST_COMMON_FAILURE | run=C_70 | role=the baseline | failure=Misplaced | count=30 | of_failed=50" in en
     diag = ask("Vì sao C_70 hỏng?", "r1", tool="round_diagnosis")["model"]
-    assert "Cụm lỗi của C_70 (bản gốc của vòng)" in diag
+    assert "DIAGNOSIS | run=C_70 | role=bản gốc | groups=3" in diag
     for q in ("Phân tích kết quả vòng này", "Vì sao run C_70 hỏng nhiều ở bước đặt?", "Nên làm gì tiếp?"):
         t = ask(q, "r1")["model"]
-        assert "- " + tools_round.WITHHELD[0] not in t, q  # not a point of an answer nobody asked for
+        assert tools_round.WITHHELD[0] not in t and "C70_R1" not in t, q  # not a point of an answer nobody asked for
     side = registry.call("rounds_side_by_side", {}, {"task": "tray", "round": "r1", "lang": "vi", "question": "Vòng 1 so với vòng đồ gá?"})["model"]
-    assert "- " + tools_round.WITHHELD[0] not in side
+    assert tools_round.WITHHELD[0] not in side and "C70_R1" not in side
     held = ask("Kết quả thi lại của C70_R1 thế nào?", "r1")
     assert held["answer"] == tools_round.WITHHELD[0]  # asked: the sentence, as it stands
 
@@ -711,26 +750,40 @@ def test_an_answer_streaming_past_the_turn_cap_is_not_cut(idx: ConsolePaths, mon
 def test_each_level_is_its_own_sentence_with_its_own_verdict(idx: ConsolePaths) -> None:
     _two_rounds(idx)
     t = ask("Mức 1 và mức 2 có đạt mốc 70% không?", "jig-r1")["model"]
-    line = next(ln for ln in t.splitlines() if "luật 2" in ln)
-    assert line == "- Từng mức (luật 2): Mức 1: 85,6 % (77/90), CI 78,9–92,2, đạt mốc 70 %. Mức 2: 65,6 % (59/90), CI 55,6–75,6, chưa đạt mốc 70 %."
-    assert "Mức 1: 85,6 % (77/90), CI 78,9–92,2, đạt mốc 70 %. Mức 2: 65,6 % (59/90), CI 55,6–75,6, chưa đạt mốc 70 %." in line
+    levels = [ln for ln in t.splitlines() if ln.startswith("LEVEL |")]
+    assert levels == ["LEVEL | run=M | level=1 | successes=77 | n=90 | rate=85,6 % | ci=78,9–92,2 | mark=70 % | verdict=đạt",
+                      "LEVEL | run=M | level=2 | successes=59 | n=90 | rate=65,6 % | ci=55,6–75,6 | mark=70 % | verdict=chưa đạt"]  # fmt: skip
     en = ask("Do levels 1 and 2 meet the 70% mark?", "jig-r1", "en")["model"]
-    assert "Level 1: 85.6% (77/90), CI 78.9–92.2, meets the 70% mark. Level 2: 65.6% (59/90), CI 55.6–75.6, below the 70% mark." in en
+    assert "LEVEL | run=M | level=1 | successes=77 | n=90 | rate=85.6% | ci=78.9–92.2 | mark=70% | verdict=met\nLEVEL | run=M | level=2 | successes=59 | n=90 | rate=65.6% | ci=55.6–75.6 | mark=70% | verdict=not met" in en
     side = registry.call("rounds_side_by_side", {}, {"task": "tray", "round": "r1", "lang": "vi", "question": "Vòng 1 so với vòng đồ gá?"})["model"]
-    assert "Mức 1: 85,6 % (77/90), CI 78,9–92,2, đạt mốc 70 %." in side
-    # the closing instructions reach the model: no next-step options, no cut at the text cap
-    assert "[truncated]" not in side and "PHƯƠNG ÁN BƯỚC TIẾP" not in side and side.rstrip().endswith("giữ số của mỗi vòng dưới tên vòng đó.")
+    assert levels[0] in side
+    # no next-step options, no cut at the text cap
+    assert "[truncated]" not in side and "OPTION" not in side
     assert "never one verdict after two levels" in llm.SYSTEM and "never write that one is better" in llm.SYSTEM
 
 
-# Labelled lines are instructions to the model (it is told not to copy upper-case headings); every
-# other line is a fact the model may copy word for word, so it must hold no instruction (Website,
-# 28/11/2026: "giữ kết luận của mỗi mức…" and "không viết vòng nào tốt hơn…" reached the answer).
-_LABELS = ("CÁCH TRẢ LỜI", "HOW TO ANSWER", "QUY TẮC", "RULE:", "ĐÃ LÀM RỒI", "ALREADY DONE", "NOTE:",
-           "PHƯƠNG ÁN", "OPTIONS FOR", "SỐ LIỆU VÀ NHẬN XÉT", "RELATED NUMBERS")  # fmt: skip
-_HEADS = re.compile(r"^(CÂU TRẢ LỜI THẲNG|DIRECT ANSWER|Ý CHÍNH CỦA VÒNG NÀY|KEY POINT OF THIS ROUND)[^:]*:\s*")
+# Every line of a tool's model text is data the model may copy (Website, 28/11/2026: "giữ kết luận
+# của mỗi mức…" and "không viết vòng nào tốt hơn…" reached the answer). No line holds an instruction,
+# a rule number, a failure label code or a source line (answer-shape design, 28/11/2026).
+_LABELS = ("CÁCH TRẢ LỜI", "HOW TO ANSWER", "QUY TẮC", "RULE:", "ĐÃ LÀM RỒI", "ALREADY DONE", "NOTE:", "PHƯƠNG ÁN",
+           "OPTIONS FOR", "SỐ LIỆU VÀ NHẬN XÉT", "RELATED NUMBERS", "CÂU TRẢ LỜI THẲNG", "DIRECT ANSWER",
+           "Ý CHÍNH CỦA VÒNG NÀY", "KEY POINT OF THIS ROUND", "mở đầu bằng câu này")  # fmt: skip
 _INSTRUCTION = re.compile(r"giữ kết luận|keep each|không viết|never write|không nói|never say|never '|đừng|\bdo not\b|don't|"
                           r"mở đầu bằng|open with|trả lời đúng|answer (only|with)", re.I)  # fmt: skip
+_FORBIDDEN = [re.compile(r"\bluật \d|\brule \d", re.I), re.compile(r"\bL-[A-Z]"), re.compile(r"Nguồn:|Source:")]
+_ROW = re.compile(r"^[A-Z][A-Z0-9_]*( \| [^|=]+=[^|]*)*$")
+
+
+def _assert_data_only(text: str, where: Any) -> int:
+    n = 0
+    for ln in str(text).splitlines():
+        if not ln.strip():
+            continue
+        n += 1
+        assert not any(lab in ln for lab in _LABELS), (where, ln)
+        assert not _INSTRUCTION.search(ln), (where, ln)
+        assert not any(rx.search(ln) for rx in _FORBIDDEN), (where, ln)
+    return n
 
 
 def test_no_fact_line_of_a_tool_holds_an_instruction(idx: ConsolePaths) -> None:
@@ -738,21 +791,25 @@ def test_no_fact_line_of_a_tool_holds_an_instruction(idx: ConsolePaths) -> None:
     qs = ["Phân tích kết quả vòng này", "Run M đạt mốc ở những mức nào?", "Vì sao run C_70 hỏng nhiều ở bước đặt?",
           "Nên làm gì tiếp?", "Chi phí của vòng?", "So sánh các bản model", "Vòng 1 so với vòng đồ gá khác nhau thế nào?",
           "đặt cạnh bảng 60 rollout", "Chẩn đoán ra những nhóm lỗi nào?", "Which run is the best, and why?",
-          "Run nào tốt nhất, vì sao?", "Which run is the best by loss?"]  # fmt: skip
+          "Run nào tốt nhất, vì sao?", "Which run is the best by loss?", "Giờ tôi nên làm gì để cải thiện kết quả này",
+          "Thống kê các toàn bộ loại lỗi cho tôi xem nào?", "What should we do next?", "Kết quả thi lại của C70_R1 thế nào?"]  # fmt: skip
     seen = 0
     for tool in ("round_report", "round_diagnosis", "pair_comparisons", "rounds_side_by_side"):
         for rnd in ("r1", "jig-r1"):
             for lang in ("vi", "en"):
                 for q in qs:
                     res = registry.call(tool, {}, {"task": "tray", "round": rnd, "lang": lang, "question": q})
-                    for ln in str(res["model"]).splitlines():
-                        fact = _HEADS.sub("", ln)
-                        if fact and not fact.startswith(_LABELS):
-                            seen += 1
-                            assert not _INSTRUCTION.search(fact), (tool, rnd, lang, q, fact)
-    assert seen > 200
-    side = registry.call("rounds_side_by_side", {}, {"task": "tray", "round": "r1", "lang": "vi", "question": "Vòng 1 so với vòng đồ gá?"})["model"]
-    assert "Hai vòng khác cảnh, tập eval, bộ chấm và số bước, nên chỉ đặt cạnh nhau, không so như một kết quả." in side
+                    assert res["ok"], (tool, rnd, lang, q, res["model"])
+                    seen += _assert_data_only(res["model"], (tool, rnd, lang, q))
+                    # every line is a labelled row; the doc references go apart
+                    assert all(_ROW.match(ln) for ln in res["model"].splitlines() if ln), (tool, rnd, lang, q, res["model"])
+                    assert isinstance(res.get("sources"), list), (tool, q)
+                    if "C70_R1" not in q:
+                        assert "C70_R1" not in res["model"] and "DA-50" not in res["model"], (tool, rnd, q)
+                    ctx_line = tools_round.round_context("tray", rnd, q)
+                    seen += _assert_data_only(ctx_line, ("round_context", rnd, q))
+                    assert _ROW.match(ctx_line), ctx_line
+    assert seen > 1000
 
 
 # ------------------------------------------------------------------ "which run is best" (Website, 28/11)
@@ -776,27 +833,89 @@ def test_best_on_the_pair_round_gives_the_highest_count_and_no_winner(idx: Conso
     _two_rounds(idx)
     for lang in ("vi", "en"):
         t = ask(BEST_QS[0 if lang == "en" else 1], "r1", lang)["model"]
-        direct = t.splitlines()[t.splitlines().index(next(ln for ln in t.splitlines() if ln.startswith(("CÂU TRẢ LỜI THẲNG", "DIRECT ANSWER")))) + 1]
-        if lang == "vi":
-            assert "C_70 có số lượt thành công cao nhất, 10/60, nhưng khoảng tin cậy của hai bản chồng nhau, nên chưa phân biệt được" in direct
-            assert "tốt nhất" not in t
-        else:
-            assert "C_70 has the most successful runs, 10/60, but the intervals of the 2 models overlap" in direct
-        assert "C70_R1" not in t and "4/60" not in t  # never in a ranking, not mentioned unasked
-        assert "da34-" not in t  # labels, not session ids
+        lines = t.splitlines()
+        # the results of the presented runs, highest first, then the reading: no winner when the
+        # intervals overlap and no comparison fixed in advance is decisive (W3)
+        assert lines[1].startswith("RESULT | run=C_70 | role=" + ("bản gốc" if lang == "vi" else "the baseline") + " | train_set=S70 | successes=10 | n=60")
+        assert lines[2].startswith("RESULT | run=C_ALL")
+        assert lines[3] == "READING | highest=C_70 | highest_successes=10 | n=60 | intervals_overlap=yes | decisive_comparisons=" + ("0 trên 1" if lang == "vi" else "0 of 1")
+        assert "tốt nhất" not in t and "best" not in t
+        assert "C70_R1" not in t and "successes=4 " not in t  # never in a ranking, not mentioned unasked
+        assert "da34-" not in t and "c-70" not in t  # labels, not session ids
     loss = ask("Which run is the best by loss?", "r1", "en")["model"]
-    assert "- Training loss is not a measure of the result: a run's result is its number of successful test runs." in loss
+    assert "READING | result_measure=successful test runs | training_loss=not a measure of the result" in loss
 
 
-def test_best_on_the_jig_round_has_nothing_to_rank_and_gives_the_rule_readings(idx: ConsolePaths) -> None:
+def test_best_on_the_jig_round_is_sample_b(idx: ConsolePaths) -> None:
+    """Sample B of the audit (05-danh-gia-chat-2811.md): the result of run M, the runs of the
+    earlier round side by side with their scene and scorer, where M comes from, the limits."""
     _two_rounds(idx)
-    t = ask("Run nào tốt nhất, vì sao?", "jig-r1")["model"]
-    lines = t.splitlines()
-    assert lines[lines.index("CÂU TRẢ LỜI THẲNG (mở đầu bằng câu này):") + 1].startswith("- Run M là run duy nhất của vòng này trên cảnh jig2 với bộ chấm bản 2, nên trong vòng không có run nào để xếp hạng")
-    assert "cả task 75,6 % (136/180 lượt thành công), CI 70,0–81,1: chưa đạt mốc 80 %" in t
-    assert "Mức 1: 85,6 % (77/90), CI 78,9–92,2, đạt mốc 70 %. Mức 2: 65,6 % (59/90), CI 55,6–75,6, chưa đạt mốc 70 %." in t
-    assert "Bước đặt (luật 3)" in t and "nên chỉ đặt cạnh nhau" in t
-    assert "C70_R1" not in t and "4/60" not in t and "tốt nhất" not in t
+    res = ask("Run nào tốt nhất, vì sao?", "jig-r1")
+    t = res["model"]
+    assert t.splitlines() == [
+        "ROUND | id=jig-r1 | title=Bê khay, Vòng đồ gá: run M | task=tray | scene=jig2 | scorer=bản 2 | run=M | checkpoint=100000 | n=180 | conditions=60 | repeats=3 | unit=điều kiện",
+        "RESULT | run=M | scope=cả task | successes=136 | n=180 | rate=75,6 % | ci=70,0–81,1 | mark=80 % | verdict=chưa đạt | read_at=cận dưới CI",
+        "PLACE_STEP | run=M | passed=161 | n=180 | rate=89,4 % | mark=50 % | verdict=chưa đọc: chưa có CI",
+        "SIDE_BY_SIDE | run=M | round=jig-r1 | scene=có đồ gá jig2 | scorer=bản 2 | successes=136 | n=180 | rate=75,6 % | on_60_rollouts=47/60",
+        "SIDE_BY_SIDE | run=C_70 | round=r1 | scene=không đồ gá | scorer=bản 1 | successes=10 | n=60 | rate=16,7 %",
+        "SIDE_BY_SIDE | run=C_ALL | round=r1 | scene=không đồ gá | scorer=bản 1 | successes=5 | n=60 | rate=8,3 %",
+        "READING | highest=M | latest=M | latest_round=jig-r1 | latest_date=26/11/2026 | runs_in_round=1",
+        "ORIGIN | round=r1 | run=C_70 | successes=10 | n=60 | carried_to_table_b=50 | placed=10",
+        "ORIGIN_STEP | date=25/11/2026 | story=DA-46 | title=Bản cắt đoạn đặt | result=539 bản cắt",
+        "ORIGIN_STEP | date=26/11/2026 | story=DA-48 | title=Train run M 100 000 bước",
+        "LIMITS | comparable=no | with_round=r1 | why=khác cảnh, tập eval, bộ chấm",
+        "LIMITS | control_run=chưa có run đối chứng K trên cùng tập điều kiện | effect=chưa tách được phần do đồ gá và phần do dữ liệu bước đặt",
+    ]  # fmt: skip
+    # the hidden run N / DA-50 and the held C70_R1 never appear; the docs go to sources
+    assert "DA-50" not in t and "C70_R1" not in t and "tốt nhất" not in t
+    assert res["sources"] == ["docs/he/tray-jig.md §2, §5", "docs/he/tray-jig.md §1", "docs/he/tray-jig.md §4"]
     en = ask("Which run is the best, and why?", "jig-r1", "en")["model"]
-    assert "Run M is the only run of this round on scene jig2 with scorer v2, so there is nothing to rank within the round" in en
-    assert "C70_R1" not in en
+    assert "SIDE_BY_SIDE | run=C_70 | round=r1 | scene=no jig fixture | scorer=v1 | successes=10 | n=60 | rate=16.7%" in en
+    assert "LIMITS | comparable=no | with_round=r1 | why=different scene, eval set, scorer" in en and "C70_R1" not in en
+
+
+def test_sample_b_without_the_new_index_keys_falls_back_and_says_what_is_missing(idx: ConsolePaths) -> None:
+    """The index before PR #266: no links, no timeline, no latest. The earlier round's carry and
+    place come from the ladder of story.demo; the missing parts are named, never invented."""
+    _two_rounds(idx)
+    p = idx.index / "tasks.json"
+    m = json.loads(p.read_text(encoding="utf-8"))
+    for r in m["rounds"]:
+        r.pop("links", None)
+    p.write_text(json.dumps(m), encoding="utf-8")
+    s = json.loads((idx.index / "story.json").read_text(encoding="utf-8"))
+    for k in ("timeline", "latest", "next_steps"):
+        s.pop(k)
+    (idx.index / "story.json").write_text(json.dumps(s), encoding="utf-8")
+    t = ask("Run nào tốt nhất, vì sao?", "jig-r1")["model"]
+    assert "ORIGIN | round=r1 | run=C_70 | successes=10 | n=60 | carried_to_table_b=50 | placed=10" in t
+    assert "ORIGIN_STEP | run=M | missing=diễn tiến của vòng (timeline)" in t
+    assert "READING | highest=M | missing=kết quả mới nhất | runs_in_round=1" in t
+    assert "LIMITS | comparable=no | with_round=r1 | why=khác cảnh, tập eval, bộ chấm" in t
+    nxt = ask("Giờ tôi nên làm gì để cải thiện kết quả này", "jig-r1")["model"]
+    assert "OPTION | missing=việc tiếp theo ghi trong tài liệu" in nxt
+    r1 = ask("Phân tích kết quả vòng này", "r1")["model"]
+    assert "NEXT_ROUND | round=jig-r1 | run=M | successes=136 | n=180 | rate=75,6 % | scene_differs=yes | scorer_differs=yes" in r1
+
+
+def test_what_next_on_the_jig_round_is_sample_c(idx: ConsolePaths) -> None:
+    """Sample C: where run M is still weak, then the next steps written in the docs only."""
+    _two_rounds(idx)
+    res = ask("Giờ tôi nên làm gì để cải thiện kết quả này", "jig-r1")
+    assert res["model"].splitlines()[1:] == [
+        "LEVEL | run=M | level=1 | successes=77 | n=90 | rate=85,6 % | mark=70 % | verdict=đạt",
+        "WEAK | run=M | level=2 | successes=59 | n=90 | rate=65,6 % | mark=70 % | verdict=chưa đạt",
+        "WEAK | run=M | failure=Đặt lệch | count=28 | of_failed=44 | ở_mức_2=20",
+        "WEAK | run=M | scope=cả task | rate=75,6 % | ci_lower=70,0 % | mark=80 % | verdict=chưa đạt",
+        "OPTION | text=Train run đối chứng K: 498 episode đầy đủ trên cùng cảnh, không có bản cắt.",
+        "LIMITS | control_run=chưa có run đối chứng K trên cùng tập điều kiện | effect=chưa tách được phần do đồ gá và phần do dữ liệu bước đặt",
+    ]  # fmt: skip
+    assert "docs/he/tray-jig.md §1" in res["sources"]
+    en = ask("What should we do next to improve this?", "jig-r1", "en")["model"]
+    assert "OPTION | text=Train the control run K: 498 full episodes on the same scene, no cuts." in en
+    assert "WEAK | run=M | failure=Misplaced | count=28 | of_failed=44 | at_level_2=20" in en
+    # round 1: never the closed (DA-38) or handled (DA-37, by DA-42) work, in any shape
+    for lang, q in (("vi", "Nên làm gì tiếp?"), ("vi", "Giờ tôi nên làm gì để cải thiện kết quả này"), ("en", "What should we do next?")):
+        t = ask(q, "r1", lang)["model"]
+        assert "DA-38" not in t and "DA-37" not in t and "OPTION" not in t, (q, t)
+        assert "NEXT_ROUND | round=jig-r1 | run=M" in t
