@@ -67,6 +67,14 @@ def test_chat_defaults_closed_and_deduplicates_requests() -> None:
     assert "toolsCache.has(" in chat
 
 
+def test_diagnose_reads_english_cluster_words() -> None:
+    # story.round.clusters / story.diag.clusters carry diagnosis_en, intervention_en (28/11)
+    story = (WEB / "pages_story.js").read_text(encoding="utf-8")
+    assert 'clusterText(c, "diagnosis")' in story
+    assert 'clusterText(c, "intervention")' in story
+    assert 'field + "_en"' in story
+
+
 def test_no_hex_in_pages() -> None:
     pages = sorted(WEB.glob("pages_*.js"))
     assert pages, "expected pages_*.js modules in web/"
