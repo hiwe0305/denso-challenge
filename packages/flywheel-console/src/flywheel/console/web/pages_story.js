@@ -1,10 +1,10 @@
 import {
-  cleanInlineMarkdown,
   cleanLogLines,
   cls,
   compactPath,
   el,
   ensureStoryRaw,
+  failureLabel,
   formatBytes,
   formatDateTime,
   formatNumber,
@@ -31,6 +31,7 @@ import {
   setChildren,
   setSelection,
   shortHashId,
+  stageLabel,
   state,
   t,
   taskSuccessText,
@@ -90,6 +91,88 @@ function successPlot(runs) {
   })), { bound: 100, unit: "%" });
 }
 
+// Paired McNemar comparisons of round 1 (story.pair.comparisons). Only comparison (a′) decides
+// stop or continue (docs/he/tray.md §20, rule of the round); (f), (g), (h) are descriptive
+// (W4), so their outcome cell says "Chỉ mô tả" whatever the index wrote.
+const DECIDING_TAG = "a";
+
+function renderPairCompTable(pairComps) {
+  return el("table", { className: "table" }, [
+    el("thead", {}, [
+      el("tr", {}, [
+        el("th", { text: t("eval.colPair") }),
+        el("th", { className: "num", text: "n" }),
+        el("th", { className: "num", text: t("eval.colPairSucc") }),
+        el("th", { className: "num", text: t("eval.colDiffCi") }),
+        el("th", { className: "num", text: t("eval.colMcnemarP") }),
+        el("th", { text: t("eval.colOutcome") }),
+      ]),
+    ]),
+    el(
+      "tbody",
+      {},
+      pairComps.map((c) =>
+        el("tr", {}, [
+          el("td", { className: "mono", text: `(${c.tag}) ${c.variant} · ${c.baseline}` }),
+          el("td", { className: "num", text: formatNumber(c.n) }),
+          el("td", { className: "num", text: `${c.variant_succ} · ${c.baseline_succ}` }),
+          el("td", {
+            className: "num",
+            text: `${formatPercent(c.diff)} (${Array.isArray(c.ci) ? `${formatPercent(c.ci[0])} – ${formatPercent(c.ci[1])}` : "–"})`,
+          }),
+          el("td", {
+            className: "num",
+            text: formatNumber(c.mcnemar_p, { maximumFractionDigits: 3 }),
+          }),
+          el("td", {}, [
+            c.tag === DECIDING_TAG
+              ? renderStateChip(c.outcome)
+              : el("span", { className: cls("chip", "neutral"), text: t("eval.descriptiveOnly") }),
+          ]),
+        ])
+      )
+    ),
+  ]);
+}
+
+// Step-4 checks of round 1 (story.demo.diagnose.checks): ids H1–H3 are the hypotheses of
+// tray.md §20.11 (not the spec's HS/HT/HD), shown with a Vietnamese title (W12).
+function diagCheckTitle(id) {
+  return hasI18nKey("diag.check." + id) ? t("diag.check." + id) : id;
+}
+
+function diagCheckText(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return formatVal(value);
+  const word = (v) => {
+    const slug = String(v).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    return hasI18nKey("diag.val." + slug) ? t("diag.val." + slug) : String(v);
+  };
+  return Object.entries(value)
+    .map(([k, v]) => `${fieldLabel(k)}: ${Array.isArray(v) ? v.join(", ") : word(v)}`)
+    .join(" · ");
+}
+
+// Outcome of one rollout (W1): "Thành công" / "Không thành công", never "Đạt".
+function outcomeChip(success) {
+  return el("span", {
+    className: cls("chip", success ? "" : "danger"),
+    text: t(success ? "outcome.ok" : "outcome.fail"),
+  });
+}
+
+// "simple-tray-predicates@2" → "bộ chấm bản 2"; anything else as written.
+function scorerLabel(raw) {
+  if (raw === null || raw === undefined || raw === "") return "–";
+  const m = String(raw).match(/@(\d+)$/) || String(raw).match(/^(\d+)$/);
+  return m ? t("exp.scorerVersion", { v: m[1] }) : String(raw);
+}
+
+// Numbers inside a preformatted index string ("7.3–33.6") in the page's decimal style.
+function localizeNumText(raw) {
+  const str = String(raw);
+  return state.lang === "vi" ? str.replace(/(\d)\.(\d)/g, "$1,$2") : str;
+}
+
 // A field name of an index object shown as a reader's word ("field.episodes" → "tập"),
 // the raw name only when the dictionary has no entry.
 function fieldLabel(k) {
@@ -137,6 +220,35 @@ function computeEmaPoints(pts, alpha = 0.14) {
 // ============================================================================
 // #/runs — Model Training
 // ============================================================================
+// Training speed (audit 02 A5): the index's thr_med is samples per second; newer indexes also
+// carry samples_per_s and steps_per_s.
+function runSpeedText(r) {
+  if (!r) return null;
+  const sps = Number.isFinite(r.samples_per_s) ? r.samples_per_s : r.thr_med;
+  if (!Number.isFinite(sps)) return null;
+  const main = t("runs.samplesPerS", { n: formatNumber(sps, { maximumFractionDigits: 1 }) });
+  return Number.isFinite(r.steps_per_s)
+    ? `${main} · ${t("runs.stepsPerS", { n: formatNumber(r.steps_per_s, { maximumFractionDigits: 2 }) })}`
+    : main;
+}
+
+function formatDurationS(sec) {
+  if (!Number.isFinite(sec)) return t("state.na");
+  if (sec >= 3600) return t("unit.hours", { n: formatNumber(sec / 3600, { maximumFractionDigits: 1 }) });
+  if (sec >= 60) return t("unit.minutes", { n: formatNumber(sec / 60, { maximumFractionDigits: 1 }) });
+  return t("unit.seconds", { n: formatNumber(sec, { maximumFractionDigits: 0 }) });
+}
+
+function metricLabel(m) {
+  return hasI18nKey("runs.metric." + m) ? t("runs.metric." + m) : m;
+}
+
+function phaseLabel(k) {
+  if (k === "persist") return t("exp.phasePersist");
+  if (String(k).startsWith("setup")) return t("runs.phase.setup");
+  return hasI18nKey("runs.phase." + k) ? t("runs.phase." + k) : k;
+}
+
 export function renderRunsPage() {
   const wrap = el("div", {});
   wrap.appendChild(renderLoadingView(t("runs.title")));
@@ -195,7 +307,7 @@ export function renderRunsPage() {
         setChildren(
           chartSlot,
           renderChartBlock({
-            title: `${t("runs.curvesTitle")} · ${activeMetric}${smoothActive ? " (EMA)" : ""}`,
+            title: `${t("runs.curvesTitle")} · ${metricLabel(activeMetric)}${smoothActive ? " (EMA)" : ""}`,
             height: 300,
             buildOption: ({ soft, line, colors }) => {
               const series = [];
@@ -248,7 +360,7 @@ export function renderRunsPage() {
                 },
                 xAxis: {
                   type: "value",
-                  name: "step",
+                  name: t("runs.axisStep"),
                   axisLabel: { color: soft },
                   splitLine: { lineStyle: { color: line } },
                 },
@@ -264,10 +376,10 @@ export function renderRunsPage() {
               el("thead", {}, [
                 el("tr", {}, [
                   el("th", { text: t("follow.colModel") }),
-                  el("th", { text: "job" }),
-                  el("th", { className: "num", text: "step" }),
-                  el("th", { className: "num", text: "loss_last" }),
-                  el("th", { className: "num", text: "val_last" }),
+                  el("th", { text: t("runs.colJob") }),
+                  el("th", { className: "num", text: t("runs.colStep") }),
+                  el("th", { className: "num", text: t("runs.colLossLast") }),
+                  el("th", { className: "num", text: t("runs.colValLast") }),
                 ]),
               ]),
               el(
@@ -336,11 +448,13 @@ export function renderRunsPage() {
       const groupsLast = (selectedRun && selectedRun.groups_last) || {};
       const groupKeys = Object.keys(groupsLast);
 
-      const thrList = validRuns.map((r) => r.thr_med).filter(Number.isFinite);
       const vramList = validRuns.map((r) => r.vram_max).filter(Number.isFinite);
       const maxVram = vramList.length ? Math.max(...vramList) : null;
-      const latestThr =
-        (selectedRun && selectedRun.thr_med) || (thrList.length ? thrList[thrList.length - 1] : null);
+      const speedRun =
+        (selectedRun && Number.isFinite(selectedRun.thr_med) && selectedRun) ||
+        [...validRuns].reverse().find((r) => Number.isFinite(r.thr_med)) ||
+        null;
+      const speedText = runSpeedText(speedRun);
 
       setChildren(
         wrap,
@@ -379,8 +493,11 @@ export function renderRunsPage() {
           },
           {
             label: t("exp.statPerf"),
-            value: latestThr != null ? `${formatNumber(latestThr, { maximumFractionDigits: 1 })} step/s` : t("state.na"),
-            sub: maxVram != null ? `VRAM ${formatNumber(maxVram, { maximumFractionDigits: 1 })} GB` : "",
+            value: speedText || t("state.na"),
+            sub:
+              maxVram != null
+                ? t("runs.vramPeak", { n: formatNumber(maxVram, { maximumFractionDigits: 1 }) })
+                : "",
           },
         ]),
 
@@ -397,7 +514,7 @@ export function renderRunsPage() {
                   load();
                 },
               },
-              [m]
+              [metricLabel(m)]
             )
           ),
           el("span", { className: "grow" }),
@@ -444,8 +561,11 @@ export function renderRunsPage() {
                 const scaleTxt =
                   epCount != null
                     ? frCount
-                      ? `${formatNumber(epCount)} ep · ${formatNumber(Math.round(frCount / 1000))}k fr`
-                      : `${formatNumber(epCount)} ep`
+                      ? t("runs.scaleEpFr", {
+                          ep: formatNumber(epCount),
+                          fr: formatNumber(frCount),
+                        })
+                      : t("runs.scaleEp", { ep: formatNumber(epCount) })
                     : t("state.na");
                 const effStep = matched ? matched.ckpt_step || matched.step : null;
                 const hasRemoteCkpt =
@@ -515,14 +635,16 @@ export function renderRunsPage() {
                           }`
                         : t("state.na"),
                     ]),
-                    el("td", { className: cls("num", "mono") }, [
-                      matched && matched.thr_med != null
-                        ? `${formatNumber(matched.thr_med, { maximumFractionDigits: 1 })} s/s · ${
-                            matched.vram_max != null
-                              ? `${formatNumber(matched.vram_max, { maximumFractionDigits: 1 })}G`
-                              : "-"
-                          }`
-                        : t("state.na"),
+                    el("td", { className: "num" }, [
+                      runSpeedText(matched) || t("state.na"),
+                      matched && matched.vram_max != null
+                        ? el("div", {
+                            className: "tiny",
+                            text: t("runs.vramPeak", {
+                              n: formatNumber(matched.vram_max, { maximumFractionDigits: 1 }),
+                            }),
+                          })
+                        : null,
                     ]),
                     el("td", {}, [
                       matched
@@ -597,11 +719,8 @@ export function renderRunsPage() {
                 { className: "meta-strip" },
                 vmPhases.map(([k, v]) =>
                   el("div", { className: "meta-box" }, [
-                    el("span", {
-                      className: "mono",
-                      text: k === "persist" ? t("exp.phasePersist") : k,
-                    }),
-                    el("b", { text: `${formatNumber(v, { maximumFractionDigits: 1 })} s` }),
+                    el("span", { title: k, text: phaseLabel(k) }),
+                    el("b", { text: formatDurationS(v) }),
                   ])
                 )
               ),
@@ -676,7 +795,9 @@ export function renderEvalPage() {
             ? Object.keys(jigDesc.step_pass)
             : []) || [];
       const ladderR1 = story.demo && story.demo.ladder ? story.demo.ladder : null;
-      const earlyEval = story.eval || null;
+      // The task-level baseline eval (policy C @40k, before round 1) is not shown on the jig
+      // round, where it reads like a figure of the jig run (W9).
+      const earlyEval = !jig && story.eval ? story.eval : null;
       const taskEvals = task && Array.isArray(task.evals) ? task.evals : [];
 
       const pairRuns = pair && Array.isArray(pair.runs) ? pair.runs : [];
@@ -735,15 +856,15 @@ export function renderEvalPage() {
                 el("span", { className: "tiny", text: ruleTitle(rd, fig) }),
               ]),
               el("div", { className: "actions" }, [
-                el("span", { className: cls("scorecard-val", "mono"), text: formatPercent(fig.p) }),
+                el("span", { className: "scorecard-val", text: formatPercent(fig.p) }),
                 el("span", {
-                  className: cls("muted", "mono"),
+                  className: "muted",
                   text: `${formatNumber(fig.successes)} / ${formatNumber(fig.n)}`,
                 }),
               ]),
               isPair(fig.ci)
                 ? el("div", {
-                    className: cls("tiny", "mono"),
+                    className: "tiny",
                     text: t("exp.ciBootstrap", {
                       lo: formatPercent(fig.ci[0]),
                       hi: formatPercent(fig.ci[1]),
@@ -752,8 +873,7 @@ export function renderEvalPage() {
                 : null,
               isPair(fig.wilson)
                 ? el("div", {
-                    className: cls("tiny", "mono", "muted"),
-                    title: fig.wilson_method || "",
+                    className: cls("tiny", "muted"),
                     text: `${t("exp.wilsonDescr")} ${formatPercent(fig.wilson[0])}–${formatPercent(fig.wilson[1])}`,
                   })
                 : null,
@@ -771,12 +891,7 @@ export function renderEvalPage() {
         return el("div", {}, [
           grid,
           el("p", { className: "tiny muted", text: t("exp.verdictNoteRules") }),
-          method
-            ? el("p", {
-                className: cls("tiny", "muted", "mono"),
-                text: t("exp.wilsonMethod", { method }),
-              })
-            : null,
+          method ? el("p", { className: cls("tiny", "muted"), text: t("exp.wilsonMethodNote") }) : null,
         ]);
       };
 
@@ -819,11 +934,11 @@ export function renderEvalPage() {
                     : t("state.na"),
                 }),
                 el("td", {
-                  className: "mono",
+                  className: "fail-cell",
                   text:
                     Object.entries(fig.failures || {})
-                      .map(([fk, fv]) => `${fk}: ${fv}`)
-                      .join(" · ") || "-",
+                      .map(([fk, fv]) => `${failureLabel(fk)}: ${fv}`)
+                      .join(" · ") || "–",
                 }),
               ])
             )
@@ -851,7 +966,10 @@ export function renderEvalPage() {
             }),
           }),
           rulesSrc
-            ? el("p", { className: "tiny", text: t("exp.rulesSource", { source: rulesSrc }) })
+            ? el("div", { className: "rules-cite" }, [
+                el("span", { className: cls("tiny", "muted"), text: t("exp.rulesLabel") }),
+                renderSourceCitation(rulesSrc),
+              ])
             : null,
           el("p", { className: cls("tiny", "muted"), text: t("exp.jigLimits") }),
         ]);
@@ -883,7 +1001,7 @@ export function renderEvalPage() {
           meta,
           body,
           ev.results_source
-            ? el("p", { className: cls("tiny", "muted", "mono"), text: ev.results_source })
+            ? renderSourceCitation(ev.results_source)
             : null,
         ]);
       };
@@ -892,7 +1010,6 @@ export function renderEvalPage() {
         jigDesc && jigSteps.length > 0
           ? renderChartBlock({
               title: t("exp.jigStepChartTitle", { n: formatNumber(jigSteps.length) }),
-              subtitle: jigDesc.source || "",
               height: 305,
               buildOption: ({ soft, line, colors }) => {
                 const lvStep = jigDesc.levels_step_pass || {};
@@ -945,7 +1062,11 @@ export function renderEvalPage() {
                   grid: { left: 48, right: 20, top: 54, bottom: 32 },
                   tooltip: { trigger: "axis" },
                   legend: { top: 0, textStyle: { color: soft } },
-                  xAxis: { type: "category", data: jigSteps, axisLabel: { color: soft, rotate: 18 } },
+                  xAxis: {
+                    type: "category",
+                    data: jigSteps.map((sk) => stageLabel(sk)),
+                    axisLabel: { color: soft, rotate: 18 },
+                  },
                   yAxis: {
                     type: "value",
                     max: 100,
@@ -969,7 +1090,7 @@ export function renderEvalPage() {
                   {},
                   jigSteps.map((sk) =>
                     el("tr", {}, [
-                      el("td", { className: "mono", text: sk }),
+                      el("td", { text: stageLabel(sk) }),
                       el("td", {
                         className: "num",
                         text: formatPercent(jigDesc.step_pass ? jigDesc.step_pass[sk] : null),
@@ -1039,7 +1160,7 @@ export function renderEvalPage() {
                   },
                   yAxis: {
                     type: "value",
-                    name: "deg",
+                    name: t("unit.deg"),
                     max: 35,
                     axisLabel: { color: soft },
                     splitLine: { lineStyle: { color: line } },
@@ -1135,7 +1256,7 @@ export function renderEvalPage() {
                       jigDesc.run,
                       [
                         ...Object.entries(jigDesc.relaxed).map(([cm, cnt]) => ({
-                          name: `≤ ${cm} cm`,
+                          name: `≤ ${formatNumber(Number(cm))} cm`,
                           value: (Number(cnt) / Math.max(1, jigDesc.n)) * 100,
                           label: `${formatPercent(Number(cnt) / Math.max(1, jigDesc.n))} (${cnt}/${jigDesc.n})`,
                         })),
@@ -1157,7 +1278,9 @@ export function renderEvalPage() {
       const c60 = story.jig && story.jig.compare60 ? story.jig.compare60 : null;
       const compare60Card = c60
         ? (() => {
-            const earlierScorer = c60.earlier_scorer || t("exp.c60ScorerV1");
+            const earlierScorer = c60.earlier_scorer
+              ? scorerLabel(c60.earlier_scorer)
+              : t("exp.c60ScorerV1");
             const rows = [
               ...(Array.isArray(c60.earlier) ? c60.earlier : []).map((e) => ({
                 run: e.run,
@@ -1169,7 +1292,7 @@ export function renderEvalPage() {
               {
                 run: t("exp.c60RunRepeat", { run: c60.run, repeat: c60.repeat }),
                 scene: t("exp.c60SceneJig"),
-                scorer: c60.scorer_version || "-",
+                scorer: scorerLabel(c60.scorer_version),
                 successes: c60.successes,
                 n: c60.n,
               },
@@ -1183,6 +1306,14 @@ export function renderEvalPage() {
               el("div", { className: "task-head" }, [
                 el("h2", { text: t("exp.c60Title", { run: c60.run, n: formatNumber(c60.n) }) }),
               ]),
+              el("p", {
+                className: "muted",
+                text: t("exp.c60Caveat", {
+                  scorer: scorerLabel(c60.scorer_version),
+                  run: c60.run,
+                  repeat: c60.repeat,
+                }),
+              }),
               el("table", { className: "table" }, [
                 el("thead", {}, [
                   el("tr", {}, [
@@ -1200,7 +1331,7 @@ export function renderEvalPage() {
                     el("tr", {}, [
                       el("td", { className: "mono", text: r.run }),
                       el("td", { text: r.scene }),
-                      el("td", { className: "mono", text: r.scorer }),
+                      el("td", { text: r.scorer }),
                       el("td", {
                         className: "num",
                         text: `${formatNumber(r.successes)} / ${formatNumber(r.n)}`,
@@ -1223,15 +1354,7 @@ export function renderEvalPage() {
                     }),
                   })
                 : null,
-              el("p", {
-                className: "tiny muted",
-                text: t("exp.c60Caveat", {
-                  scorer: c60.scorer_version || "-",
-                  run: c60.run,
-                  repeat: c60.repeat,
-                }),
-              }),
-              sources ? el("p", { className: cls("tiny", "muted", "mono"), text: sources }) : null,
+              sources ? renderSourceCitation(sources) : null,
             ]);
           })()
         : null;
@@ -1278,7 +1401,7 @@ export function renderEvalPage() {
           ? el("section", { className: cls("card", "table-wrap") }, [
               el("div", { className: "task-head" }, [
                 el("h2", { text: t("eval.pairRunsTitle") }),
-                el("span", { className: cls("muted", "mono"), text: pair.source || "" }),
+                renderSourceCitation(pair.source),
               ]),
               successPlot(pairRuns),
               el("table", { className: "table", style: "margin-top:10px" }, [
@@ -1309,9 +1432,9 @@ export function renderEvalPage() {
                           : t("state.na"),
                       }),
                       el("td", {
-                        className: "mono",
+                        className: "fail-cell",
                         text: Object.entries(r.failures || {})
-                          .map(([fk, fv]) => `${fk}: ${fv}`)
+                          .map(([fk, fv]) => `${failureLabel(fk)}: ${fv}`)
                           .join(" · "),
                       }),
                     ])
@@ -1324,13 +1447,12 @@ export function renderEvalPage() {
         pairRuns.length > 0 && stepKeys.length > 0
           ? renderChartBlock({
               title: t("eval.stepPassTitle"),
-              subtitle: pair.source || "",
               height: 260,
               buildOption: ({ soft, line, colors }) => ({
                 grid: { left: 48, right: 20, top: 34, bottom: 32 },
                 tooltip: { trigger: "axis" },
                 legend: { top: 0, textStyle: { color: soft } },
-                xAxis: { type: "category", data: stepKeys, axisLabel: { color: soft } },
+                xAxis: { type: "category", data: stepKeys.map((sk) => stageLabel(sk)), axisLabel: { color: soft, interval: 0, rotate: 30 } },
                 yAxis: {
                   type: "value",
                   max: 100,
@@ -1361,7 +1483,7 @@ export function renderEvalPage() {
                   {},
                   stepKeys.map((sk) =>
                     el("tr", {}, [
-                      el("td", { className: "mono", text: sk }),
+                      el("td", { text: stageLabel(sk) }),
                       ...pairRuns.map((r) =>
                         el("td", {
                           className: "num",
@@ -1378,38 +1500,8 @@ export function renderEvalPage() {
         pairComps.length > 0
           ? el("section", { className: cls("card", "table-wrap") }, [
               el("h2", { text: t("eval.pairCompTitle") }),
-              el("table", { className: "table" }, [
-                el("thead", {}, [
-                  el("tr", {}, [
-                    el("th", { text: t("eval.colPair") }),
-                    el("th", { className: "num", text: "n" }),
-                    el("th", { className: "num", text: t("eval.colSuccN") }),
-                    el("th", { className: "num", text: t("eval.colDiffCi") }),
-                    el("th", { className: "num", text: "McNemar p" }),
-                    el("th", { text: t("eval.colOutcome") }),
-                  ]),
-                ]),
-                el(
-                  "tbody",
-                  {},
-                  pairComps.map((c) =>
-                    el("tr", {}, [
-                      el("td", { className: "mono", text: `${c.variant} vs ${c.baseline}` }),
-                      el("td", { className: "num", text: formatNumber(c.n) }),
-                      el("td", { className: "num", text: `${c.variant_succ} vs ${c.baseline_succ}` }),
-                      el("td", {
-                        className: "num",
-                        text: `${formatPercent(c.diff)} (${Array.isArray(c.ci) ? `${formatPercent(c.ci[0])}..${formatPercent(c.ci[1])}` : "-"})`,
-                      }),
-                      el("td", {
-                        className: "num",
-                        text: formatNumber(c.mcnemar_p, { maximumFractionDigits: 4 }),
-                      }),
-                      el("td", {}, [renderStateChip(c.outcome)]),
-                    ])
-                  )
-                ),
-              ]),
+              el("p", { className: "muted", text: t("eval.pairCompNote") }),
+              renderPairCompTable(pairComps),
             ])
           : null,
 
@@ -1417,7 +1509,7 @@ export function renderEvalPage() {
           ? el("section", { className: cls("card", "table-wrap") }, [
               el("div", { className: "task-head" }, [
                 el("h2", { text: t("exp.relaxedR1Title") }),
-                el("span", { className: cls("muted", "mono"), text: ladderR1.source || "" }),
+                renderSourceCitation(ladderR1.source),
               ]),
               el("table", { className: "table" }, [
                 el("thead", {}, [
@@ -1425,7 +1517,7 @@ export function renderEvalPage() {
                     el("th", { text: t("follow.colModel") }),
                     el("th", { className: "num", text: t("exp.reachTableB") }),
                     ...(ladderR1.relaxed_cm || []).map((cm) =>
-                      el("th", { className: "num", text: `≤ ${cm} cm` })
+                      el("th", { className: "num", text: `≤ ${formatNumber(Number(cm))} cm` })
                     ),
                   ]),
                 ]),
@@ -1489,7 +1581,7 @@ export function renderEvalPage() {
                         className: "mono",
                         text: `${ev.sim_mode || "-"} · L${ev.level ?? "-"}`,
                       }),
-                      el("td", { className: "mono", text: ev.source || ev.doc || "-" }),
+                      el("td", { className: "mono", text: scrubPath(ev.source || ev.doc || "–") }),
                     ])
                   )
                 ),
@@ -1504,7 +1596,7 @@ export function renderEvalPage() {
               el("table", { className: "table" }, [
                 el("thead", {}, [
                   el("tr", {}, [
-                    el("th", { text: "Level" }),
+                    el("th", { text: t("eval.colLevel") }),
                     el("th", { className: "num", text: t("eval.colSuccN") }),
                     el("th", { className: "num", text: t("eval.colWilson") }),
                   ]),
@@ -1516,7 +1608,7 @@ export function renderEvalPage() {
                     el("tr", {}, [
                       el("td", { className: "mono", text: lv.level }),
                       el("td", { className: "num", text: lv.succ || `${lv.successes}/${lv.n}` }),
-                      el("td", { className: "num", text: lv.wilson || "-" }),
+                      el("td", { className: "num", text: lv.wilson ? localizeNumText(lv.wilson) : "–" }),
                     ])
                   )
                 ),
@@ -1524,7 +1616,7 @@ export function renderEvalPage() {
             ])
           : null,
 
-        !pair && !jig ? renderProcessEmptyBlock(4) : null
+        !pair && !jig ? renderRoundEmpty({ keys: ["story.pair", "story.jig"] }) : null
       );
     } catch (err) {
       setChildren(wrap, renderErrorBlock(err, load));
@@ -1578,21 +1670,14 @@ export function renderDiagnosePage() {
                 el("h2", { text: t("exp.diagJigTitle", { caseId: latestAsm.case_id || "-" }) }),
                 renderStateChip(latestAsm.status || "info"),
               ]),
-              el("p", {
-                className: cls("muted", "mono"),
-                style: "margin:4px 0 10px",
-                text: t("exp.diagJigSub", {
-                  source: latestAsm.source || "-",
-                  status: latestAsm.status || "-",
-                }),
-              }),
+              renderSourceCitation(latestAsm.source),
               comparisonPlot(
                 t("diagnose.clustersTitle"),
                 asmClusters
                   .filter((c) => Number(c.size) > 0)
                   .slice(0, 8)
                   .map((c) => ({
-                    name: `${c.label || "-"} (L${c.level ?? "-"})`,
+                    name: t("diag.clusterName", { label: failureLabel(c.label || "–"), lv: c.level ?? "–" }),
                     value: c.size,
                   }))
               ),
@@ -1611,19 +1696,26 @@ export function renderDiagnosePage() {
                   asmClusters.map((ac) =>
                     el("tr", {}, [
                       el("td", {}, [
-                        el("b", { className: "mono", text: ac.label || ac.cluster_id || "-" }),
+                        el("b", { title: ac.label || "", text: failureLabel(ac.label || ac.cluster_id || "–") }),
                         el("div", {
-                          className: cls("tiny", "mono"),
-                          text: `${ac.run || "-"} · ${ac.step || "-"} · L${ac.level ?? "-"}`,
+                          className: "tiny",
+                          text: t("diag.clusterWhere", {
+                            run: ac.run || "–",
+                            step: stageLabel(ac.step || "–"),
+                            lv: ac.level ?? "–",
+                          }),
                         }),
                       ]),
                       el("td", { className: "num", text: formatNumber(ac.size) }),
                       el("td", {}, [
                         ac.rule_id
                           ? el("span", {
-                              className: cls("tax-badge", "mono"),
+                              className: "tax-badge",
                               style: "margin-bottom:3px",
-                              text: `${ac.hypothesis_id || "H1"} · ${ac.rule_id}`,
+                              title: ac.hypothesis_id || "",
+                              text: hasI18nKey("diag.rule." + String(ac.rule_id).toLowerCase())
+                                ? t("diag.rule." + String(ac.rule_id).toLowerCase())
+                                : ac.rule_id,
                             })
                           : null,
                         el("div", {
@@ -1643,8 +1735,9 @@ export function renderDiagnosePage() {
                         }),
                       ]),
                       el("td", {
-                        className: "mono",
-                        text: ac.support_count ? `${ac.support_count} facts` : "-",
+                        text: ac.support_count
+                          ? t("diag.facts", { n: formatNumber(ac.support_count) })
+                          : "–",
                       }),
                     ])
                   )
@@ -1674,9 +1767,9 @@ export function renderDiagnosePage() {
                 // Use .check-row + .check-badge so long check IDs (e.g. delay_sync_camera) wrap cleanly (F3)
                 diagDemo.checks.map((chk) =>
                   el("div", { className: "check-row" }, [
-                    el("span", { className: cls("check-badge", "mono"), text: chk.id }),
+                    el("span", { className: "check-badge", text: diagCheckTitle(chk.id) }),
                     el("div", { className: "row-body" }, [
-                      el("b", { text: formatVal(chk.value) }),
+                      el("b", { text: diagCheckText(chk.value) }),
                       renderSourceCitation(chk.source, chk.quote),
                     ]),
                   ])
@@ -1707,7 +1800,7 @@ export function renderDiagnosePage() {
                   roundClusters.map((c) =>
                     el("tr", {}, [
                       el("td", { className: "mono", text: c.id }),
-                      el("td", { className: "mono", text: c.stage }),
+                      el("td", { text: stageLabel(c.stage) }),
                       el("td", { className: "num", text: formatNumber(c.n) }),
                       el("td", { text: c.diagnosis }),
                       el("td", { text: c.intervention }),
@@ -1738,12 +1831,9 @@ export function renderDiagnosePage() {
                     el("tr", {}, [
                       el("td", { className: "mono", text: it.id }),
                       el("td", { className: "mono", text: it.checkpoint }),
-                      el("td", { text: `${it.step ?? "-"} · ${it.stage || "-"}` }),
+                      el("td", { text: `${it.step ?? "–"} · ${stageLabel(it.stage || "–")}` }),
                       el("td", { className: "num", text: formatNumber(it.members) }),
-                      el("td", {
-                        className: "mono",
-                        text: [it.source, cleanInlineMarkdown(it.quote)].filter(Boolean).join(" — "),
-                      }),
+                      el("td", {}, [renderSourceCitation(it.source, it.quote)]),
                     ])
                   )
                 ),
@@ -1831,13 +1921,13 @@ function renderJigLoop(round, jig) {
         cut
           ? t("loop.jigCutSub", { files: formatNumber(cut.files), size: formatBytes(cut.bytes) })
           : "",
-        cut ? cut.source : null
+        null
       ),
-      node("04", t("loop.statAfter"), t("loop.noAfterRound"), t("loop.noAfterRoundSub"), null, true),
+      node("04", t("loop.statAfter"), "—", "", null, true),
     ]),
     el("section", { className: "card" }, [
       el("p", { text: t("loop.jigNote", { run: runId || "-" }) }),
-      ...sources.map((src) => el("p", { className: cls("tiny", "muted", "mono"), text: src })),
+      ...sources.map((src) => renderSourceCitation(src)),
     ]),
   ];
 }
@@ -1868,7 +1958,7 @@ export function renderLoopPage() {
             title: t("loop.title"),
           }),
           renderReportSubnav("loop"),
-          renderProcessEmptyBlock(6, t("loop.title"))
+          renderRoundEmpty({ keys: ["story.round", "story.jig"] })
         );
         return;
       }
@@ -1921,7 +2011,7 @@ export function renderLoopPage() {
           el("div", { className: "loop-evo-node" }, [
             el("span", { className: "tax-badge", text: "03" }),
             el("span", { className: "tiny", text: t("loop.stepSelected") }),
-            el("b", { className: "mono", text: `+${formatNumber(chain.selected)} ep` }),
+            el("b", { className: "mono", text: t("loop.selectedEp", { n: formatNumber(chain.selected) }) }),
             round.cut
               ? el("span", {
                   className: cls("tiny", "mono"),
@@ -1971,7 +2061,6 @@ export function renderLoopPage() {
         presentChain.length > 0
           ? renderChartBlock({
               title: t("loop.funnelTitle"),
-              subtitle: sr.source || "",
               height: 235,
               buildOption: ({ soft, line, colors }) => ({
                 grid: { left: 48, right: 20, top: 24, bottom: 32 },
@@ -2041,7 +2130,7 @@ export function renderBasePage() {
             title: t("base.title"),
           }),
           renderReportSubnav("base"),
-          renderProcessEmptyBlock(6, t("base.title"))
+          renderRoundEmpty({ keys: ["story.demo", "story.jig"] })
         );
         return;
       }
@@ -2049,6 +2138,11 @@ export function renderBasePage() {
       const models = story.demo && story.demo.models ? story.demo.models : {};
       const modelRuns = models.runs || {};
       const cites = models.cites ? Object.entries(models.cites) : [];
+      // On the jig round the train entries of story.jig give the episodes and the cut (A14).
+      const jigRuns = hasIndexAccess("story.jig") && story.jig && Array.isArray(story.jig.runs)
+        ? story.jig.runs
+        : [];
+      const jigCuts = (story.jig && story.jig.cuts) || {};
 
       setChildren(
         wrap,
@@ -2059,16 +2153,14 @@ export function renderBasePage() {
         renderReportSubnav("base"),
 
         renderStatStrip([
-          { label: t("loop.statBaseline"), value: round.baseline || t("state.na"), sub: round.id },
+          { label: t("loop.statBaseline"), value: round.baseline || "—" },
           {
             label: t("base.statControls"),
-            value: (round.controls || []).join(", ") || t("state.na"),
-            sub: models.source || "",
+            value: (round.controls || []).join(", ") || "—",
           },
           {
             label: t("base.statMaxSteps"),
             value: formatNumber(round.max_steps),
-            sub: round.train_dir || "",
           },
         ]),
 
@@ -2088,11 +2180,13 @@ export function renderBasePage() {
               "tbody",
               {},
               (round.runs || []).map((rr) => {
-                const m = modelRuns[rr.id] || {};
+                const jr = jigRuns.find((r) => r && r.branch === rr.id) || null;
+                const m = modelRuns[rr.id] || (jr ? { episodes: jr.episodes } : {});
+                const cutName = jigCuts[rr.id] ? jigCuts[rr.id].name : null;
                 return el("tr", {}, [
                   el("td", { className: "mono", text: rr.id }),
                   el("td", {}, [renderStateChip(rr.role)]),
-                  el("td", { className: "mono", text: m.data || rr.train_set || "-" }),
+                  el("td", { className: "mono", text: m.data || rr.train_set || cutName || "—" }),
                   el("td", {
                     className: "num",
                     text:
@@ -2100,7 +2194,10 @@ export function renderBasePage() {
                         ? `${formatNumber(m.episodes)} (${formatNumber(m.base_episodes)}+${formatNumber(m.targeted_episodes)})`
                         : formatNumber(m.episodes),
                   }),
-                  el("td", { className: "num", text: formatNumber(m.human_clips) }),
+                  el("td", {
+                    className: "num",
+                    text: m.human_clips != null ? formatNumber(m.human_clips) : "—",
+                  }),
                 ]);
               })
             ),
@@ -2220,7 +2317,7 @@ export function renderFollowPage(ctx) {
                     return el("option", {
                       value: k,
                       selected: k === selectedKey,
-                      text: `L${c.level} · seed ${c.seed} (${c.pass_k}/${c.n_rep}${c.top_failure ? ` · ${c.top_failure}` : ""})`,
+                      text: `L${c.level} · seed ${c.seed} (${c.pass_k}/${c.n_rep}${c.top_failure ? ` · ${failureLabel(c.top_failure)}` : ""})`,
                     });
                   })
                 ),
@@ -2260,7 +2357,7 @@ export function renderFollowPage(ctx) {
                   (activeCond.trials || []).map((tr) =>
                     el("tr", {}, [
                       el("td", { className: "mono", text: `#${tr.repeat}` }),
-                      el("td", {}, [renderStateChip(tr.success ? "pass" : "failed")]),
+                      el("td", {}, [outcomeChip(tr.success)]),
                       el("td", {
                         className: "num",
                         text: tr.dist_cm != null ? `${formatNumber(tr.dist_cm, { maximumFractionDigits: 2 })} cm` : "-",
@@ -2273,7 +2370,7 @@ export function renderFollowPage(ctx) {
                         className: "num",
                         text: tr.sim_s != null ? `${formatNumber(tr.sim_s, { maximumFractionDigits: 1 })} s` : "-",
                       }),
-                      el("td", { className: "mono", text: tr.failure || "-" }),
+                      el("td", { title: tr.failure || "", text: tr.failure ? failureLabel(tr.failure) : "–" }),
                     ])
                   )
                 ),
@@ -2282,22 +2379,27 @@ export function renderFollowPage(ctx) {
           : null,
 
         !fol || runEntries.length === 0
-          ? el("div", { className: "empty", text: t("state.empty") })
+          ? activeCond
+            ? null
+            : renderRoundEmpty({ keys: ["story.follow", "story.jig"] })
           : el("section", { className: cls("card", "table-wrap") }, [
               el("div", { className: "task-head" }, [
                 el("h2", {
                   text: t("follow.caseMeta", {
                     level: fol.level ?? "-",
                     seed: fol.seed ?? "-",
-                    dist: fol.tol ? fol.tol.distance_m : "-",
+                    dist: fol.tol ? formatNumber(fol.tol.distance_m * 100, { maximumFractionDigits: 1 }) : "–",
                     yaw: fol.tol ? fol.tol.yaw_error_deg : "-",
                   }),
                 }),
-                el("span", { className: cls("muted", "mono"), text: fol.source || "" }),
+                renderSourceCitation(fol.source),
               ]),
               el("div", { className: "comparison-grid" }, [
                 comparisonPlot(t("follow.colDist"), runEntries.map(([name, run]) =>
-                  ({ name, value: run.distance_m })), { threshold: fol.tol?.distance_m, unit: " m" }),
+                  ({ name, value: Number.isFinite(run.distance_m) ? run.distance_m * 100 : null })), {
+                  threshold: Number.isFinite(fol.tol?.distance_m) ? fol.tol.distance_m * 100 : null,
+                  unit: " cm",
+                }),
                 comparisonPlot(t("follow.colYaw"), runEntries.map(([name, run]) =>
                   ({ name, value: run.yaw_error_deg })), { threshold: fol.tol?.yaw_error_deg, unit: "°" }),
               ]),
@@ -2318,17 +2420,17 @@ export function renderFollowPage(ctx) {
                   runEntries.map(([rId, rv]) =>
                     el("tr", {}, [
                       el("td", { className: "mono", text: rId }),
-                      el("td", {}, [renderStateChip(rv.success ? "pass" : "failed")]),
+                      el("td", {}, [outcomeChip(rv.success)]),
                       el("td", { text: rv.reach_b ? t("common.yes") : t("common.no") }),
                       el("td", {
                         className: "num",
-                        text: `${formatNumber(rv.distance_m, { maximumFractionDigits: 4 })} m`,
+                        text: `${formatNumber(rv.distance_m * 100, { maximumFractionDigits: 2 })} cm`,
                       }),
                       el("td", {
                         className: "num",
                         text: `${formatNumber(rv.yaw_error_deg, { maximumFractionDigits: 2 })}°`,
                       }),
-                      el("td", { className: "mono", text: rv.failure || "-" }),
+                      el("td", { title: rv.failure || "", text: rv.failure ? failureLabel(rv.failure) : "–" }),
                     ])
                   )
                 ),
@@ -2433,6 +2535,120 @@ export function renderDesignPage() {
 // ============================================================================
 // #/cost — Cost & Ledger
 // ============================================================================
+// Ledger rows (audit 02 P1-1): new shape {story, label, est_cu, mea_cu, est_usd, mea_usd};
+// the old shape [story, est_usd, mea_usd] carries USD only, so it is never labelled CU.
+function normalizeLedger(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const legacy = list.some((r) => Array.isArray(r));
+  const out = list
+    .map((r) => {
+      if (Array.isArray(r)) {
+        const [story, est, mea] = r;
+        return { story, name: String(story ?? ""), est: numOrNull(est), mea: numOrNull(mea) };
+      }
+      if (!r || typeof r !== "object") return null;
+      const label = pickLang(r.label);
+      return {
+        story: r.story,
+        name: label || String(r.story ?? ""),
+        est: numOrNull(r.est_cu),
+        mea: numOrNull(r.mea_cu),
+        estUsd: numOrNull(r.est_usd),
+        meaUsd: numOrNull(r.mea_usd),
+      };
+    })
+    .filter((r) => r && ((r.est || 0) !== 0 || (r.mea || 0) !== 0));
+  return { legacy, rows: out };
+}
+
+function numOrNull(v) {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+function renderLedgerCard(rawLedger) {
+  const { legacy, rows } = normalizeLedger(rawLedger);
+  if (!rows.length) return null;
+  // The old shape cannot fold hidden stories into the "other" row (tasks.json does not list
+  // them), so it shows no per-story rows: rebuild the index for the table.
+  if (legacy) {
+    return el("section", { className: "card" }, [
+      el("h2", { text: t("cost.ledgerTitle") }),
+      el("p", { className: "muted", text: t("cost.ledgerLegacyNote") }),
+    ]);
+  }
+  const unit = " CU";
+  const fmt = (v) => (v == null ? "—" : formatNumber(v, { maximumFractionDigits: 2 }));
+  const head = [t("cost.colTask"), t("cost.colEstCu"), t("cost.colMeaCu")];
+  return el("section", { className: cls("card", "table-wrap") }, [
+    el("h2", { text: t("cost.ledgerTitle") }),
+    el("p", { className: "muted", text: t("cost.ledgerNote") }),
+    el("table", { className: "table" }, [
+      el("thead", {}, [el("tr", {}, head.map((h, i) => el("th", { className: i ? "num" : "", text: h })))]),
+      el(
+        "tbody",
+        {},
+        rows.map((r) =>
+          el("tr", {}, [
+            el("td", { text: r.name, title: r.story && r.story !== r.name ? String(r.story) : null }),
+            el("td", { className: "num", text: fmt(r.est) }),
+            el("td", { className: "num", text: fmt(r.mea) }),
+          ])
+        )
+      ),
+    ]),
+    el("details", { className: "studio-details" }, [
+      el("summary", { text: t("cost.ledgerChart") }),
+      comparisonPlot(
+        t("cost.colEstCu"),
+        rows.map((r) => ({ name: r.name, value: r.est })),
+        { unit }
+      ),
+      comparisonPlot(
+        t("cost.colMeaCu"),
+        rows.map((r) => ({ name: r.name, value: r.mea })),
+        { unit }
+      ),
+    ]),
+  ]);
+}
+
+function costLineLabel(id) {
+  const key = "cost.line." + id;
+  return hasI18nKey(key) ? t(key) : String(id ?? "");
+}
+
+// Measured cost of the jig round when the index carries it (story.jig.cost).
+function renderJigCostCard(jigCost) {
+  if (!jigCost || typeof jigCost !== "object") return null;
+  const parts = Object.entries(jigCost).filter(([, v]) => v && typeof v === "object");
+  if (!parts.length) return null;
+  return el("section", { className: "card" }, [
+    el("h2", { text: t("cost.jigTitle") }),
+    el(
+      "div",
+      { className: "row-list" },
+      parts.map(([part, v]) =>
+        el("div", { className: "row" }, [
+          el("div", { className: "row-body" }, [
+            el("b", {
+              text: `${costLineLabel("jig_" + part)}: ${
+                v.cu != null ? formatNumber(v.cu, { maximumFractionDigits: 2 }) + " CU" : "—"
+              }`,
+            }),
+            el("p", {
+              className: "muted",
+              text: [pickLang(v.label), v.kind === "measured" ? t("cost.kindMeasured") : t("cost.kindEstimated")]
+                .filter(Boolean)
+                .join(" · "),
+            }),
+            v.doc ? renderSourceCitation(v.doc.source, v.doc.quote) : null,
+          ]),
+        ])
+      )
+    ),
+  ]);
+}
+
 export function renderCostPage() {
   const wrap = el("div", {});
   wrap.appendChild(renderLoadingView(t("cost.title")));
@@ -2446,12 +2662,14 @@ export function renderCostPage() {
       const story = scopeStoryForTask(rawStory);
       const task = getCurrentTask();
       const roundCost = story.demo && story.demo.round_cost ? story.demo.round_cost : null;
+      const jigCost = story.jig && story.jig.cost ? story.jig.cost : null;
       const colabMach =
         state.statusDoc && state.statusDoc.machines && state.statusDoc.machines.colab
           ? state.statusDoc.machines.colab
           : {};
-      const ledger = Array.isArray(story.ledger) ? story.ledger : [];
-      const colabHist = Array.isArray(story.colab_balance) ? story.colab_balance : [];
+      const colabHist = (Array.isArray(story.colab_balance) ? story.colab_balance : []).filter(
+        (p) => Array.isArray(p) && Number.isFinite(p[1]) && Number.isFinite(Date.parse(p[0]))
+      );
 
       setChildren(
         wrap,
@@ -2476,16 +2694,17 @@ export function renderCostPage() {
             value:
               roundCost && roundCost.total_cu != null
                 ? `${formatNumber(roundCost.total_cu, { maximumFractionDigits: 2 })} CU`
-                : t("state.na"),
+                : "—",
             sub:
               roundCost && roundCost.total_usd != null
-                ? `~$${formatNumber(roundCost.total_usd, { maximumFractionDigits: 2 })}`
-                : "",
+                ? `~${formatNumber(roundCost.total_usd, { maximumFractionDigits: 2 })} USD`
+                : roundCost
+                  ? ""
+                  : t("cost.roundCostOther"),
           },
           {
             label: t("cost.estimatesTitle"),
             value: formatNumber((estimates || []).length),
-            sub: "/api/estimates",
           },
         ]),
 
@@ -2496,21 +2715,27 @@ export function renderCostPage() {
         roundCost
           ? el("section", { className: "card" }, [
               el("h2", { text: t("cost.roundCostTitle") }),
-              renderSourceCitation(roundCost.source, roundCost.total_note, roundCost.kind),
               el(
                 "div",
                 { className: "row-list" },
                 (roundCost.lines || []).map((ln) =>
                   el("div", { className: "row" }, [
                     el("div", { className: "row-body" }, [
-                      el("b", { className: "mono", text: `${ln.id}: ${formatNumber(ln.value)} CU` }),
+                      el("b", {
+                        text: `${costLineLabel(ln.id)}: ${formatNumber(ln.value, { maximumFractionDigits: 2 })} CU`,
+                      }),
                       renderSourceCitation(ln.source, ln.quote),
                     ]),
                   ])
                 )
               ),
+              renderSourceCitation(roundCost.source, t("cost.totalNote"), roundCost.kind),
             ])
           : null,
+
+        renderJigCostCard(jigCost),
+
+        renderLedgerCard(story.ledger),
 
         colabHist.length > 0
           ? renderChartBlock({
@@ -2520,19 +2745,21 @@ export function renderCostPage() {
                 grid: { left: 48, right: 20, top: 18, bottom: 32 },
                 tooltip: { trigger: "axis" },
                 xAxis: {
-                  type: "category",
-                  data: colabHist.map((p) => formatDateTime(p[0])),
-                  axisLabel: { color: soft },
+                  type: "time",
+                  axisLabel: { color: soft, hideOverlap: true },
                 },
                 yAxis: {
                   type: "value",
+                  name: "CU",
+                  nameTextStyle: { color: soft },
                   axisLabel: { color: soft },
                   splitLine: { lineStyle: { color: line } },
                 },
                 series: [
                   {
                     type: "line",
-                    data: colabHist.map((p) => p[1]),
+                    showSymbol: false,
+                    data: colabHist.map((p) => [Date.parse(p[0]), p[1]]),
                     lineStyle: { width: 2, color: colors[0] },
                   },
                 ],
@@ -2541,36 +2768,15 @@ export function renderCostPage() {
                 el(
                   "tbody",
                   {},
-                  colabHist.map(([tm, bal]) =>
+                  colabHist.slice(-40).map(([tm, bal]) =>
                     el("tr", {}, [
                       el("td", { text: formatDateTime(tm) }),
-                      el("td", { className: "num", text: `${formatNumber(bal)} CU` }),
+                      el("td", { className: "num", text: `${formatNumber(bal, { maximumFractionDigits: 2 })} CU` }),
                     ])
                   )
                 ),
               ]),
             })
-          : null,
-
-        ledger.length > 0
-          ? el("section", { className: cls("card", "table-wrap") }, [
-              comparisonPlot(t("cost.ledgerTitle"), ledger.map(([name, value]) => ({ name, value })), { unit: " CU" }),
-              el("details", { className: "studio-details" }, [
-                el("summary", { text: t("chart.showTable") }),
-                el("table", { className: "table" }, [
-                el(
-                  "tbody",
-                  {},
-                  ledger.map(([stId, cu]) =>
-                    el("tr", {}, [
-                      el("td", { className: "mono", text: stId }),
-                      el("td", { className: "num", text: `${formatNumber(cu)} CU` }),
-                    ])
-                  )
-                ),
-              ]),
-              ]),
-            ])
           : null,
 
         Array.isArray(estimates) && estimates.length > 0
@@ -2582,8 +2788,7 @@ export function renderCostPage() {
                 estimates.map((es) =>
                   el("div", { className: "row" }, [
                     el("div", { className: "row-body" }, [
-                      el("b", { text: es.label }),
-                      el("p", { className: cls("muted", "mono"), text: scrubPath(es.path) }),
+                      el("b", { text: pickLang(es.label) }),
                     ]),
                   ])
                 )
@@ -2609,18 +2814,17 @@ export function renderReportPage() {
 
   const load = async () => {
     try {
-      const [rawStory, exportsList] = await Promise.all([
-        ensureStoryRaw(),
-        getJSON("/api/exports"),
-      ]);
+      const rawStory = await ensureStoryRaw();
       const story = scopeStoryForTask(rawStory);
       const task = getCurrentTask();
-      const round = getCurrentRound();
       const demo = story.demo || {};
       const clip = demo.success_clip || null;
       const failShare = demo.fail_share || null;
+      const pairRuns = story.pair && Array.isArray(story.pair.runs) ? story.pair.runs : [];
       const pairComps =
         story.pair && Array.isArray(story.pair.comparisons) ? story.pair.comparisons : [];
+      const jig = hasIndexAccess("story.jig") && story.jig ? story.jig : null;
+      const hasRound1 = pairRuns.length > 0 || pairComps.length > 0 || Boolean(clip);
 
       let clipUrl = null;
       if (clip && typeof clip.path === "string" && clip.path.startsWith("console/media/demo/")) {
@@ -2632,6 +2836,7 @@ export function renderReportPage() {
         ...renderCrumbHeading({
           crumbs: [{ label: t("app.crumbRoot"), href: "#/tasks" }, { label: t("report.title") }],
           title: t("report.title"),
+          lead: t("report.lead"),
         }),
         renderReportSubnav("report"),
 
@@ -2643,16 +2848,35 @@ export function renderReportPage() {
             ])
           : null,
 
+        jig ? renderJigReportBlock(jig) : null,
+
+        pairRuns.length > 0
+          ? el("section", { className: "card" }, [
+              el("h2", { text: t("report.round1Title") }),
+              renderStatStrip(
+                pairRuns.map((r) => ({
+                  label: r.run,
+                  value: `${formatNumber(r.successes)}/${formatNumber(r.n)}`,
+                  sub: t("report.runSuccSub", { pct: formatPercent(r.p) }),
+                }))
+              ),
+              wilsonOverlap(pairRuns)
+                ? el("p", { className: "muted", text: t("report.round1Overlap") })
+                : null,
+              renderSourceCitation(story.pair.source),
+            ])
+          : null,
+
         clip
           ? el("section", { className: "card" }, [
               el("h2", { text: t("report.clipTitle") }),
               el("p", {
                 className: "muted",
                 text: t("report.clipMeta", {
-                  model: clip.model || "-",
-                  prov: clip.provenance || "-",
-                  level: clip.level != null ? clip.level : t("state.na"),
-                  seed: clip.seed != null ? clip.seed : t("state.na"),
+                  model: clip.model || "–",
+                  prov: clip.provenance || "–",
+                  level: clip.level != null ? clip.level : "–",
+                  seed: clip.seed != null ? clip.seed : "–",
                 }),
               }),
               clipUrl
@@ -2663,7 +2887,7 @@ export function renderReportPage() {
                     src: clipUrl,
                   })
                 : null,
-              clip.note ? el("p", { className: "sources-note", text: clip.note }) : null,
+              clip.note ? el("p", { className: "sources-note", text: t("report.clipNote") }) : null,
               renderSourceCitation(clip.source, clip.deck_caption),
             ])
           : null,
@@ -2671,33 +2895,14 @@ export function renderReportPage() {
         pairComps.length > 0
           ? el("section", { className: cls("card", "table-wrap") }, [
               el("h2", { text: t("eval.pairCompTitle") }),
-              el("table", { className: "table" }, [
-                el(
-                  "tbody",
-                  {},
-                  pairComps.map((c) =>
-                    el("tr", {}, [
-                      el("td", { className: "mono", text: `${c.variant} vs ${c.baseline}` }),
-                      el("td", {
-                        className: "num",
-                        text: `n=${c.n} · ${c.variant_succ} vs ${c.baseline_succ}`,
-                      }),
-                      el("td", {
-                        className: "num",
-                        text: `${formatPercent(c.diff)} (p=${formatNumber(c.mcnemar_p, { maximumFractionDigits: 3 })})`,
-                      }),
-                      el("td", {}, [renderStateChip(c.outcome)]),
-                    ])
-                  )
-                ),
-              ]),
+              el("p", { className: "muted", text: t("eval.pairCompNote") }),
+              renderPairCompTable(pairComps),
             ])
           : null,
 
         failShare && failShare.runs
           ? el("section", { className: "card" }, [
               el("h2", { text: t("report.failShareTitle") }),
-              renderSourceCitation(failShare.source),
               el(
                 "div",
                 { className: "meta-strip" },
@@ -2705,40 +2910,20 @@ export function renderReportPage() {
                   el("div", { className: "meta-box" }, [
                     el("span", { text: rk }),
                     el("b", { text: formatPercent(rv.share) }),
-                    el("small", { text: `${rv.place_pose + rv.tray_tilt} / ${rv.failed}` }),
-                  ])
-                )
-              ),
-            ])
-          : null,
-
-        Array.isArray(exportsList) && exportsList.length > 0
-          ? el("section", { className: "card" }, [
-              el("h2", { text: t("jobs.exportsTitle") }),
-              el(
-                "div",
-                { className: "row-list" },
-                exportsList.map((ex) =>
-                  el("div", { className: "row" }, [
-                    el("div", { className: "row-body" }, [
-                      el("b", { className: "mono", text: ex.name }),
-                      el("p", {
-                        className: "muted",
-                        text: `${formatBytes(ex.size)} · ${formatDateTime(ex.time)}`,
+                    el("small", {
+                      text: t("report.failShareSub", {
+                        part: formatNumber(rv.place_pose + rv.tray_tilt),
+                        failed: formatNumber(rv.failed),
                       }),
-                    ]),
-                    !state.locked && ex.url && String(ex.url).startsWith("/api/exports/")
-                      ? el("a", { className: "link", href: ex.url, download: ex.name }, [
-                          t("jobs.downloadZip"),
-                        ])
-                      : null,
+                    }),
                   ])
                 )
               ),
+              renderSourceCitation(failShare.source),
             ])
           : null,
 
-        !round ? renderProcessEmptyBlock(6) : null
+        !jig && !hasRound1 ? renderRoundEmpty({ keys: ["story.jig", "story.pair", "story.demo"] }) : null
       );
     } catch (err) {
       setChildren(wrap, renderErrorBlock(err, load));
@@ -2747,4 +2932,67 @@ export function renderReportPage() {
 
   load();
   return wrap;
+}
+
+// True when every Wilson interval of the runs shares a common point: the counts then do not
+// separate the runs (W3: "các khoảng chồng nhau").
+function wilsonOverlap(runs) {
+  const iv = runs.map((r) => r && r.wilson).filter((w) => Array.isArray(w) && w.length === 2);
+  if (iv.length < 2) return false;
+  return Math.max(...iv.map((w) => w[0])) <= Math.min(...iv.map((w) => w[1]));
+}
+
+// Report of the jig round (story.jig, DA-53): headline of the featured run with the rule
+// readings, the train run, and links to the pages with the detail. Numbers come from the
+// index only; wording follows W1 (successes, never "đạt" for a count).
+function renderJigReportBlock(jig) {
+  const evals = Array.isArray(jig.evals) ? jig.evals : [];
+  const ev =
+    evals.find((e) => e && e.run === jig.featured && e.status === "ready") ||
+    evals.find((e) => e && e.status === "ready") ||
+    null;
+  const head = ev && ev.headline ? ev.headline : null;
+  const train = Array.isArray(jig.runs)
+    ? jig.runs.find((r) => r && r.branch === (ev ? ev.run : jig.featured)) || jig.runs[0]
+    : null;
+  const readings = jigReadingLines(ev);
+  const items = [];
+  if (head) {
+    items.push({
+      label: t("report.jigHeadLabel", { run: ev.run }),
+      value: `${formatNumber(head.successes)}/${formatNumber(head.n)}`,
+      sub: t("report.jigHeadSub", { pct: formatPercent(head.p), conditions: formatNumber(head.conditions) }),
+    });
+    if (Array.isArray(head.ci)) {
+      items.push({
+        label: t("report.jigCiLabel"),
+        value: `${formatPercent(head.ci[0])} – ${formatPercent(head.ci[1])}`,
+        sub: t("report.jigCiSub"),
+      });
+    }
+  }
+  if (train) {
+    items.push({
+      label: t("report.jigTrainLabel", { run: train.branch }),
+      value: formatNumber(train.ckpt_step ?? train.step),
+      sub: t("report.jigTrainSub", {
+        episodes: formatNumber(train.episodes),
+        frames: formatNumber(train.frames),
+      }),
+    });
+  }
+  return el("section", { className: "card" }, [
+    el("h2", { text: t("report.jigTitle", { scene: jig.scene || "" }) }),
+    items.length > 0 ? renderStatStrip(items) : el("p", { className: "muted", text: t("state.empty") }),
+    readings.length > 0
+      ? el("ul", { className: "reading-list" }, readings.map((ln) => el("li", { text: ln })))
+      : null,
+    el("p", { className: "muted", text: t("report.jigNote") }),
+    el("div", { className: "actions" }, [
+      el("a", { className: cls("btn", "primary"), href: "#/eval" }, [t("report.jigToEval")]),
+      el("a", { className: "btn", href: "#/follow" }, [t("nav.item.follow")]),
+      el("a", { className: "btn", href: "#/diagnose" }, [t("nav.item.diagnose")]),
+    ]),
+    renderSourceCitation(ev ? ev.results_source : jig.source),
+  ]);
 }
