@@ -2,7 +2,7 @@
 
 Tài liệu này giữ quy tắc đọc kết quả và runbook của run M, lần train Ψ₀ đầu tiên trên cảnh đồ gá `jig2`. Story: [DA-48](../product/stories/DA-48-train-vong-moi-canh-do-ga.md). Plan: `configs/runplans/tray/he-tray-jig-m.yaml`. Các vòng trước (cảnh cũ) ở [tray.md](tray.md).
 
-Mọi số ở mục 1 và 3 là ước lượng trừ khi ghi "thực đo". Kết quả eval của run M ở mục 5; đề xuất vòng train tiếp (run N) và luật đọc của nó ở mục 6.
+Mọi số ở mục 1 và 3 là ước lượng trừ khi ghi "thực đo". Kết quả eval của run M ở mục 5; đề xuất vòng train tiếp (run N) và luật đọc của nó ở mục 6. Kết quả eval của run N ở mục 9.
 
 ## 1. Run M là gì
 
@@ -269,6 +269,55 @@ Lỗi vận hành gặp trong run, không ảnh hưởng trọng số:
 
 Giao cho làn eval (nhiệm vụ 6): đường dẫn Drive và sha256 ở bảng trên.
 
+## 9. Kết quả eval run N (thực đo, 28/11/2026)
+
+Eval của story [DA-50](../product/stories/DA-50-train-run-n-nham-loi-dat.md) nhiệm vụ 6: `ckpt_100000` của run N, cảnh `jig2`, bộ chấm bản 2, đúng 60 điều kiện của run M × 3 lượt = 180 rollout. Đọc theo khối `jig-n-rules` (mục 6). Số là sơ bộ: một seed train, một lần train, trong mô phỏng. Dữ liệu của N được chọn sau khi đã xem lỗi của M trên chính 60 điều kiện này, nên đây là kết quả trên tập dev, không phải holdout.
+
+**Điều kiện trước khi đọc.** Plan `rp_23b25206d96e` đã đóng băng. Ba server kiểm sha256 của checkpoint (`1011d2ce…12d0e2`, bản ghi ở mục 8; chỉ có một nguồn là Drive) và của stats (`3dae55d7…57bb6c`) trước khi nạp. Tập điều kiện `conditions.sha256` `bbec07e3…5d348`; seed của dữ liệu thêm không trùng seed eval (mục 7). Đủ 180 rollout: 18 lô đều `exit` 0 ở lần thử đầu, `missing` rỗng, không rollout nào bị loại. Sim trên `rtx3060` chạy đúng code đã chạy run M (commit `f809d363`); code serve trên VM ở commit `9758a339` (nhánh DA-50, đã push). Số của M là bản ở mục 5, không chạy lại.
+
+Bootstrap theo điều kiện, 10 000 lần, seed 20261126, lấy lại trong từng mức.
+
+| Quy tắc | Run N | Khoảng tin cậy 95 % | Kết luận |
+|---|---|---|---|
+| 1. Cả task, mốc 80 % | 68,9 % (124/180) | 61,1–76,1 | **Chưa đạt mốc 80 %** |
+| 1. Mức 1, mốc 70 % | 63,3 % (57/90) | 51,1–74,4 | **Chưa đạt mốc 70 %** |
+| 1. Mức 2, mốc 70 % | 74,4 % (67/90) | 65,6–83,3 | **Chưa đạt mốc 70 %** |
+| 1. Bước `place`, mốc 50 % | 85,0 % (153/180) | 79,4–90,6 | **Bước đặt trên 50 %** |
+| 2. N trừ M, cả task (60 điều kiện) | −6,7 điểm (68,9 so với 75,6) | −14,4 đến +1,1 | **Chưa phân biệt được N với M** |
+| 3. N trừ M, mức 2 (30 điều kiện) | +8,9 điểm (74,4 so với 65,6) | −3,3 đến +21,1 | **Chưa phân biệt được N với M** |
+
+Quy tắc 2: 16 điều kiện N cao hơn, 24 điều kiện M cao hơn, 20 bằng nhau. Quy tắc 3: 14, 8 và 8.
+
+**Mức 1, ngoài các quy tắc viết trước (mô tả).** Lệnh đọc cũng in hiệu riêng của mức 1: −22,2 điểm (63,3 so với 85,6), khoảng −33,3 đến −12,2, nằm hẳn dưới 0; 2 điều kiện N cao hơn, 16 điều kiện M cao hơn. Khối luật không có quy tắc cho riêng mức 1, nên không viết kết luận theo luật từ con số này.
+
+**Quy tắc 4, cơ chế (mô tả, không ngưỡng).**
+
+| | Run M | Run N |
+|---|---|---|
+| `L-PLACE-POSE` (mức 1 / mức 2) | 28 (8 / 20) | 32 (21 / 11) |
+| `L-TRAY-TILT` (mức 1 / mức 2) | 13 (5 / 8) | 12 (5 / 7) |
+| `L-TIMEOUT` | 1 | 6 |
+| `L-PART-DROP` | 1 | 3 |
+| `L-ONE-HAND` | 1 | 3 |
+| Tới bàn B | 178/180 | 172/180 |
+| Khay cuối không phẳng, trong các lượt tới bàn B | 58/178 | 60/172 |
+| Điều kiện thành công 3/3, 2/3, 1/3, 0/3, mức 1 | 18, 11, 1, 0 | 10, 10, 7, 3 |
+| Điều kiện thành công 3/3, 2/3, 1/3, 0/3, mức 2 | 10, 9, 11, 0 | 13, 11, 6, 0 |
+
+**Quy tắc 5.** Hiệu N trừ M chỉ quy cho cả tập dữ liệu mới. Không viết "dữ liệu lệch góc giúp" hay "hại": `L-PLACE-POSE` ở mức 2 giảm từ 20 xuống 11 trong khi ở mức 1 tăng từ 8 lên 21, và các phần của tập đổi cùng lúc. Chưa kiểm nguyên nhân mức 1 kém đi; hai điều khác nhau giữa hai run có thể liên quan là lô thêm nghiêng về mức 2 (59 %) và số epoch ở 100 000 bước giảm từ 1,69 xuống 1,30 (mục 7). Đây là giả thuyết.
+
+**Quy tắc 6.** Chỉ đọc `ckpt_100000`. Không đọc checkpoint nào khác.
+
+**Chạy.** Một phiên Colab L4 `da50-serve-n-1` với ba server, 03:36Z tới 06:46Z; mẫu kỹ thuật 6 điều kiện (5 thành công, 1 `L-TIMEOUT`) rồi 180 rollout trong ba làn trên `rtx3060`, 04:18Z tới 06:46Z. 7,38 CU (số dư 95,98 xuống 88,60), trong đó khoảng 40 phút đầu là dựng VM và chờ mount Drive. VM được dừng ngay khi lô cuối xong. Sổ chi phí: [DA-50.csv](../g0/ledger/DA-50.csv).
+
+Lệnh đọc (laptop):
+
+```bash
+uv run python -m flywheel_psi0.tray.eval_results configs/runplans/tray/he-tray-v2.yaml --set <tập của M> --out <lô N> --baseline <lô M> --repeats 3 --no-yaw --bootstrap-seed 20261126
+```
+
+Lệnh in hiệu ghép cặp của ba dòng trên; khoảng tin cậy của các mốc tuyệt đối và của bước `place` tính bằng `eval_results.bootstrap_ci` với cùng seed. Outcome K1 và `Score` của run N (180 dòng mỗi file) đã xuất cho nhóm C; trường `run_plan_id` trong đó là id plan của tập điều kiện (`rp_a410d01efa62`), không phải plan N.
+
 ## Change log
 
 | Ngày | Nội dung | Người |
@@ -279,3 +328,4 @@ Giao cho làn eval (nhiệm vụ 6): đường dẫn Drive và sha256 ở bảng
 | 26/11/2026 | Mục 5 mới: kết quả eval run M đọc theo mục 2 (thực đo). Mục 6 mới: đề xuất run N và khối luật đọc `jig-n-rules`. Khối `jig-m-rules` không đổi | Hiếu (soạn với Claude) |
 | 27/11/2026 | Mục 7 mới: tập dữ liệu, plan đóng băng và runbook train của run N. Hai khối luật không đổi | Hiếu (soạn với Claude) |
 | 28/11/2026 | Mục 8 mới: số thực đo của lần train run N (100 000 bước, 55,78 CU, sha256 của `ckpt_100000` trên Drive), các lỗi vận hành; mục 7 ghi tar đã lên Drive. Hai khối luật không đổi | Hiếu (soạn với Claude) |
+| 28/11/2026 | Mục 9 mới: kết quả eval run N đọc theo `jig-n-rules` (thực đo). Hai khối luật không đổi | Hiếu (soạn với Claude) |
