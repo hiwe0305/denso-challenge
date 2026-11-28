@@ -508,7 +508,8 @@ export function renderChatStudioPage() {
       : t("analysis.reasoning", { count }) });
     summary.addEventListener("click", () => reasoningOpen.set(tr.id, { open: !box.open, running: isRunning }));
     const artifacts = getActiveSession().artifacts || [];
-    box.append(summary, el("ol", { className: "reasoning-steps" }, tr.steps.map((st) => {
+    // never box.append(null): the DOM writes a null child as the text "null"
+    box.append(...[summary, el("ol", { className: "reasoning-steps" }, tr.steps.map((st) => {
       const rows = st.ms === null || st.ok === false ? null : Number.isFinite(st.rows) ? st.rows : stepRows(st.ui);
       return el("li", { className: "reasoning-step" }, [
         el("span", { className: cls("step-status-icon", st.ms === null && "running", st.ms !== null && !st.ok && "err"), "aria-hidden": "true" },
@@ -525,7 +526,7 @@ export function renderChatStudioPage() {
               onClick: () => openArtifactInWorkbench(st.artifactId) }, [t("studio.openInWorkbench")])
           : null,
       ]);
-    })), tokMeta ? el("small", { className: cls("muted", "reasoning-total"), text: tokMeta }) : null);
+    })), tokMeta ? el("small", { className: cls("muted", "reasoning-total"), text: tokMeta }) : null].filter(Boolean));
     return box;
   };
 
