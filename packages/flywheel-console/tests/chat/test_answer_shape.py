@@ -219,12 +219,16 @@ def test_the_panel_names_tools_plainly_and_shows_the_step_trace() -> None:
     import re
     from pathlib import Path
 
-    js = (Path(llm.__file__).parent.parent / "web" / "chat.js").read_text(encoding="utf-8")
+    web = Path(llm.__file__).parent.parent / "web"
+    js = (web / "chat.js").read_text(encoding="utf-8")
     assert "export function toolLabel" in js and "export function renderTraceBox" in js
     assert 'el("b", { className: "mono", text: st.name })' not in js
-    # the web map and the server map name every tool the same way
-    pairs = dict((n, (vi, en)) for n, vi, en in re.findall(r'^\s+(\w+): \["([^"]*)", "([^"]*)"\],', js, re.M))
-    assert pairs == registry.TOOL_LABELS
+    # the web dictionaries and the server map name every tool the same way
+    names = {}
+    for k, lang in enumerate(("vi", "en")):
+        for n, label in re.findall(r'^\s+"chat\.tool\.(\w+)": "([^"]*)",', (web / "i18n" / f"{lang}.js").read_text(encoding="utf-8"), re.M):
+            names.setdefault(n, ["", ""])[k] = label
+    assert {n: tuple(p) for n, p in names.items()} == registry.TOOL_LABELS
     assert set(registry.TOOLS) <= set(registry.TOOL_LABELS)
     # "Quá trình suy luận" is shown on a locked console too, and never holds the model's thinking
     assert "!state.locked" not in js.split("export function renderTraceBox")[1].split("\nfunction ")[0]

@@ -465,41 +465,12 @@ function buildTable(lines, startIdx) {
   return { node: el("div", { className: "md-table-wrap" }, [table]), next };
 }
 
-// A readable name for each chat lookup; the raw tool name stays in the trace and diagnostics.
-const TOOL_LABELS = {
-  round_report: ["Báo cáo vòng", "Round report"],
-  round_diagnosis: ["Chẩn đoán vòng", "Round diagnosis"],
-  rounds_side_by_side: ["Các vòng cạnh nhau", "Rounds side by side"],
-  pair_comparisons: ["Phép so sánh cặp", "Paired comparisons"],
-  failure_table: ["Bảng lỗi", "Failure table"],
-  train_progress: ["Tiến độ train", "Training progress"],
-  project_status: ["Diễn tiến dự án", "Project status"],
-  ego_summary: ["Video egocentric", "Egocentric video"],
-  catalog_search: ["Tìm bộ dữ liệu", "Dataset search"],
-  dataset_stats: ["Thống kê bộ dữ liệu", "Dataset statistics"],
-  episode_list: ["Danh sách episode", "Episode list"],
-  episode_get: ["Chi tiết episode", "Episode details"],
-  qa_summary: ["Kết quả QA", "QA summary"],
-  run_list: ["Danh sách run", "Run list"],
-  run_metrics: ["Đường loss của run", "Run curve"],
-  run_compare: ["So đường của các run", "Run curves compared"],
-  log_tail: ["Log", "Log"],
-  eval_summary: ["Kết quả thi trước", "Earlier eval"],
-  eval_failures: ["Lỗi khi thi", "Eval failures"],
-  loop_proposals: ["Đề xuất của vòng lặp", "Loop proposals"],
-  ledger_query: ["Sổ chi phí", "Cost ledger"],
-  job_list: ["Danh sách job", "Job list"],
-  job_get: ["Chi tiết job", "Job details"],
-  findings: ["Phát hiện QA", "QA findings"],
-  lineage: ["Nguồn gốc dữ liệu", "Data lineage"],
-  open_page: ["Mở trang", "Open page"],
-  propose_job: ["Đề xuất job", "Job proposal"],
-};
+// A readable name for each chat lookup (i18n chat.tool.*); the raw tool name stays in the trace
+// and diagnostics. chat/registry.py TOOL_LABELS holds the same pairs for the server's events.
 
 export function toolLabel(name) {
-  const pair = TOOL_LABELS[String(name || "")];
-  if (!pair) return String(name || "");
-  return state.lang === "en" ? pair[1] : pair[0];
+  const key = "chat.tool." + String(name || "");
+  return hasI18nKey(key) ? t("chat.tool." + String(name || "")) : String(name || "");
 }
 
 // Source chips under an answer; `sources` is done.sources (array of strings).
@@ -574,12 +545,11 @@ function chartTable(obj) {
 // note and a table when the block breaks a rule; never the raw JSON. opts.unverified marks the
 // chart's numbers the server could not check; opts.index > 2 is over the limit.
 export function renderChartSpec(raw, opts = {}) {
-  const vien2 = (vi, en) => (state.lang === "en" ? en : vi);
   const parsed = parseChartSpec(raw);
   const over = (opts.index || 1) > CHART_MAX;
   if (!parsed.spec || over) {
     return el("div", { className: "md-chart md-chart-invalid" }, [
-      el("div", { className: "missing-item", text: vien2("Không vẽ được biểu đồ.", "The chart could not be drawn.") }),
+      el("div", { className: "missing-item", text: t("chat.chart.invalid") }),
       chartTable(parsed.obj),
     ]);
   }
@@ -626,7 +596,7 @@ export function renderMarkdownInto(container, rawText, isStreaming = false, opts
         charts += 1;
         if (!closed && isStreaming) {
           // the block is still arriving: a placeholder until its fence closes
-          blocks.push(el("div", { className: cls("md-chart", "md-chart-pending", "tiny"), text: state.lang === "en" ? "Drawing the chart…" : "Đang vẽ biểu đồ…" }));
+          blocks.push(el("div", { className: cls("md-chart", "md-chart-pending", "tiny"), text: t("chat.chart.pending") }));
         } else {
           blocks.push(renderChartSpec(codeStr, { unverified: opts.unverified, index: charts }));
         }
@@ -1770,18 +1740,16 @@ function updateSlashMenu() {
   els.slashMenu._matches = matches;
 }
 
-const vien = (vi, en) => (state.lang === "en" ? en : vi);
-
 // "Quá trình suy luận": the steps the console took for the turn (round, each lookup with its
 // rows and time, the number check), never the model's own reasoning, prompt or tool text
 export function renderTraceBox(tr, isRunning) {
   const steps = tr.steps || [];
   if (steps.length === 0 && !tr.traceRound) return null;
   const head = [];
-  if (tr.traceRound) head.push(el("li", { className: "trace-line", text: vien(`Vòng: ${tr.traceRound}`, `Round: ${tr.traceRound}`) }));
+  if (tr.traceRound) head.push(el("li", { className: "trace-line", text: t("chat.trace.round", { round: tr.traceRound }) }));
   const stepNodes = steps.map((st) => {
     const meta = [];
-    if (Number.isFinite(st.rows)) meta.push(vien(`${st.rows} dòng`, `${st.rows} rows`));
+    if (Number.isFinite(st.rows)) meta.push(t("chat.trace.rows", { n: st.rows }));
     meta.push(st.ms === null ? "…" : `${st.ms} ms`);
     return el(
       "details",
@@ -1805,13 +1773,10 @@ export function renderTraceBox(tr, isRunning) {
     const n = tr.groundedCount || 0;
     const bad = (tr.unverified || []).length;
     tail.push(
-      el("li", {
-        className: "trace-line",
-        text: vien(`Đối chiếu số: ${n} khớp, ${bad} chưa khớp`, `Number check: ${n} matched, ${bad} not matched`),
-      })
+      el("li", { className: "trace-line", text: t("chat.trace.check", { ok: n, bad }) })
     );
   }
-  const summaryText = `💭 ${t("chat.reasoningTitle")} · ${vien(`${steps.length} bước`, `${steps.length} steps`)}`;
+  const summaryText = `💭 ${t("chat.reasoningTitle")} · ${t("chat.trace.steps", { n: steps.length })}`;
   const hasChart = steps.some((st) => st.ui && ["bar", "line", "thumbs", "confirm"].includes(st.ui.type));
   return el("details", { className: "reasoning-box", open: Boolean(isRunning) || hasChart }, [
     el("summary", { text: summaryText }),
