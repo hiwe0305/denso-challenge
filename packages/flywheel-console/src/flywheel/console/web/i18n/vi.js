@@ -832,7 +832,6 @@ export default {
   "exp.targetAt": "Mốc {pct}, đọc ở cận dưới",
   "exp.targetPlace": "Mốc trên {pct}, đọc ở cận dưới",
   "exp.verdictMet": "Đạt mốc {pct}",
-  "exp.verdictPlaceMet": "Bước đặt trên {pct}",
   "exp.verdictNotMet": "Chưa đạt mốc {pct}",
   "exp.verdictBlocked": "Không đọc theo luật",
   "exp.verdictNoCi": "Chưa có khoảng tin cậy, không có câu đọc",

@@ -75,6 +75,17 @@ def test_diagnose_reads_english_cluster_words() -> None:
     assert 'field + "_en"' in story
 
 
+def test_place_rule_met_reading_uses_the_common_wording() -> None:
+    # Rule 3 (place step) reads "Dat moc {pct}" like rules 1-2 (approved N4 wording, 28/11)
+    for name in ("pages_story.js", "core.js", "i18n/vi.js", "i18n/en.js"):
+        text = (WEB / name).read_text(encoding="utf-8")
+        assert "exp.verdictPlaceMet" not in text, name
+    assert '"exp.verdictMet": "Đạt mốc {pct}"' in (WEB / "i18n/vi.js").read_text(encoding="utf-8")
+    assert '"exp.verdictMet": "Meets the {pct} target"' in (WEB / "i18n/en.js").read_text(
+        encoding="utf-8"
+    )
+
+
 def test_no_hex_in_pages() -> None:
     pages = sorted(WEB.glob("pages_*.js"))
     assert pages, "expected pages_*.js modules in web/"

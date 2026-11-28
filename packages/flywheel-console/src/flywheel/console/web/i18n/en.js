@@ -832,7 +832,6 @@ export default {
   "exp.targetAt": "Target {pct}, read at the lower bound",
   "exp.targetPlace": "Target above {pct}, read at the lower bound",
   "exp.verdictMet": "Meets the {pct} target",
-  "exp.verdictPlaceMet": "Place step above {pct}",
   "exp.verdictNotMet": "Does not meet the {pct} target",
   "exp.verdictBlocked": "Not read by the rules",
   "exp.verdictNoCi": "No confidence interval yet, no reading",
