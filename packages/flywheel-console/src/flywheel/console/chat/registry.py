@@ -47,6 +47,9 @@ from .tools_runs import (
 ToolFn = Callable[[dict[str, Any], dict[str, Any]], Result]
 MAX_OFFERED = 7  # plus open_page
 ANALYSIS_TOOLS = ["round_report", "round_diagnosis", "pair_comparisons"]
+# what a deep analysis may read in a row: the round's facts first, then failures, training,
+# other rounds side by side and the project's next steps (Hiếu, 28/11/2026)
+DEEP_TOOLS = [*ANALYSIS_TOOLS, "failure_table", "train_progress", "rounds_side_by_side", "project_status"]
 
 # The step names the reasoning trace shows (vi, en); web/chat.js TOOL_LABELS holds the same pairs
 TOOL_LABELS: dict[str, tuple[str, str]] = {
