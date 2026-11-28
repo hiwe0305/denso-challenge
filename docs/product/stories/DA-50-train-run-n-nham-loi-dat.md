@@ -94,12 +94,12 @@ Luật đọc: khối `jig-n-rules` ở [tray-jig.md](../../he/tray-jig.md) mụ
   - [x] 4.1 Dựng tập ghép, kiểm seed (tiêu chí 3). Tập N trên `rtx3060` (`~/fwdata/da50-n/N/`): 1 591 episode (1 037 của M, cộng 227 và 327 đoạn đặt lệch góc), 1 230 839 khung; 554 seed mới không trùng seed eval và seed của M (lệnh và output trong commit)
   - [x] 4.2 Viết và đóng băng `he-tray-jig-n.yaml`; dòng ledger ước tính. Plan `rp_23b25206d96e`, `mixplan check --launch` in "launch OK"; runbook ở tray-jig.md mục 7; trần 70 CU là **[Đề xuất]**, chờ Hiếu duyệt trong PR
 - [x] 5. Train run N trên Colab L4 (Hiếu chạy), dừng VM ngay khi xong. Xong 28/11/2026: 100 000 bước, 55,78 CU, `ckpt_100000` trên Drive; VM không được dừng ngay (chờ khoảng 2,4 giờ), xem [tray-jig.md](../../he/tray-jig.md) mục 8
-- [ ] 6. Eval và đọc
+- [x] 6. Eval và đọc
   - [x] 6.1 Hiệu ghép cặp trên nhiều lượt mỗi điều kiện trong `eval_results` (`paired_diff_repeats`, khối `paired.repeats`), có test CPU. Lệnh đọc N so với M: `eval_results configs/runplans/tray/he-tray-v2.yaml --set <tập> --out <lô N> --baseline <lô M> --repeats 3 --no-yaw --bootstrap-seed 20261126`
   - [x] 6.4 Sửa theo review sau merge của PR 228 (phiên điều phối, 27/11/2026): `eval_set` từ chối cảnh lệch với `task.env_id` của plan; `eval_results` và `place_error` cảnh báo và ghi `plan_mismatch` khi tập điều kiện được dựng cho plan khác plan đang đọc
   - [x] 6.5 `colab_serve --branch N` và `expect --checkpoint-sha256` (laptop không có checkpoint của N; sha256 lấy từ bản ghi lúc train xong, VM vẫn kiểm file trên Drive)
-  - [ ] 6.2 Eval 180 rollout theo runbook của DA-47
-  - [ ] 6.3 Đọc theo `jig-n-rules`, ghi kết quả và dòng ledger thực đo
+  - [x] 6.2 Eval 180 rollout theo runbook của DA-47. Xong 28/11/2026: 18 lô `exit` 0, đủ 180 rollout, 7,38 CU ([tray-jig.md](../../he/tray-jig.md) mục 9)
+  - [x] 6.3 Đọc theo `jig-n-rules`, ghi kết quả và dòng ledger thực đo. Run N 68,9 % (124/180), chưa đạt mốc 80 %; N so với M chưa phân biệt được ở cả task và ở mức 2 (tray-jig.md mục 9)
 - [ ] 7. Kiểm tra cuối và PR
 
 ## Phạm vi file
@@ -158,3 +158,4 @@ Hiếu (làm cùng Claude), duyệt cuối: Hiếu.
 | 27/11/2026 | 3.1, 3.2, 4.1, 4.2 xong: lô lệch góc (554 đoạn đặt giữ lại), tập N và plan `rp_23b25206d96e`; Phạm vi file ghi từng đường dẫn để `pr_guard` đọc được | Hiếu (soạn với Claude) |
 | 28/11/2026 | Nhiệm vụ 5 xong: train run N (Hiếu cho chạy 27/11/2026, "Chạy train N"), số thực đo ở tray-jig.md mục 8 và dòng sổ thực đo | Hiếu (soạn với Claude) |
 | 28/11/2026 | 6.5 thêm và xong: serve run N từ `colab_serve` để eval | Hiếu (soạn với Claude) |
+| 28/11/2026 | 6.2 và 6.3 xong: eval run N và đọc theo `jig-n-rules`; dòng ledger thực đo của phiên eval (không có dòng ước tính ghi trước) | Hiếu (soạn với Claude) |
