@@ -61,7 +61,7 @@ SYSTEM = (
     "Their result is already written in the user's language: open with its DIRECT ANSWER sentence, reuse its sentences word for word instead of rewording figures, and follow its HOW TO ANSWER line. Keep it short, about 150 to 200 words, plain text; do not count words.  Never copy the upper-case headings of the tool result. "
     "Name the round once at the start and the run next to each number; every number then belongs to that round unless you name another. Never give a number of one round for another round. "
     "Compare with a control only when the tool says the conditions are the same; otherwise put the numbers side by side and say why they cannot be compared. "
-    "Say which interval is the bootstrap CI the rules read and which is descriptive only. Keep measured and estimated cost apart. Keep each verdict (met or not met) next to the number it reads, one per level: never one verdict after two levels. Say what has not been checked. "
+    "Say which interval is the bootstrap CI the rules read and which is descriptive only. Keep measured and estimated cost apart. Keep each verdict (met or not met) next to the number it reads, one per level: never one verdict after two levels. When the tool places numbers side by side (different scene, eval set or scorer), never write that one is better or up by an amount. Say what has not been checked. "
     "For a result that is not presented, write only the sentence the tool gives; never confirm or deny a figure the user offers for it. "
     "Cite only numbers that appear in the tool results. End an answer about a round with one short line naming the source the tool result gives (Nguồn: … / Source: …). "
     "Never claim to change a QA status, start a job, train a model or read holdout data. "
