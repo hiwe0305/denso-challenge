@@ -18,9 +18,11 @@ from .tools_data import (
     qa_summary,
 )
 from .tools_ops import KINDS, findings, job_get, job_list, open_page, propose_job
+from .tools_project import failure_table, project_status, train_progress
 from .tools_round import (
     RANK_RX,
     asks_held,
+    asks_hidden,
     ego_summary,
     pair_comparisons,
     pair_runs_named,
@@ -71,7 +73,7 @@ def P(**props: tuple[str, str]) -> dict[str, Any]:
 
 TOOLS: dict[str, tuple[ToolFn, str, str, dict[str, Any]]] = {
     "ego_summary": (ego_summary, "/ego", "The egocentric (human first-person video) pipeline in numbers: clips in, episodes exported, clips rejected by QA or left out, the QA reasons. Call this for any question about egocentric or human video clips as a whole (video người, clip egocentric, đã xuất, bị loại).", P()),
-    "round_report": (round_report, "/round", "ALL facts of the selected task and ONE Failure -> Data round in one call, already written in the user's language and tagged with the round they belong to: each model's test result with its confidence interval and the reading rules (marks met or not), the model with the most successes and whether the intervals tell the models apart, where the robot fails, the side-by-side table against earlier runs, the diagnosis summary, the data order, the cost of the round, the limits, the points worth raising and options for next steps. Also the status of a task that has no round yet. Call this FIRST for results, status, 'which model has the most successes', 'does it meet the mark', 'where does it fail', 'cost of the round', 'analyse', 'comment', 'assess', 'why', 'what next', 'summarise' (kết quả, đạt mốc, hỏng ở đâu, chi phí vòng, nhận xét, phân tích, đánh giá, vì sao, nên làm gì, tóm tắt).",
+    "round_report": (round_report, "/round", "ALL facts of the selected task and ONE Failure -> Data round in one call, as labelled data rows in the user's language, tagged with the round they belong to: each model's test result with its confidence interval and the reading rules (marks met or not), the model with the most successes and whether the intervals tell the models apart, where the robot fails, the side-by-side table against earlier runs, the diagnosis summary, the data order, the cost of the round, the limits, the points worth raising and options for next steps. Also the status of a task that has no round yet. Call this FIRST for results, status, 'which model has the most successes', 'does it meet the mark', 'where does it fail', 'cost of the round', 'analyse', 'comment', 'assess', 'why', 'what next', 'summarise' (kết quả, đạt mốc, hỏng ở đâu, chi phí vòng, nhận xét, phân tích, đánh giá, vì sao, nên làm gì, tóm tắt).",
                      P()),
     "round_diagnosis": (round_diagnosis, "/diagnosis", "Diagnosis of the selected round: each failure group (c1-c8) with its diagnosis and whether it got data, the step-4 system checks (H1-H3) with their verdict and ticket, and the cost of generating and checking the data. Call this for 'why were these groups chosen', 'which system issues were ruled out', 'what did step 4 find', tickets (vì sao chọn cụm, lỗi hệ thống nào đã loại trừ, bước 4, phiếu).",
                         P()),
@@ -79,6 +81,12 @@ TOOLS: dict[str, tuple[ToolFn, str, str, dict[str, Any]]] = {
                             P(rounds=("array", "round ids, e.g. tray-r1, tray-jig-r1"))),
     "pair_comparisons": (pair_comparisons, "/comparisons", "The paired comparisons fixed in advance between the models of the DA-34 round, each with its difference, confidence interval and McNemar p, read descriptively. Call this for confidence intervals, significance, 'is the difference real' (khoảng tin cậy, phép so sánh, có khác biệt thật không).",
                          P()),
+    "failure_table": (failure_table, "/failures", "Failure labels by run for every round of the task (or the round the question names): one row per failure label with the count of each run, then failed and n per run, the scorer version of each round and whether two rounds can be compared. Never a run whose result is not presented. Call this for every failure type, failure statistics, a table of failures (thống kê lỗi, toàn bộ loại lỗi, bảng lỗi, nhãn lỗi, lỗi theo run).",
+                      P(round=("string", "round id, e.g. tray-r1 or tray-jig-r1; omit for every round"))),
+    "train_progress": (train_progress, "/train", "Training progress of each run of the round(s): steps done of max, state, steps per second, VM hours by phase (setup, train, persist) and whether they cover the whole run, measured training CU, and the loss as a trend only (first value, end mean, late trend) with the note that training loss is not a measure of the result. Call this for training progress, phases, training logs, loss of a run (tiến độ train, các phase, log training, loss, train mất bao lâu).",
+                       P(round=("string", "round id; omit for every round"))),
+    "project_status": (project_status, "/status", "Where the project stands: the latest presented result with its numbers, the dated timeline of work since 18/11 with results, the next steps written in the docs, and how the rounds of the task link (default round, previous and next round). Says which parts the index does not have yet. Call this for project status, progress so far, what has been done, what is the latest result, what comes next (tình hình dự án, diễn tiến, đã làm gì, kết quả mới nhất, bước tiếp theo).",
+                       P()),
     "catalog_search": (catalog_search, "/catalog", "List datasets in the catalog. Use for 'what datasets', 'which sets are teleop/egocentric/synthetic', find a dataset by text.",
                        P(q=("string", "free text"), data_type=("string", "egocentric | teleop | synthetic"), task=("string", "tray | two_table"), status=("string", "current | upstream"), limit=("integer", "max rows"))),
     "dataset_stats": (dataset_stats, "/stats", "Statistics of ONE dataset: episodes, hours, frames, fps, size, length histogram.",
@@ -275,6 +283,56 @@ _EARLIER_RX = re.compile(r"\bpolicy C\b|\beval C\b|40k|lần thi trước", re.I
 _WHY_RX = re.compile(r"vì sao|tại sao|\bwhy\b|hỏng|thất bại|\bfail|lỗi|điểm yếu|\bweak", re.I)
 
 
+# the questions the audit of 28/11/2026 found with no lookup of their own (05-danh-gia-chat-2811.md)
+FAILURE_TABLE_RX = re.compile(r"thống kê.{0,40}lỗi|loại lỗi|nhãn lỗi|bảng lỗi|(các|mọi|toàn bộ|tất cả)( các)? (loại )?lỗi|lỗi (của )?(các|mọi|từng) run|"
+                              r"failure (table|labels?|types?|breakdown|counts?|statistics)|(types?|kinds?) of failures?|all (the )?failures|failures? (by|per) run|error types", re.I)  # fmt: skip
+TRAIN_PROGRESS_RX = re.compile(r"tiến độ.{0,30}(train|huấn luyện)|(train|training|huấn luyện).{0,40}(tiến độ|phase|log)|\bphases?\b|\blogs? (train|training)|"
+                               r"training (log|progress|phases?)|đánh giá.{0,30}\blogs?\b|train (đến đâu|tới đâu|bao nhiêu bước)", re.I)  # fmt: skip
+PROJECT_STATUS_RX = re.compile(r"tiến độ (của )?dự án|dự án.{0,30}(đến đâu|tới đâu|thế nào|ra sao|tiến độ|diễn tiến)|diễn tiến|timeline|dòng thời gian|"
+                               r"(đã|vừa) làm (được )?(những )?gì|gần đây (đã|có) gì|project (status|progress|timeline)|where (is the project|are we)|what has been done|what('s| is) new", re.I)  # fmt: skip
+# "what should we do / how to improve": the weak points of the latest presented result and the
+# next steps the documents give (sample C)
+NEXT_RX = re.compile(r"nên làm gì|cần làm gì|làm gì (tiếp|để|bây giờ|nữa)|cải thiện|bước tiếp|việc tiếp|hướng tiếp|"
+                     r"what (should|do) (we|i) do|next steps?|\bimprove", re.I)  # fmt: skip
+# words that mean the newest result, not the round in the top bar ("mới nhất", "hiện tại")
+_LATEST_RX = re.compile(r"tốt nhất|cao nhất|mới nhất|gần nhất|hiện tại|hiện giờ|bây giờ|\bbest\b|highest|latest|newest|most recent|\bcurrent\b|\bnow\b", re.I)
+# ... unless the question points at the selected round itself
+_THIS_ROUND_RX = re.compile(r"vòng này|round này|this round|the selected round", re.I)
+
+
+def asks_latest(question: Any) -> bool:
+    """True for a best / latest / what-next question that names no round and no run: it is about
+    the latest presented result (run M), whatever round the top bar shows (Hiếu, 28/11/2026)."""
+    q = str(question or "")
+    if _THIS_ROUND_RX.search(q) or rounds_named(q) or runs_named(q):
+        return False
+    return bool(_LATEST_RX.search(q) or RANK_RX.search(q) or NEXT_RX.search(q))
+
+
+def latest_round(task: Any = None) -> str:
+    """The round of the latest presented result: ``story.latest.round``, else the task's
+    ``default_round``, else the task's round with the highest number. Empty when none is known."""
+    from .common import story
+    from .tools_round import manifest
+
+    m = manifest()
+    rounds = [r for r in m.get("rounds") or [] if isinstance(r, dict) and r.get("id")]
+    ids = {str(r["id"]) for r in rounds}
+    try:
+        latest = (story().get("latest") or {}).get("round")
+    except Exception:
+        latest = None
+    if latest and str(latest) in ids:
+        return str(latest)
+    tasks = [t for t in m.get("tasks") or [] if isinstance(t, dict)]
+    t = next((x for x in tasks if x.get("id") == task), tasks[0] if tasks else None)
+    if t and str(t.get("default_round") or "") in ids:
+        return str(t["default_round"])
+    mine = [r for r in rounds if not t or r.get("task") == t.get("id")]
+    best = max(mine, key=lambda r: int(r.get("number") or 0), default=None)
+    return str(best["id"]) if best else ""
+
+
 def forced_tools(question: Any) -> list[str]:
     """Every tool the code runs itself, in order, before the model writes anything (see
     ``forced_tool``). Three questions need more than one lookup or a lookup ``forced_tool`` does
@@ -292,6 +350,15 @@ def forced_tools(question: Any) -> list[str]:
     if RANK_RX.search(q) and not _dataset_in(strip_round_refs(q)):
         # "which run is best / better", a ranking: the test results of the round, never the loss
         return ["round_report"]
+    if FAILURE_TABLE_RX.search(q) and not _dataset_in(strip_round_refs(q)):
+        return ["failure_table"]  # every run's failure labels, every round (sample A)
+    if TRAIN_PROGRESS_RX.search(q) and not _dataset_in(strip_round_refs(q)) and not asks_hidden(q):
+        # the loss of one run ("Loss của C_70 thế nào?") stays the model's curve lookup (run_metrics)
+        return ["train_progress"]  # phases, steps, hours, CU; loss as a trend only
+    if PROJECT_STATUS_RX.search(q) and not rounds_named(q) and not runs_named(q):
+        return ["project_status"]
+    if NEXT_RX.search(q) and not _dataset_in(strip_round_refs(q)) and not _COST_RX.search(q):
+        return ["round_report"]  # weak points of the latest result and the documented next steps (sample C)
     if _COST_RX.search(q) and _PROJECT_RX.search(q) and not rounds_named(q) and not runs_named(q):
         return ["ledger_query"]
     if len(rounds_named(q)) >= 2 and not runs_named(q) and not _LOOKUP_RX.search(q):

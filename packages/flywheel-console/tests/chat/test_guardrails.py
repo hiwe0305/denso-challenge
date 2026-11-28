@@ -21,7 +21,8 @@ def test_tool_denies_vault_path(idx: ConsolePaths) -> None:
 
 
 def test_no_training_or_shell_tool(idx: ConsolePaths) -> None:
-    assert not any("train" in n and n != "run_metrics" for n in registry.TOOLS)
+    # train_progress only reads the index (steps, phases, CU, loss trend): no tool starts training
+    assert not any("train" in n and n not in ("run_metrics", "train_progress") for n in registry.TOOLS)
     assert not registry.call("propose_job", {"kind": "train", "params": {}})["ok"]
     assert not registry.call("run_shell", {"cmd": "ls"})["ok"]
 
