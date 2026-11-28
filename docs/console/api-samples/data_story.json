@@ -741,15 +741,19 @@
     "n": 14,
     "diagnosis": "KỸ NĂNG YẾU 5/5",
     "intervention": "sinh quanh lỗi",
+    "diagnosis_en": "WEAK SKILL 5/5",
+    "intervention_en": "generate around the failures",
     "failures": 10
    },
    {
-    "id": "c2",
-    "stage": "place",
-    "n": 12,
-    "diagnosis": "KỸ NĂNG YẾU 4/5",
-    "intervention": "sinh quanh lỗi",
-    "failures": 10
+    "id": "c4",
+    "stage": "—",
+    "diagnosis": "thiếu tín hiệu đo",
+    "intervention": "phiếu DA-38",
+    "diagnosis_en": "missing measurement signal",
+    "intervention_en": "ticket DA-38",
+    "historical": true,
+    "closed": "2026-11-06"
    }
   ],
   "per_case": {
@@ -2022,23 +2026,25 @@
     "quote": "| c1 | `place` | `L-PLACE-POSE` | 1 | 14 | Bước 5–8 |"
    },
    {
-    "id": "c2",
+    "id": "c4",
     "key": {
-     "step": "place",
-     "label": "L-PLACE-POSE",
+     "step": "release_stand",
+     "label": "L-TRAY-TILT",
      "level": 2
     },
-    "n_fail": 12,
-    "diagnosis": "KỸ NĂNG YẾU 4/5",
-    "diagnosis_en": "WEAK SKILL 4/5",
-    "intervention": "sinh quanh lỗi",
-    "intervention_en": "generate around the failures",
-    "gets_data": true,
+    "n_fail": 4,
+    "diagnosis": "thiếu tín hiệu đo",
+    "diagnosis_en": "missing measurement signal",
+    "intervention": "phiếu DA-38",
+    "intervention_en": "ticket DA-38",
+    "gets_data": false,
     "source": [
      "docs/he/tray.md §20.2",
-     "docs/he/tray.md §20.13"
+     "docs/he/tray.md §20.11"
     ],
-    "quote": "| c2 | `place` | `L-PLACE-POSE` | 2 | 12 | Bước 5–8 |"
+    "quote": "| c4 | `release_stand` | `L-TRAY-TILT` | 2 | 4 | Kiểm H3 |",
+    "historical": true,
+    "closed": "2026-11-06"
    }
   ],
   "step4": [
@@ -2054,7 +2060,10 @@
     "verdict_en": "UNCLEAR (scorer threshold)",
     "ticket": "DA-37",
     "source": "docs/he/tray.md §20.11",
-    "quote": "**H1: chuỗi bước gãy ở `approach_a`.** CHƯA RÕ (ngưỡng bộ chấm), phiếu cho DA-37."
+    "quote": "**H1: chuỗi bước gãy ở `approach_a`.** CHƯA RÕ (ngưỡng bộ chấm), phiếu cho DA-37.",
+    "historical": true,
+    "closed": null,
+    "handled_by": "DA-42"
    },
    {
     "id": "H2",
@@ -2096,6 +2105,173 @@
     "docs/he/tray.md §20.11",
     "docs/he/tray.md §20.16"
    ]
+  }
+ },
+ "timeline": [
+  {
+   "date": "2026-11-12",
+   "story": "DA-34",
+   "title": {
+    "vi": "Vòng 1: chẩn đoán lỗi của C_70 sau giai đoạn 1",
+    "en": "Round 1: diagnosis of the failures of C_70 after stage 1"
+   },
+   "result": {
+    "vi": "C_70: 10 thành công, 50 lỗi; lỗi chính ở bước đặt",
+    "en": "C_70: 10 successes, 50 failures; most failures at the place step"
+   },
+   "doc": "docs/he/tray.md §20.2",
+   "round": "tray-r1"
+  },
+  {
+   "date": "2026-11-19",
+   "story": "DA-42",
+   "title": {
+    "vi": "Bộ chấm khay bản 2",
+    "en": "Tray scorer version 2"
+   },
+   "result": {
+    "vi": "Bản 2 sửa approach_a và L-TRAY-TILT; bản 1 vẫn chạy được để so",
+    "en": "Version 2 fixes approach_a and L-TRAY-TILT; version 1 still runs for comparison"
+   },
+   "doc": "docs/g0/tray/scorer-v2.md §1",
+   "round": "tray-jig-r1"
+  },
+  {
+   "date": "2026-11-22",
+   "story": "DA-41",
+   "title": {
+    "vi": "Cảnh đồ gá jig2 và lô khoảng 600 episode",
+    "en": "Jig scene jig2 and a batch of about 600 episodes"
+   },
+   "result": {
+    "vi": "632 lượt chạy, 595 ghi được, giữ 568 episode (403 mức 1, 165 mức 2)",
+    "en": "632 runs, 595 recorded, 568 episodes kept (403 level 1, 165 level 2)"
+   },
+   "doc": "docs/g0/tray/jig.md §4.12",
+   "round": "tray-jig-r1"
+  },
+  {
+   "date": "2026-11-25",
+   "story": "DA-46",
+   "title": {
+    "vi": "Dữ liệu riêng cho bước đặt",
+    "en": "Data for the place step"
+   },
+   "result": {
+    "vi": "612 bản cắt đoạn đặt, lệch đích ±10 cm; run M dùng 539 (377 + 162) sau lọc ≤ 3 cm",
+    "en": "612 place-segment cuts, target offset ±10 cm; run M uses 539 (377 + 162) after the ≤ 3 cm filter"
+   },
+   "doc": "docs/g0/tray/place-data.md §7; docs/he/tray-jig.md §1",
+   "round": "tray-jig-r1"
+  },
+  {
+   "date": "2026-11-26",
+   "story": "DA-48",
+   "title": {
+    "vi": "Train run M trên cảnh đồ gá",
+    "en": "Training of run M on the jig scene"
+   },
+   "result": {
+    "vi": "100 000 bước trên tập 1 037 episode; 56,15 CU, khoảng 21 giờ",
+    "en": "100000 steps on a set of 1037 episodes; 56.15 CU, about 21 hours"
+   },
+   "doc": "docs/he/tray-jig.md §4, §1",
+   "round": "tray-jig-r1"
+  },
+  {
+   "date": "2026-11-26",
+   "story": "DA-47",
+   "title": {
+    "vi": "Eval run M: 180 rollout trên cảnh đồ gá",
+    "en": "Eval of run M: 180 rollouts on the jig scene"
+   },
+   "result": {
+    "vi": "136/180 thành công (75,6 %), bước đặt 89,4 % (161/180); mức 1 85,6 %, mức 2 65,6 %",
+    "en": "136/180 successes (75.6%), place step 89.4% (161/180); level 1 85.6%, level 2 65.6%"
+   },
+   "doc": "docs/he/tray-jig.md §5",
+   "round": "tray-jig-r1"
+  }
+ ],
+ "latest": {
+  "round": "tray-jig-r1",
+  "run": "M",
+  "date": "2026-11-26"
+ },
+ "next_steps": [
+  {
+   "text": {
+    "vi": "Train run đối chứng K: 498 episode đầy đủ, không có bản cắt, cùng cảnh jig2 và cùng tập điều kiện, để tách phần do đồ gá và phần do dữ liệu bước đặt",
+    "en": "Train the control run K: 498 full episodes, no cuts, same jig2 scene and condition set, to separate the effect of the jig from that of the place data"
+   },
+   "doc": "docs/he/tray-jig.md §1, §2",
+   "round": "tray-jig-r1"
+  }
+ ],
+ "failure_table": {
+  "tray-r1": {
+   "scorer_version": 1,
+   "runs": {
+    "C_ALL": {
+     "labels": {
+      "L-PLACE-POSE": 29,
+      "L-TRAY-TILT": 15,
+      "L-TIMEOUT": 7,
+      "L-ONE-HAND": 2,
+      "L-PART-DROP": 2
+     },
+     "failed": 55,
+     "n": 60
+    },
+    "C_70": {
+     "labels": {
+      "L-PLACE-POSE": 32,
+      "L-TRAY-TILT": 10,
+      "L-TIMEOUT": 7,
+      "L-PART-DROP": 1
+     },
+     "failed": 50,
+     "n": 60
+    },
+    "B_ALL": {
+     "labels": {
+      "L-PLACE-POSE": 25,
+      "L-TRAY-TILT": 17,
+      "L-PART-DROP": 6,
+      "L-TIMEOUT": 5,
+      "L-ONE-HAND": 1
+     },
+     "failed": 54,
+     "n": 60
+    },
+    "B_70": {
+     "labels": {
+      "L-PLACE-POSE": 25,
+      "L-TRAY-TILT": 21,
+      "L-TIMEOUT": 4,
+      "L-ONE-HAND": 2,
+      "L-PART-DROP": 1
+     },
+     "failed": 53,
+     "n": 60
+    }
+   }
+  },
+  "tray-jig-r1": {
+   "scorer_version": 2,
+   "runs": {
+    "M": {
+     "labels": {
+      "L-PLACE-POSE": 28,
+      "L-TRAY-TILT": 13,
+      "L-ONE-HAND": 1,
+      "L-PART-DROP": 1,
+      "L-TIMEOUT": 1
+     },
+     "failed": 44,
+     "n": 180
+    }
+   }
   }
  }
 }
