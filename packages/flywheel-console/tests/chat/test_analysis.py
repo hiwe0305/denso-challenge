@@ -118,6 +118,9 @@ def test_the_question_picks_the_round(idx: ConsolePaths) -> None:
     assert tools_round.round_named("So M với C_ALL trên 60 rollout", "r1") == "jig-r1"
     assert tools_round.round_named("Chi phí vòng 1 bao nhiêu?", "jig-r1") == "r1"
     assert tools_round.round_named("cost of r1", "jig-r1") == "r1"
+    assert tools_round.round_named("Phân tích vòng đồ gá", "r1") == "jig-r1"
+    assert tools_round.round_named("So vòng 1 với vòng đồ gá") == "jig-r1"
+    assert tools_round.round_named("What failed in the jig round?", "r1") == "jig-r1"
     assert tools_round.round_named("Mức 2 hỏng ở đâu?", "r1") == "r1"  # "Mức" is not run M
     assert ask("M có đạt mốc 80%?", "r1")["round"] == "jig-r1"
     f = registry.forced_tool

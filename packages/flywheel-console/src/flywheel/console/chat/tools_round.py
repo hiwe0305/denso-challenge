@@ -212,10 +212,12 @@ def _named_rounds(q: str, rounds: list[dict[str, Any]]) -> list[str]:
     for r in sorted(rounds, key=lambda r: -len(str(r["id"]))):
         if re.search(r"(?<![\w-])" + re.escape(str(r["id"])) + r"(?![\w-])", q, re.I):
             out.append(str(r["id"]))
-    for m in re.finditer(r"(?:vòng|round)\s*(\d)\b", q, re.I):
-        out += [str(r["id"]) for r in rounds if str(r.get("number")) == m.group(1)]
+    # The scene word goes before "vòng N": "vòng đồ gá" or "jig" names the jig round even when the
+    # question also says "vòng 1" (e.g. "so vòng 1 với vòng đồ gá").
     if re.search(r"đồ gá|\bjig", q, re.I):
         out += [str(r["id"]) for r in rounds if r.get("scene") or "story.jig" in (r.get("index") or [])]
+    for m in re.finditer(r"(?:vòng|round)\s*(\d)\b", q, re.I):
+        out += [str(r["id"]) for r in rounds if str(r.get("number")) == m.group(1)]
     return list(dict.fromkeys(out))
 
 
