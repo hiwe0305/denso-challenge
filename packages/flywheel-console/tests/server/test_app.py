@@ -462,6 +462,26 @@ def test_unlocked_status_says_unlocked(srv: Srv) -> None:
     assert st == 200 and json.loads(body)["locked"] is False
 
 
+def test_chat_config_get_post_and_lock_guard(srv: Srv, locked_srv: Srv) -> None:
+    st, body = srv.get("/api/chat/config")
+    cfg = json.loads(body)
+    assert st == 200 and "presets" in cfg and "openai" in cfg["presets"]
+
+    st_p, saved = srv.post(
+        "/api/chat/config",
+        {"preset": "openai", "model": "gpt-4.1", "api_key": "sk-never-echoed"},
+    )
+    assert st_p == 200 and saved["ready"] is True and saved["model"] == "gpt-4.1"
+    assert "sk-never-echoed" not in json.dumps(saved)
+
+    # Locked server refuses POST /api/chat/config
+    st_lock, err_lock = locked_srv.post("/api/chat/config", {"preset": "openai"})
+    assert st_lock == 403 and err_lock == {"error": "locked"}
+    from flywheel.console.chat import providers
+
+    providers.reset_runtime_config()
+
+
 def test_simmedia_serves_ranges_and_refuses_escape(srv: Srv) -> None:
     v = write_mp4(srv.paths.sim_media / "e84ec995" / "ep_000003.mp4")
     st, hd, body = srv.req(

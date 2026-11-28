@@ -1,49 +1,99 @@
 <!doctype html>
-<html lang="vi">
+<html lang="vi" data-theme="light">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Humanoid Data Flywheel</title>
-<link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="chat.css">
-<script>try{var t=localStorage.getItem("v5theme");document.documentElement.setAttribute("data-theme",t||"light");if(/(^|[?&#])demo=1/.test(location.search+location.hash)||sessionStorage.getItem("v5demo")==="1")document.documentElement.classList.add("demo")}catch(e){document.documentElement.setAttribute("data-theme","light")}</script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flywheel Studio</title>
+  <link rel="stylesheet" href="style.css?v=20261128b">
+  <script src="vendor/echarts.min.js" defer></script>
+  <script type="module" src="app.js?v=20261128b"></script>
 </head>
 <body>
-<header id="hdr">
-  <a class="logo" href="#/tasks"><b>Humanoid Data Flywheel</b><span class="team">· ilovephysicalintelligence</span></a>
-  <div class="srch" id="srch"><span>&#8981;</span><span>Search</span><kbd>&#8984;K</kbd></div>
-  <select id="task" title="task"></select>
-  <select id="round" title="round" hidden></select>
-  <div id="meta"></div>
-</header>
-<div id="body">
-  <nav id="side"></nav>
-  <main id="main"></main>
-  <aside id="rp"><div id="chat" class="rp-pane"></div></aside>
-</div>
-<div id="pal"><div class="box"><input id="pal-in" placeholder="go to, dataset, run, job, /tool" autocomplete="off"><div class="res" id="pal-res"></div></div></div>
-<div id="keys"><div class="box" id="keys-box"></div></div>
-<div id="cap"></div>
-<div class="drawer-bg" id="drawer-bg"></div>
-<aside class="drawer" id="drawer"><header><b id="dtitle"></b><button class="iconbtn" id="dclose">Esc</button></header>
-<div class="dtabs" id="dtabs"><a data-t="method">repro</a><a data-t="log">log</a><a data-t="src">src</a></div><div class="dbody" id="dbody"></div></aside>
-<script src="vendor/echarts.min.js"></script>
-<script src="i18n/vi.js"></script>
-<script src="i18n/en.js"></script>
-<script src="core.js"></script>
-<script src="explain.js"></script>
-<script src="pages_data.js"></script>
-<script src="pages_story.js"></script>
-<script src="pages_ops.js"></script>
-<script src="pages_sim.js"></script>
-<script src="pages_start.js"></script>
-<script src="pages_wheel.js"></script>
-<script src="pages_steps.js"></script>
-<script src="pages_proc.js"></script>
-<script src="pages_tasks.js"></script>
-<script src="pages_ego.js"></script>
-<script src="chat.js"></script>
-<script src="app.js"></script>
+  <a class="skip-link" id="skip-link" href="#main-content"></a>
+  <div id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <header class="top" id="topbar">
+    <button type="button" class="topbtn mobile-only" id="menu-toggle" aria-expanded="false" aria-controls="sidebar">☰</button>
+    <a class="brand-wrap" href="#/tasks">
+      <div class="mark" aria-hidden="true">F</div>
+      <div class="brand">
+        <span id="brand-title"></span>
+        <small id="brand-sub"></small>
+      </div>
+    </a>
+
+    <div class="top-scope-group">
+      <div class="top-scope-field">
+        <label class="tiny" for="task-select" id="task-select-label"></label>
+        <select class="topbtn" id="task-select"></select>
+      </div>
+      <div class="top-scope-field">
+        <label class="tiny" for="round-select" id="round-select-label"></label>
+        <select class="topbtn round-select" id="round-select"></select>
+      </div>
+    </div>
+
+    <span class="grow"></span>
+
+    <div class="top-controls">
+      <button type="button" class="topbtn" id="lock-badge" hidden></button>
+
+      <div class="top-prefs-group">
+        <div class="lang-pill" role="group" id="lang-group">
+          <button type="button" class="lang-btn" id="lang-vi" data-lang="vi">VI</button>
+          <button type="button" class="lang-btn" id="lang-en" data-lang="en">EN</button>
+        </div>
+
+        <button type="button" class="topbtn" id="theme-toggle">
+          <span aria-hidden="true">◐</span>
+          <span id="theme-label"></span>
+        </button>
+      </div>
+
+      <button type="button" class="topbtn chat-tool-btn" id="chat-toggle" aria-expanded="true" aria-controls="chat-panel">
+        <span aria-hidden="true">✦</span>
+        <span id="chat-toggle-label"></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="error-banner" id="error-banner" role="alert" hidden>
+    <div class="error-banner-body">
+      <strong id="error-banner-title"></strong>
+      <span class="chip warning mono" id="error-banner-code" hidden></span>
+      <span class="error-banner-msg mono" id="error-banner-msg"></span>
+    </div>
+    <div class="actions">
+      <button type="button" class="topbtn" id="error-banner-retry" hidden></button>
+      <button type="button" class="topbtn" id="error-banner-close">×</button>
+    </div>
+  </div>
+
+  <div class="shell" id="workspace-shell">
+    <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
+
+    <aside class="sidebar" id="sidebar">
+      <nav id="sidebar-nav"></nav>
+      <div class="side-bottom" id="side-bottom">
+        <b id="side-bottom-title"></b>
+        <p id="side-bottom-desc"></p>
+      </div>
+    </aside>
+
+    <main id="main-content" tabindex="-1"></main>
+
+    <aside class="chat" id="chat-panel">
+      <div class="chat-head">
+        <div class="avatar" aria-hidden="true">✦</div>
+        <div>
+          <b id="chat-pane-title"></b>
+          <div class="tiny" id="chat-pane-sub"></div>
+        </div>
+        <div class="grow"></div>
+        <button type="button" class="topbtn" id="chat-close">×</button>
+      </div>
+      <div class="chat-body" id="chat-body"></div>
+    </aside>
+  </div>
 </body>
 </html>

@@ -156,3 +156,21 @@ def test_a_hosted_turn_sets_the_rule_first_and_resets_it(
     assert all(m["role"] != "assistant" for m in msgs)  # no earlier answer goes out
     assert not {s["function"]["name"] for s in schemas or []} & registry.LOCAL_ONLY
     assert common.HOSTED.get() is False  # reset when the turn ends
+
+
+def test_a_request_body_cannot_declare_a_hosted_api_self_hosted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for k in ("FW_CHAT_BASE_URL", "FW_CHAT_SELF_HOSTED"):
+        monkeypatch.delenv(k, raising=False)
+    saved = dict(providers._RUNTIME_CFG)
+    try:
+        cfg = providers.set_runtime_config(
+            {"base_url": "https://api.openai.com/v1", "model": "gpt-4.1", "self_hosted": True},
+            persist=False,
+        )
+        assert cfg["hosted"] and not cfg["self_hosted"]
+        assert providers.active(NEMO, "nemo").hosted
+    finally:
+        providers._RUNTIME_CFG.clear()
+        providers._RUNTIME_CFG.update(saved)

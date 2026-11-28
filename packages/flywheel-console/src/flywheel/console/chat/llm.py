@@ -150,7 +150,7 @@ def gpu_busy() -> str | None:
 
 def nemotron_status() -> str:
     p = provider()
-    if p.kind == "openai" and not needs_tunnel(p):
+    if p.kind in ("openai", "anthropic") and not needs_tunnel(p):
         return "down" if providers.problem(p) else "warm"  # nothing to load: ready when configured
     if runner.TUNNEL.tags() is None:
         return "down"
@@ -165,7 +165,7 @@ def nemotron_status() -> str:
 
 def prewarm() -> dict[str, Any]:
     p = provider()
-    if p.kind == "openai" and not needs_tunnel(p):
+    if p.kind in ("openai", "anthropic") and not needs_tunnel(p):
         why = providers.problem(p)
         return {"ok": not why, "nemotron": nemotron_status(), "error": why, "ms": 0}
     if runner.TUNNEL.tags() is None and not runner.TUNNEL.ensure(10):
@@ -274,7 +274,20 @@ def build_messages(
             + ", ".join("{}={}".format(*kv) for kv in d.items())
             + "."
         )
-    msgs: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM + " " + ctxline}]
+    mode = str(body.get("mode") or "ask").strip().lower()
+    sys_prompt = SYSTEM
+    if mode == "investigate":
+        sys_prompt += (
+            " Mode: INVESTIGATE (deep multi-step analysis). Cross-check dataset stats, QA, and round/eval "
+            "metrics using multiple tools when helpful, then write a structured engineering synthesis "
+            "(up to 320 words, bullet points and bold headings allowed). Cite only verified tool numbers."
+        )
+    elif mode == "operate":
+        sys_prompt += (
+            " Mode: OPERATE. Help the user inspect jobs, pipelines, and prepare allowlisted workflow "
+            "actions or navigation links while strictly respecting all safety guardrails."
+        )
+    msgs: list[dict[str, Any]] = [{"role": "system", "content": sys_prompt + " " + ctxline}]
     hist = [
         m
         for m in body.get("messages", [])
@@ -355,12 +368,15 @@ def parse_markup_calls(text: str) -> list[dict[str, Any]]:
 
 
 def generate(
-    messages: list[dict[str, Any]], tool_schemas: list[dict[str, Any]] | None, deadline: float
+    messages: list[dict[str, Any]],
+    tool_schemas: list[dict[str, Any]] | None,
+    deadline: float,
+    max_tokens: int = NUM_PREDICT,
 ) -> Iterator[tuple[str, Any]]:
-    """One streamed /api/chat call. Yields ("tok", text) live, then ("end", (content, calls, tin, tout))."""
+    """One streamed /api/chat call. Yields ("tok"|"think", text) live, then ("end", (content, calls, tin, tout))."""
     p = provider()
-    if p.kind == "openai":
-        yield from providers.generate(p, messages, tool_schemas, deadline, NUM_PREDICT)
+    if p.kind in ("openai", "anthropic"):
+        yield from providers.generate(p, messages, tool_schemas, deadline, max_tokens)
         return
     if not endpoint_ok():
         raise RuntimeError("model endpoint must be the loopback tunnel")
@@ -492,7 +508,12 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
             },
         )
         return
-    deadline = t0 + TURN_CAP_S
+    mode = str(body.get("mode") or "ask").strip().lower()
+    max_rounds = 5 if mode == "investigate" else MAX_ROUNDS
+    max_predict = 1280 if mode == "investigate" else NUM_PREDICT
+    turn_cap = 85.0 if mode == "investigate" else TURN_CAP_S
+    keep_md = mode in ("investigate", "operate")
+    deadline = t0 + turn_cap
     evidence = [question] + [
         "{} {}".format(*kv) for kv in registry.context_defaults(context).items()
     ]
@@ -500,12 +521,21 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
     nodes: list[dict[str, Any]] = tr["nodes"]
     lang = lang_of(question)
     tool_rounds = 0
-    forced = registry.forced_tool(question)
+    forced = None if mode == "investigate" else registry.forced_tool(question)
     if forced and forced not in names:
         names = [forced] + names
+
+    def _call_gen(m_list: list[dict[str, Any]], sch: list[dict[str, Any]] | None) -> Iterator[tuple[str, Any]]:
+        if max_predict == NUM_PREDICT:
+            return generate(m_list, sch, deadline)
+        try:
+            return generate(m_list, sch, deadline, max_predict)
+        except TypeError:  # test doubles with 3-arg signature (msgs, schemas, deadline)
+            return generate(m_list, sch, deadline)
+
     try:
-        for rnd in range(MAX_ROUNDS + 1):
-            offered = registry.schemas(context.get("route"), names) if rnd < MAX_ROUNDS else None
+        for rnd in range(max_rounds + 1):
+            offered = registry.schemas(context.get("route"), names) if rnd < max_rounds else None
             if forced:
                 offered = None  # the lookup is made by the code; the model only writes the answer
             g0 = time.time()
@@ -514,12 +544,15 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
             if forced and rnd == 0:
                 tcalls = [{"name": forced, "arguments": {}}]
             else:
-                for kind, val in generate(msgs, offered, deadline):
-                    if kind == "tok":
-                        yield "token", {"text": val.replace("**", "")}  # the panel shows plain text
+                for kind, val in _call_gen(msgs, offered):
+                    if kind == "think":
+                        yield "thinking", {"text": val}
+                    elif kind == "tok":
+                        yield "token", {"text": val if keep_md else val.replace("**", "")}
                     else:
                         content, tcalls, tin, tout = val
-                content = content.replace("**", "")
+                if not keep_md:
+                    content = content.replace("**", "")
                 if forced:
                     tcalls = []  # no tool is offered now: a call written as text is not run
             nodes.append(
@@ -536,7 +569,7 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
             )
             tr["tokens_in"] += tin
             tr["tokens_out"] += tout
-            if not tcalls or rnd == MAX_ROUNDS:
+            if not tcalls or rnd == max_rounds:
                 # the last round offers no tools: calls parsed from text markup are ignored too
                 if content.strip():
                     answer_parts.append(content)
@@ -616,15 +649,17 @@ def _turn(body: dict[str, Any], prov: providers.Provider) -> Iterator[tuple[str,
             msgs.append({"role": "user", "content": FORCE_ANSWER.format(lang=lang)})
             g0 = time.time()
             content, tcalls, tin, tout = "", [], 0, 0
-            for kind, val in generate(msgs, None, deadline):
-                if kind == "tok":
+            for kind, val in _call_gen(msgs, None):
+                if kind == "think":
+                    yield "thinking", {"text": val}
+                elif kind == "tok":
                     yield "token", {"text": val}
                 else:
                     content, tcalls, tin, tout = val
             nodes.append(
                 {
                     "type": "generation",
-                    "round": MAX_ROUNDS + 1,
+                    "round": max_rounds + 1,
                     "ms": int((time.time() - g0) * 1000),
                     "tokens_in": tin,
                     "tokens_out": tout,

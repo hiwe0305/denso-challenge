@@ -91,10 +91,22 @@ def run_list(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
         if want and want not in st:
             continue
         cfg, ln = _config(r)
+        res_doc = jload(r["dir"] / "result.json", {}) or {}
+        flag_steps = to_int((cfg.get("flags") or {}).get("train.max_training_steps"), 0)
+        ckpt_steps = (
+            res_doc.get("checkpoint_step")
+            if isinstance(res_doc, dict) and isinstance(res_doc.get("checkpoint_step"), int)
+            else None
+        )
+        inferred_max = (
+            flag_steps
+            or ckpt_steps
+            or (100000 if str(r["dir"].parent.name).startswith("jig-") else 60000)
+        )
         ema = _ema([x["loss"] for x in tr])
         row = {
             "run": r["id"], "branch": r["branch"], "state": st, "step": last.get("step"),
-            "max_steps": 60000, "loss_ema50": round(ema, 3) if ema is not None else None,
+            "max_steps": inferred_max, "loss_ema50": round(ema, 3) if ema is not None else None,
             "mtime": datetime.fromtimestamp(mt).astimezone().isoformat(timespec="seconds"),
             "machine": _machine(r, ln),
         }  # fmt: skip

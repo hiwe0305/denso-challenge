@@ -39,7 +39,8 @@ tasks:
     # story.json keys that belong to this task (besides the keys of its rounds)
     index: [story.runs, story.train_log_tail, story.vm_phases, story.sources, story.heat,
             story.reasons, story.qa_sample, story.h1m, story.ledger, story.colab_balance,
-            story.colab_sessions, story.ds, story.eval, story.loop_chain, story.loop_detail]
+            story.colab_sessions, story.ds, story.eval, story.loop_chain, story.loop_detail,
+            story.jig]
     evals: []
     clusters: []
     process:

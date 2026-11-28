@@ -1,643 +1,2491 @@
-/* v5 OPS pages, part 1: shared kit + #/runs, #/eval, #/loop, #/qa.
-   Part 2 (pages_ops.js) adds #/jobs. Single global: PAGES_OPS. Components come from UI (core.js). */
-(function () {
-"use strict";
-const P = window.PAGES_OPS = window.PAGES_OPS || {};
-const K = P.kit = {};
-/* @budget-skip-start */
-const GR = { w32: "minmax(0,3fr) minmax(0,2fr)", w21: "minmax(0,2fr) minmax(0,1fr)", groups: "repeat(auto-fill, minmax(110px,1fr))", runs: "minmax(430px,38%) minmax(0,1fr)", jobs: "minmax(380px,40%) minmax(0,1fr)", h: "calc(100vh - 110px)", hair: "1px solid " };
-const CMD = {
-  train: "finetune_simple_psi0_config", evalRun: "python -m flywheel_psi0.tray.eval_batch --level 1,2", evalRead: "python -m flywheel_psi0.tray.eval_results --json", gen: "generate.py --conditions",
-  qaRun: "fw agentqa run --model nemotron --out D", qaReview: "fw agentqa review --reports D/reports.jsonl", qaBench: "python -m flywheel.eval.agentqa.bench"
-};
-const NUMCLS = "n ops-mono", AMACH = "colab A100", EV_SRC = "docs/he/tray.md";
-K.GR = GR;
-/* @budget-skip-end */
+import {
+  cleanInlineMarkdown,
+  cls,
+  compactPath,
+  el,
+  ensureStoryRaw,
+  formatBytes,
+  formatDateTime,
+  formatNumber,
+  formatPercent,
+  getCurrentRound,
+  getCurrentTask,
+  getJSON,
+  hasI18nKey,
+  hasIndexAccess,
+  pickLang,
+  renderChartBlock,
+  renderCrumbHeading,
+  renderErrorBlock,
+  renderLoadingView,
+  renderProcessEmptyBlock,
+  renderReportSubnav,
+  renderSourceCitation,
+  renderStatStrip,
+  renderStateChip,
+  scopeStoryForTask,
+  setChildren,
+  setSelection,
+  shortHashId,
+  state,
+  t,
+} from "./core.js";
 
-/* ------------------------------------------------------------ kit */
-function h(tag, attrs, kids) {
-  const e = document.createElement(tag);
-  if (attrs) for (const k in attrs) {
-    const v = attrs[k];
-    if (v == null || v === false) continue;
-    if (k === "class") e.className = v;
-    else if (k === "text") e.textContent = v;
-    else if (k.slice(0, 2) === "on") e.addEventListener(k.slice(2), v);
-    else if (k === "style" && typeof v === "object") Object.assign(e.style, v);
-    else e.setAttribute(k, v === true ? "" : v);
-  }
-  (Array.isArray(kids) ? kids : kids == null ? [] : [kids]).flat(9).forEach(c => {
-    if (c == null || c === false) return;
-    e.appendChild(typeof c === "string" || typeof c === "number" ? document.createTextNode(c) : c);
-  });
-  return e;
-}
-async function api(path, body) {
-  if (body !== undefined && !UI.canWrite(path.replace(/^\/api\//, "") + (body && body.kind ? " · " + body.kind : ""))) throw new Error("cancelled");
-  const o = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
-  const r = await fetch(path, o);
-  let d = null; try { d = await r.json(); } catch (e) { /* not json */ }
-  if (!r.ok) throw new Error((d && d.error) || ("HTTP " + r.status));
-  return d;
-}
-const tryApi = (path) => api(path).catch(() => null);
-const startJob = (kind, params) => api("/api/jobs", { kind, params });
-/* interval that stops itself once `owner` leaves the document */
-function poll(fn, ms, owner) {
-  const t = setInterval(() => { if (owner && !owner.isConnected) { clearInterval(t); return; } fn(); }, ms);
-  return t;
-}
-let _story = null;
-/* the same scoping as STORY (TASK.scopeStory): another task's keys and a round's withheld results are left out */
-const story = () => (_story || (_story = fetch("data/story.json").then(r => r.json()))).then(s => TASK.scopeStory(s));
-const cv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const col = {
-  text: () => cv("--text"), t2: () => cv("--text-2"), t3: () => cv("--text-3"), line: () => cv("--line"),
-  ok: () => cv("--ok"), warn: () => cv("--warn"), bad: () => cv("--bad"), run: () => cv("--run"),
-  acc: () => cv("--accent"), llm: () => cv("--llm"), code: () => cv("--code")
-};
-/* series colour per run id, fixed order, shared by every page */
-/* series colour i, read from the active theme at call time */
-const ser = i => cv("--s" + (((i % 8) + 8) % 8 + 1));
-/* fallback order when UI.color is missing: the round's runs (seed/tasks.yaml) */
-const runOrder = () => (typeof TASK !== "undefined" ? TASK.runs() : []);
-const runColor = id => { if (typeof UI !== "undefined" && UI.color) return UI.color(id); const o = runOrder(), i = o.indexOf(id); return ser(i < 0 ? o.length : i); };
-const num = (v, f) => (typeof UI !== "undefined" && UI.fmt) ? UI.fmt(v, f) : (v == null ? "—" : String(v));
-const dash = v => (v == null || v === "") ? "—" : v;
-function secs(s) {
-  if (s == null) return "—";
-  if (typeof UI !== "undefined" && UI.fmt) return UI.fmt(s, "dur");
-  if (s < 60) return num(s, "float1") + " s";
-  const m = Math.floor(s / 60);
-  return m >= 60 ? Math.floor(m / 60) + "h" + String(m % 60).padStart(2, "0") : m + "m" + String(Math.round(s % 60)).padStart(2, "0");
-}
-const jobSecs = j => j && j.started ? Math.max(0, ((j.ended ? new Date(j.ended) : new Date()) - new Date(j.started)) / 1000) : null;
-const hhmm = iso => iso ? iso.slice(11, 16) : "—";
-const dm = iso => iso ? iso.slice(8, 10) + "/" + iso.slice(5, 7) : "—";
-const GLYPH = { ok: "✓", done: "✓", running: "▶", run: "▶", queued: "◷", wait: "◷", pending: "◷", failed: "✕", reject: "✕", flag: "!", partial: "!", cancelled: "·", cancel: "·", todo: "·", na: "·", agree: "✓", override: "✕" };
-const GCOL = { ok: "ok", done: "ok", agree: "ok", running: "run", run: "run", queued: "warn", wait: "warn", pending: "warn", failed: "bad", reject: "bad", override: "bad", flag: "warn", partial: "warn", cancelled: "t3", cancel: "t3", todo: "t3", na: "t3" };
-const STATE_MAP = { done: "ok", partial: "flag", todo: "idle", na: "idle", agree: "ok", override: "reject", cancel: "cancelled" };
-function stateTag(s, label) {
-  if (typeof UI !== "undefined" && UI.status) return UI.status(STATE_MAP[s] || s, label);
-  return h("span", { class: "ops-tag", style: { color: col[GCOL[s] || "t2"]() } }, (GLYPH[s] || "·") + " " + (label || s));
-}
-function wilson(k, n, z = 1.96) {
-  const p = k / n, d = 1 + z * z / n, c = p + z * z / (2 * n), m = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n));
-  return [(c - m) / d, (c + m) / d];
-}
-function ctx(sel) { try { typeof CHAT !== "undefined" && CHAT.setContext && CHAT.setContext(sel); } catch (e) { /* chat optional */ } }
-const setQs = p => { try { UI.setQs(p); } catch (e) { /* no router */ } };
-function bindKeys(map, scope) { try { UI.keys.bind(map, scope); } catch (e) { /* keys optional */ } }
-/* hash-link helper: route fragment without leading # */
-const go = frag => { location.hash = "#/" + frag; };
+const RUN_METRICS = ["loss", "val", "thr", "vram", "gn"];
+const CHAIN_KEYS = ["targets", "generated", "recorded", "qa_pass", "quality", "selected"];
 
-let cssDone = false;
-function css() {
-  if (cssDone) return; cssDone = true;
-  document.head.appendChild(h("style", { id: "ops-css" }, `
-.ops-wrap{display:flex;flex-direction:column;gap:12px}
-.ops-grid{display:grid;gap:12px}
-.ops-panel{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:8px 12px;min-width:0;overflow-x:auto}
-.ops-sec{font-size:11px;line-height:16px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;color:var(--text-2);display:flex;gap:12px;align-items:center;margin:0 0 6px}
-.ops-sec .sp{flex:1}
-.ops-tag{font-family:var(--mono,"JetBrains Mono",ui-monospace,monospace);font-size:12px;white-space:nowrap}
-.ops-mono{font-family:var(--mono,"JetBrains Mono",ui-monospace,monospace);font-variant-numeric:tabular-nums}
-.ops-btn{height:26px;padding:0 8px;background:transparent;color:var(--text);border:1px solid var(--line-strong);border-radius:4px;font:inherit;font-size:12.5px;cursor:pointer}
-.ops-btn:hover{background:var(--surface-2)}
-.ops-btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
-.ops-btn[disabled]{opacity:.4;cursor:default}
-.ops-in{height:26px;padding:0 8px;background:var(--surface-2);color:var(--text);border:1px solid var(--line);border-radius:4px;font:inherit;font-size:12.5px}
-.ops-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.ops-chart{width:100%}
-.ops-dot{display:inline-block;width:8px;height:8px;border-radius:50%}
-.ops-eye{cursor:pointer;background:none;border:0;color:var(--text-2);padding:0 2px;font-size:12px}
-.ops-eye.off{opacity:.35}
-.ops-strip{display:flex;flex-wrap:wrap;gap:0;align-items:stretch}
-.ops-node{flex:1 1 0;min-width:84px;border:1px solid var(--line);margin-left:-1px;padding:4px 6px;cursor:pointer;background:var(--surface);display:flex;flex-direction:column;gap:2px;text-decoration:none;color:var(--text)}
-.ops-node:first-child{margin-left:0;border-radius:4px 0 0 4px}
-.ops-node:last-child{border-radius:0 4px 4px 0}
-.ops-node.sel{outline:1px solid var(--accent);outline-offset:-1px;z-index:1}
-.ops-node .v{font-size:15px;line-height:20px;font-weight:500}
-.ops-node .l{font-size:11px;color:var(--text-2)}
-.ops-node .m{font-size:11px;color:var(--text-2)}
-.ops-drop{border:1px dashed var(--line-strong);border-radius:4px;padding:16px 12px;color:var(--text-2);cursor:pointer;font-size:12.5px}
-.ops-drop.over{border-color:var(--accent);color:var(--text)}
-.ops-bar{height:4px;background:var(--line);border-radius:2px}.ops-bar i{display:block;height:4px;background:var(--accent);border-radius:2px}
-.ops-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
-.ops-tbl th{position:sticky;top:0;text-align:left;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--line-strong);padding:4px 8px;font-size:11px;background:var(--surface)}
-.ops-tbl td{padding:0 8px;height:28px;border-bottom:1px solid var(--line);white-space:nowrap}
-.ops-tbl .n{text-align:right}
-.ops-tbl tr.cur td{background:var(--surface-2)}
-.ops-tbl tr.cur td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
-.ops-tbl tr.click{cursor:pointer}
-.ops-sticky{position:sticky;bottom:0;z-index:3;background:var(--bg);padding-top:6px}
-`));
-}
+// Keep point estimates, uncertainty and exact values readable without a tooltip.
+function comparisonPlot(title, rows, { bound, threshold, unit = "" } = {}) {
+  const measured = rows.filter((row) => Number.isFinite(row.value));
+  if (!measured.length) return null;
+  const endpoints = measured.flatMap((row) => [row.value, ...(row.interval || [])]);
+  if (Number.isFinite(threshold)) endpoints.push(threshold);
+  const min = Math.min(0, ...endpoints);
+  const max = Math.max(bound || 0, ...endpoints);
+  const position = (value) => 100 * (value - min) / (max - min || 1);
+  const label = (value) => formatNumber(value, { maximumFractionDigits: 4 }) + unit;
 
-/* tables: UI.Table with a safe fallback while core.js components land */
-function table(spec) {
-  const colLab = c => tt("ops.col." + (c.label || c.key).toLowerCase().replace(/[^a-z0-9]+/g, "_"), c.label || c.key);
-  spec = Object.assign({}, spec, { columns: spec.columns.map(c => Object.assign({}, c, { label: colLab(c) })) });
-  if (typeof UI !== "undefined" && UI.Table) return UI.Table(spec);
-  const t = h("table", { class: "ops-tbl" }, [
-    h("thead", null, h("tr", null, spec.columns.map(c => h("th", { text: c.label })))),
-    h("tbody", null, spec.rows.map(r => h("tr", { class: spec.onRow ? "click" : "", onclick: spec.onRow ? () => spec.onRow(r) : null },
-      spec.columns.map(c => { const v = c.fmt ? c.fmt(r[c.key], r) : r[c.key]; return h("td", { class: c.align === "right" ? NUMCLS : (c.mono ? "ops-mono" : "") }, v instanceof Node ? v : dash(v)); }))))]);
-  return h("div", null, t);
-}
-/* panel titles and column headers read the dictionary (ops.<label>, ops.col.<key>); an unknown one stays as written */
-const tt = (k, fb) => { const v = t(k); return v === k ? fb : v; };
-const lab = x => typeof x === "string" ? tt("ops." + x.toLowerCase().replace(/[^a-z0-9]+/g, "_"), x) : x;
-function sec(label, right) { return h("div", { class: "ops-sec" }, [lab(label), h("span", { class: "sp" }), right || null]); }
-function panel(label, body, right, style) { return h("div", { class: "ops-panel", style }, [sec(label, right), body]); }
-function pageHead(title, stat, actions) {
-  const acts = actions == null ? [] : [].concat(actions), st = stat && stat.length ? stat.map(x => Object.assign({}, x, { label: lab(x.label) })) : null;
-  /* on a process stage the stage header (PROC.head) names the page; elsewhere (Jobs) the page keeps its title */
-  const stage = typeof EXPLAIN !== "undefined" && EXPLAIN.stationOf(location.hash.replace(/^#\/?/, "").split("?")[0], UI.qs()) != null;
-  if (!stage && typeof UI !== "undefined" && UI.page) return UI.page({ title: lab(title), stat: st, actions: acts.length ? acts : null });
-  return h("div", { class: "ops-row pr-statrow" }, [st ? statLine(st) : null, ...acts]);
-}
-function statLine(items) { return (typeof UI !== "undefined" && UI.StatLine) ? UI.StatLine(items) : h("div", { class: "ops-mono", text: items.map(i => i.label + " " + i.value).join(" · ") }); }
-function logView(spec) { return (typeof UI !== "undefined" && UI.Log) ? UI.Log(spec) : h("pre", { class: "ops-mono", text: spec.text || "" }); }
-function repro(spec) { return (typeof UI !== "undefined" && UI.Repro) ? UI.Repro(spec) : null; }
-Object.assign(K, { h, api, tryApi, startJob, poll, story, col, runColor, num, dash, secs, jobSecs, hhmm, dm, stateTag, wilson, ctx, bindKeys, go, css, table, sec, panel, pageHead, statLine, logView, repro, GLYPH });
-
-/* charts: one registry, disposed on the next page render */
-let CH = [];
-function chartsDispose() { CH.forEach(c => { try { c.dispose(); } catch (e) { /* gone */ } }); CH = []; }
-function ec(box, opt, group) {
-  const c = echarts.init(box, null, { renderer: "canvas" });
-  c.setOption(Object.assign({ animation: false, backgroundColor: "transparent", textStyle: { color: col.t2(), fontSize: 11 } }, opt));
-  if (group) c.group = group;
-  CH.push(c);
-  const ro = new ResizeObserver(() => { try { c.resize(); } catch (e) { /* disposed */ } });
-  ro.observe(box);
-  return c;
-}
-const axis = o => Object.assign({ axisLine: { lineStyle: { color: col.line() } }, axisTick: { show: false }, axisLabel: { color: col.t2(), fontSize: 11 },
-  splitLine: { lineStyle: { color: col.line(), type: "dashed" } }, nameTextStyle: { color: col.t2(), fontSize: 11 } }, o);
-function setPanel(o) { try { if (typeof UI !== "undefined" && UI.panel && UI.panel.set) UI.panel.set(o); } catch (e) { /* panel optional */ } }
-const box = (hgt) => h("div", { class: "ops-chart", style: { height: hgt + "px" } });
-Object.assign(K, { ec, axis, setPanel, box, ser });
-const ema = (pts, a) => { let m = null; return pts.map(([x, y]) => { m = m == null ? y : a * m + (1 - a) * y; return [x, m]; }); };
-
-/* ============================================================ RUNS */
-/* abandoned attempts (branch "<run>.attempt1") were re-run in full; they are not runs of the experiment */
-const notAttempt = r => !/\.attempt/.test(r.branch || "");
-const IDENTITY_KEYS = new Set(["exp", "timestamp", "train.output_dir"]);
-function flatConfig(r) {
-  const c = r.config || {}, o = Object.assign({}, c, c.flags || {});
-  delete o.flags;
-  return o;
-}
-function storyConfig(r) {
-  const flags = {};
-  (r.argv || []).slice(1).forEach(a => { const m = /^--([^=]+)=(.*)$/.exec(a); if (m) flags[m[1]] = m[2]; });
-  return { release_id: r.release, run_plan_id: r.run_plan_id, flags };
-}
-/* live runs: run_list + run_metrics tools; story.json as fallback */
-async function loadLive(S) {
-  const tool = (name, args) => UI.locked ? Promise.resolve(null) : tryApi("/api/tool?name=" + name + "&args=" + encodeURIComponent(JSON.stringify(args)));
-  const rl = await tool("run_list", {});
-  const runs = rl && rl.raw && rl.raw.runs;
-  if (!runs || !runs.length) return S.runs.filter(notAttempt).map(r => ({ branch: r.branch, run: r.job, step: r.step, max_steps: r.max_steps, ema50: null, machine: AMACH, mtime: null, config: storyConfig(r),
-    loss: r.loss, thr: r.thr.filter(p => p[1] != null), vram: r.vram, groups: r.groups_last, gser: {} }));
-  return Promise.all(runs.filter(notAttempt).map(async r => {
-    const m = await tool("run_metrics", { run_id: r.run, keys: "all", points: 2000 }), x = (m && m.raw) || {}, groups = {}, gser = {};
-    Object.keys(x).forEach(k => { if (k.startsWith("loss_by_group.")) { const v = x[k]; gser[k.slice(14)] = v; groups[k.slice(14)] = v.length ? v[v.length - 1][1] : null; } });
-    return Object.assign({}, r, { loss: x.loss || [], thr: x.throughput || [], vram: x.vram_gb || [], groups, gser });
-  }));
-}
-const tail = v => { v = String(v); return v.length > 20 ? "…" + v.slice(-18) : v; };
-
-async function runsPage(main, params, qs) {
-  css(); chartsDispose(); main.replaceChildren();
-  const S = await story();
-  let live = await loadLive(S);
-  const q = Object.assign({}, qs || (typeof UI !== "undefined" && UI.qs ? UI.qs() : {}));
-  const state = {
-    sel: new Set((q.sel ? q.sel.split(",") : live.map(r => r.branch)).filter(Boolean)),
-    cmp: new Set((q.cmp ? q.cmp.split(",") : []).filter(Boolean)),
-    smooth: q.smooth != null ? Math.min(.99, Math.max(0, +q.smooth)) : .9,
-    logy: q.logy == null ? true : q.logy === "1" || q.logy === "true", raw: q.raw === "1",
-    step: q.step != null ? +q.step : null,
-    cur: null
-  };
-  const setQs = () => { try { UI.setQs({ sel: [...state.sel].join(","), cmp: [...state.cmp].join(",") || null, smooth: state.smooth, logy: state.logy ? 1 : 0, raw: state.raw ? 1 : null }); } catch (e) { /* no router */ } };
-  const lastEma = r => { const e = ema(r.loss, state.smooth); return e.length ? e[e.length - 1][1] : null; };
-  const rowsOf = () => live.map(r => ({ id: r.branch, step: r.step, max: r.max_steps, loss: r.ema50 != null ? r.ema50 : lastEma(r), machine: r.machine, cu: cuOf(r.branch), updated: r.mtime, live: true }));
-  /* CU per model: story.demo.design.resource train_cu (index), never typed */
-  const cuOf = id => { const x = ((((S.demo || {}).design || {}).resource) || []).find(y => y.id === "train_cu"); return x && x.per_model_cu && x.per_model_cu[id] != null ? x.per_model_cu[id] : null; };
-  const liveBy = id => live.find(r => r.branch === id);
-
-  /* header */
-  const stat = [{ label: "runs", value: String(live.length) }, { label: "CU", value: num((S.colab_balance.at(-1) || [])[1], "float1") }];
-  main.appendChild(pageHead("Runs", stat));
-
-  /* left: table */
-  const tbox = h("div", { style: { overflowX: "auto" } });
-  let tbl = null;
-  const curRow = () => tbl && tbl.table && tbl.table.cursor;
-  function drawTable() {
-    const rows = rowsOf();
-    if (tbl && tbl.table) { tbl.table.setRows(rows); return; }
-    tbl = table({
-      columns: [
-        { key: "id", label: "run", mono: true, fmt: (v, r) => h("span", { class: "ops-row", style: { gap: "6px", flexWrap: "nowrap" } }, [
-          h("span", { class: "ops-dot", style: { background: runColor(v) } }),
-          r.live ? h("button", { class: "ops-eye" + (state.sel.has(v) ? "" : " off"), title: "show", onclick: e => { e.stopPropagation(); state.sel.has(v) ? state.sel.delete(v) : state.sel.add(v); drawTable(); drawCharts(); setQs(); } }, "◉") : h("span", { class: "ops-eye off" }, "◉"),
-          h("span", { class: "ops-mono", title: v, text: EXPLAIN.runName(v) }), state.cmp.has(v) ? h("span", { class: "ops-tag", style: { color: col.acc() } }, "x") : null]) },
-        { key: "step", label: "step/" + (TASK.maxSteps() ? num(TASK.maxSteps() / 1000, "int") + "k" : "max"), align: "right", mono: true, fmt: (v, r) => v == null ? "—" : h("span", { class: "ops-row", style: { gap: "6px", flexWrap: "nowrap", justifyContent: "flex-end" } }, [h("span", { class: "ops-bar", style: { width: "44px" } }, h("i", { style: { width: Math.min(100, v / (r.max || TASK.maxSteps() || v || 1) * 100) + "%", background: runColor(r.id) } })), (v >= 1000 ? num(v / 1000, "float1") + "k" : String(v))]) },
-        { key: "loss", align: "right", mono: true, fmt: v => v == null ? "—" : num(v, "float3") },
-        { key: "machine", label: "host", fmt: v => v ? String(v).replace(/^colab /, "") : "—" },
-        { key: "cu", label: "CU", align: "right", mono: true, fmt: v => v == null ? "—" : num(v, "float1") },
-        { key: "updated", mono: true, fmt: v => v ? dm(v) : "—" }
-      ],
-      rows, qsKey: "run", onRow: r => { state.cur = r.id; pushCtx(); }
-    });
-    tbox.replaceChildren(tbl);
-  }
-  function toggleCmp(id) {
-    if (!liveBy(id)) return;
-    state.cmp.has(id) ? state.cmp.delete(id) : state.cmp.add(id);
-    drawTable(); drawDiff(); setQs(); pushCtx();
-  }
-  function pushCtx() {
-    ctx({ route: "runs", selection: { runs: [...state.sel], compare: [...state.cmp] } });
-    const r = liveBy(state.cur) || live[0]; if (!r) return;
-    const c = flatConfig(r);
-    setPanel({ method: [{ step: "train", cmd: CMD.train + " " + Object.keys(c.flags || c).filter(k => /^(seed|data\.root_dir|model\.model_name_or_path)$/.test(k)).map(k => "--" + k + "=" + c[k]).join(" ") }, { step: "metrics", cfg: "fwdata/" + TASK.trainDir() + "/" + r.branch + "/" + r.run + "/metrics.jsonl" }],
-      log: null, sources: [{ label: r.branch + " metrics", path: "fwdata/" + TASK.trainDir() + "/" + r.branch + "/" + r.run + "/metrics.jsonl" }, { label: "launch", path: "fwdata/" + TASK.trainDir() + "/" + r.branch + "/" + r.run + "/launch.json" }] });
-  }
-
-  /* right: charts */
-  const lossBox = h("div", { class: "ops-chart", style: { height: "220px" } });
-  const thrBox = h("div", { class: "ops-chart", style: { height: "140px" } });
-  const vramBox = h("div", { style: { minHeight: "140px" } });
-  const cuBox = h("div", { class: "ops-chart", style: { height: "140px" } });
-  const groups = Object.keys((live[0] || {}).groups || {});
-  const gBoxes = groups.map(g => h("div", null, [h("div", { class: "ops-mono", style: { fontSize: "11px", color: col.t2() }, text: g }), h("div", { class: "ops-chart", style: { height: "80px" } })]));
-  const slider = h("input", { type: "range", min: 0, max: .99, step: .01, value: state.smooth, style: { width: "90px" }, oninput: e => { state.smooth = +e.target.value; smoothLab.textContent = state.smooth.toFixed(2); drawTable(); drawCharts(); }, onchange: setQs });
-  const smoothLab = h("span", { class: "ops-mono", text: state.smooth.toFixed(2) });
-  const rawChk = h("input", { type: "checkbox", checked: state.raw, onchange: e => { state.raw = e.target.checked; drawCharts(); setQs(); } });
-  const logyChk = h("input", { type: "checkbox", checked: state.logy, onchange: e => { state.logy = e.target.checked; drawCharts(); setQs(); } });
-  const lossRight = h("span", { class: "ops-row", style: { textTransform: "none", letterSpacing: 0 } }, [h("span", { text: "EMA" }), slider, smoothLab, h("label", { class: "ops-row", style: { gap: "4px" } }, [rawChk, "raw"]), h("label", { class: "ops-row", style: { gap: "4px" } }, [logyChk, "log-y"])]);
-  const GROUP = "runs-x";
-  let cLoss, cThr, cCu; const cG = [];
-  const tipFmt = ps => { const L = (Array.isArray(ps) ? ps : [ps]).filter(p => !/raw$/.test(p.seriesName)).sort((a, b) => b.value[1] - a.value[1]);
-    return (L.length ? "<span class=ops-mono>step " + L[0].value[0] + "</span><br>" : "") + L.map(p => "<span class=ops-mono style='display:flex;justify-content:space-between;gap:12px'><span>" + p.marker + p.seriesName + "</span><b>" + (+p.value[1]).toFixed(3) + "</b></span>").join(""); };
-  const vis = () => live.filter(r => state.sel.has(r.branch));
-  function drawCharts() {
-    const rs = vis();
-    const stepLine = state.step != null ? { silent: true, symbol: "none", lineStyle: { color: col.warn(), type: "dashed" }, label: { formatter: String(state.step), color: col.warn() }, data: [{ xAxis: state.step }] } : undefined;
-    const xmax = Math.ceil(Math.max(1000, ...live.map(r => r.step || 0)) * 1.05);
-    const target = { silent: true, symbol: "none", lineStyle: { color: col.t3(), type: "dashed" }, label: { formatter: "target", color: col.t3() }, data: TASK.maxSteps() ? [{ xAxis: TASK.maxSteps() }] : [] };
-    const lossSeries = rs.flatMap((r, i) => {
-      const c = runColor(r.branch);
-      return (state.raw ? [{ name: r.branch + " raw", type: "line", showSymbol: false, data: r.loss, lineStyle: { width: 1, color: c, opacity: .15 }, silent: true, z: 1 }] : []).concat([
-        { name: r.branch, type: "line", showSymbol: false, data: ema(r.loss, state.smooth), lineStyle: { width: 2, color: c }, itemStyle: { color: c }, z: 3, markLine: i === 0 ? Object.assign({}, target, stepLine ? { data: target.data.concat(stepLine.data) } : {}) : undefined }]);
-    });
-    const base = { grid: { left: 44, right: 10, top: 8, bottom: 22 }, tooltip: { trigger: "axis", confine: true, formatter: tipFmt, backgroundColor: cv("--surface-2"), borderColor: col.line(), textStyle: { color: col.text(), fontSize: 11 } },
-      xAxis: axis({ type: "value", min: 0, max: xmax, axisLabel: { color: col.t2(), fontSize: 11, formatter: v => v / 1000 + "k" } }) };
-    const set = (c, opt) => c.setOption(opt, true);
-    if (!cLoss) { cLoss = ec(lossBox, {}, GROUP); cThr = ec(thrBox, {}, GROUP); cCu = ec(cuBox, {}); gBoxes.forEach(b => cG.push(ec(b.lastChild, {}, GROUP))); echarts.connect(GROUP); }
-    set(cLoss, Object.assign({}, base, { yAxis: axis({ type: state.logy ? "log" : "value", min: state.logy ? undefined : 0 }), series: lossSeries }));
-    set(cThr, Object.assign({}, base, { yAxis: axis({ type: "value", scale: true }), series: rs.map(r => ({ name: r.branch, type: "line", showSymbol: false, data: ema(r.thr.filter(p => p[1] != null), state.smooth), lineStyle: { width: 1.5, color: runColor(r.branch) }, itemStyle: { color: runColor(r.branch) } })) }));
-    vramBox.replaceChildren(statLine(rs.map(r => ({ label: r.branch, value: r.vram.length ? num(r.vram[r.vram.length - 1][1], "float1") : "—", unit: "GB" }))));
-    const bal = S.colab_balance; let jump = 0;
-    for (let i = 1; i < bal.length; i++) if (Math.abs(bal[i][1] - bal[i - 1][1]) > 100) { jump = i; break; }
-    set(cCu, { grid: { left: 44, right: 10, top: 8, bottom: 22 }, tooltip: { trigger: "axis", textStyle: { fontSize: 11 } }, xAxis: axis({ type: "time" }), yAxis: axis({ type: "value", scale: true }),
-      series: [{ type: "line", step: "end", showSymbol: false, data: bal.slice(jump), lineStyle: { width: 1.5, color: col.t2() } }] });
-    groups.forEach((g, i) => set(cG[i], { grid: { left: 30, right: 4, top: 4, bottom: 4 }, tooltip: base.tooltip,
-      xAxis: axis({ type: "value", min: 0, max: xmax, axisLabel: { show: false } }), yAxis: axis({ type: "value", min: 0, splitNumber: 2, axisLabel: { color: col.t2(), fontSize: 10 } }),
-      series: rs.map(r => ({ name: r.branch, type: "line", showSymbol: false, data: ema(r.gser[g] || [], state.smooth), lineStyle: { width: 1.5, color: runColor(r.branch) }, itemStyle: { color: runColor(r.branch) } })) }));
-    pushCtx();
-  }
-
-  /* config diff */
-  const diffBox = h("div", { style: { overflowX: "auto" } });
-  function drawDiff() {
-    const ids = state.cmp.size >= 2 ? [...state.cmp] : [];
-    diffBox.replaceChildren();
-    if (ids.length < 2) { diffBox.style.display = "none"; return; }
-    diffBox.style.display = "";
-    const cfgs = ids.map(id => flatConfig(liveBy(id)));
-    const keys = [...new Set(cfgs.flatMap(c => Object.keys(c)))].filter(k => !IDENTITY_KEYS.has(k) && new Set(cfgs.map(c => c[k])).size > 1);
-    diffBox.appendChild(panel("Diff", keys.length
-      ? h("table", { class: "ops-tbl" }, [h("thead", null, h("tr", null, [h("th", { text: "key" })].concat(ids.map(id => h("th", { style: { color: runColor(id) }, text: id }))))),
-        h("tbody", null, keys.map(k => h("tr", null, [h("td", { class: "ops-mono", text: k })].concat(cfgs.map(c => h("td", { class: "ops-mono", title: dash(c[k]), text: c[k] == null ? "—" : tail(c[k]) }))))))])
-      : h("span", { class: "ops-mono", style: { color: col.t2() }, text: "none" }),
-      h("button", { class: "ops-btn", text: lab("Clear"), onclick: () => { state.cmp.clear(); drawTable(); drawDiff(); setQs(); } })));
-  }
-
-  /* the training log lives in the stage's Log tab (PROC.log), not under the charts */
-  /* layout */
-  const right = h("div", { class: "ops-wrap", style: { minWidth: 0 } }, [
-    panel("Loss", lossBox, lossRight),
-    panel("Groups", h("div", { class: "ops-grid", style: { gridTemplateColumns: GR.groups } }, gBoxes)),
-    h("div", { class: "ops-grid", style: { gridTemplateColumns: "repeat(3,minmax(0,1fr))" } }, [panel("Throughput", thrBox), panel("VRAM", vramBox), panel("CU burn", cuBox)])
+  return el("figure", { className: "comparison-plot" }, [
+    el("figcaption", {}, [
+      el("b", { text: title }),
+      Number.isFinite(threshold)
+        ? el("small", { text: t("visual.threshold", { value: label(threshold) }) })
+        : null,
+    ]),
+    ...measured.map((row) => el("div", { className: "plot-row" }, [
+      el("span", { text: row.name }),
+      el("div", { className: "plot-track", "aria-hidden": "true" }, [
+        row.interval ? el("i", { className: "plot-interval", style:
+          `left:${position(row.interval[0])}%;width:${position(row.interval[1])-position(row.interval[0])}%` }) : null,
+        Number.isFinite(threshold) ? el("i", { className: "plot-limit", style: `left:${position(threshold)}%` }) : null,
+        el("i", { className: "plot-point", style: `left:${position(row.value)}%` }),
+      ]),
+      el("span", { className: "plot-value", text: row.label || label(row.value) }),
+    ])),
+    el("div", { className: "plot-row", "aria-hidden": "true" }, [
+      el("span"), el("div", { className: "plot-axis" }, [
+        el("span", { text: label(min) }), el("span", { text: label(max) }),
+      ]),
+    ]),
   ]);
-  const root = h("div", { class: "ops-wrap" }, [
-    h("div", { class: "ops-grid", style: { gridTemplateColumns: GR.runs, alignItems: "start" } }, [h("div", { class: "ops-wrap", style: { minWidth: 0 } }, [panel("Runs", tbox, h("button", { class: "ops-btn", text: lab("Compare"), onclick: () => { if (state.cmp.size < 2) live.slice(0, 2).forEach(r => state.cmp.add(r.branch)); drawTable(); drawDiff(); setQs(); } })), diffBox]), right])
-  ]);
-  main.appendChild(root);
-  drawTable(); drawCharts(); drawDiff();
-  poll(async () => { live = await loadLive(S); drawTable(); drawCharts(); drawDiff(); }, 60 * 1000, root);
-  bindKeys({
-    x: () => { const r = curRow(); if (r) toggleCmp(r.id); },
-    c: () => { if (state.cmp.size < 2) live.slice(0, 2).forEach(r => state.cmp.add(r.branch)); drawTable(); drawDiff(); setQs(); }
-  }, root);
 }
 
-/* ============================================================ EVAL */
-const pctS = v => (v * 100).toFixed(1) + "%";
-
-/* bar per category with a Wilson whisker; ks successes of ns */
-function succChart(el, cats, ks, ns) {
-  ec(el, { grid: { left: 36, right: 10, top: 10, bottom: 22 }, tooltip: { trigger: "axis" }, xAxis: axis({ type: "category", data: cats, axisLabel: { color: col.t2(), fontSize: 11, interval: 0 } }), yAxis: axis({ type: "value", min: 0, axisLabel: { formatter: "{value}%", color: col.t2(), fontSize: 11 } }),
-    series: [{ type: "bar", barMaxWidth: 28, data: ks.map((k, i) => +(k / ns[i] * 100).toFixed(1)), itemStyle: { color: col.acc(), borderRadius: 2 } },
-      { type: "custom", z: 5, data: ks.map((k, i) => { const w = wilson(k, ns[i]); return [i, +(w[0] * 100).toFixed(1), +(w[1] * 100).toFixed(1)]; }), tooltip: { formatter: p => p.value[1] + "–" + p.value[2] + "%" },
-        renderItem: (p, a) => { const lo = a.coord([a.value(0), a.value(1)]), hi = a.coord([a.value(0), a.value(2)]), st = { stroke: col.text(), lineWidth: 1.5 };
-          return { type: "group", children: [{ type: "line", shape: { x1: lo[0], y1: lo[1], x2: hi[0], y2: hi[1] }, style: st }, { type: "line", shape: { x1: lo[0] - 5, y1: lo[1], x2: lo[0] + 5, y2: lo[1] }, style: st }, { type: "line", shape: { x1: hi[0] - 5, y1: hi[1], x2: hi[0] + 5, y2: hi[1] }, style: st }] }; } }] });
-}
-const L_CI = "CI 95%", L_D = "Δ", OUT_F = "F", PG_EVAL = "Eval";
-const [P_SUCC, P_STACK, P_EVALS, P_FUN, P_CMP] = ["Success", "Failure stack", "Evals", "Step pass %", "Compare"];
-/* "p" meant two things: the success rate in Evals and McNemar's p-value in Compare */
-const [L_RATE, L_MCN] = ["rate", "p McNemar"];
-/* the Failure → Data round run (role after_round) and its stage-1 outcome against every baseline */
-function pairRound(PR) {
-  const rr = (PR.runs || []).find(r => r.run === TASK.after()) || null;
-  const cs = rr ? (PR.comparisons || []).filter(c => c.variant === rr.run) : [];
-  const out = cs.length && cs.every(c => c.outcome === OUT_F) ? OUT_F : (cs[0] || {}).outcome;
-  return { rr, cs, out };
-}
-function funnel(cats, series) {
-  const fb = (typeof UI !== "undefined" && UI.Chart) ? UI.Chart({ type: "bar", categories: cats.map(x => TASK.stageName(x)), series }, { height: 200 }) : h("div", { class: "ops-mono", text: "—" });
-  if (fb.instance) { let tries = 0; const fix = () => { const c = fb.instance(); if (c) c.setOption({ xAxis: { axisLabel: { interval: 0, fontSize: 10 } } }); else if (tries++ < 40) setTimeout(fix, 100); }; fix(); }
-  return fb;
+function successPlot(runs) {
+  return comparisonPlot(t("eval.colRate"), runs.map((run) => ({
+    name: run.run,
+    value: Number.isFinite(run.p) ? run.p * 100 : null,
+    interval: Array.isArray(run.wilson) && run.wilson.length === 2 && run.wilson.every(Number.isFinite)
+      ? run.wilson.map((value) => value * 100) : null,
+    label: [
+      `${formatPercent(run.p)} · ${formatNumber(run.successes)}/${formatNumber(run.n)}`,
+      Array.isArray(run.wilson) && run.wilson.length === 2 && run.wilson.every(Number.isFinite)
+        ? `${t("eval.colWilson")} ${formatPercent(run.wilson[0])}–${formatPercent(run.wilson[1])}`
+        : "",
+    ].filter(Boolean).join(" · "),
+  })), { bound: 100, unit: "%" });
 }
 
-/* the round's runs read at stage 1 (story.pair) */
-/* the scorer marks each step on its own, so the last step can disagree with the success count */
-function stepGap(r, steps) {
-  const last = (steps || []).at(-1), k = last == null ? null : Math.round((r.step_pass[last] || 0) * r.n);
-  if (k == null || k === r.successes) return null;
-  return h("span", { style: { color: col.warn() }, title: `${r.run}: ${r.successes} successes, ${last} passed ${k}` }, "⚠");
-}
-function evalPair(main, PR) {
-  const R = PR.runs, best = R.find(r => r.run === PR.best) || R[0], { rr, cs, out } = pairRound(PR);
-  const frac = r => r.successes + "/" + r.n, lvS = (r, lv) => (r.levels || {})[lv] ? r.levels[lv].successes + "/" + r.levels[lv].n : "—";
-  const stat = [{ label: "runs", value: String(R.length) }, { label: "best", value: best.run + " " + frac(best) }];
-  if (rr) stat.push({ label: "round", value: rr.run + " " + frac(rr) + " · " + dash(out) });
-  main.appendChild(pageHead(PG_EVAL, stat));
-  const top = f => Object.keys(f || {}).slice(0, 2).map(k => k.replace("L-", "") + " " + f[k]).join(" · ");
-  const runTable = table({
-    columns: [
-      { key: "run", mono: true, fmt: (v, r) => h("span", { class: "ops-row", style: { gap: "6px" }, title: v }, [h("span", { class: "ops-dot", style: { background: runColor(v) } }), EXPLAIN.runName(v),
-        v === best.run ? stateTag("ok", "best") : null, rr && v === rr.run ? stateTag("run", "round") : null]) },
-      { key: "succ", align: "right", mono: true, fmt: (v, r) => frac(r) }, { key: "p", label: L_RATE, align: "right", mono: true, fmt: v => pctS(v) },
-      { key: "wilson", label: L_CI, align: "right", mono: true, fmt: v => v ? (v[0] * 100).toFixed(1) + "–" + (v[1] * 100).toFixed(1) : "—" },
-      { key: "l1", align: "right", mono: true, fmt: (v, r) => lvS(r, "1") }, { key: "l2", align: "right", mono: true, fmt: (v, r) => lvS(r, "2") },
-      { key: "failures", mono: true, fmt: v => top(v) }
-    ], rows: R.map(r => Object.assign({ id: r.run, succ: r.successes, l1: 0, l2: 0 }, r)), qsKey: "run", onRow: r => ctx({ route: "eval", selection: { run: r.run } })
-  });
-  const funBox = funnel(PR.steps || [], R.map(r => ({ name: r.run + " " + frac(r), values: (PR.steps || []).map(s => +((r.step_pass[s] || 0) * 100).toFixed(1)) })));
-  const legend = h("div", { class: "ops-row ops-mono", style: { gap: "12px", fontSize: "11px" } }, R.map(r => h("span", { class: "ops-row", style: { gap: "4px" } }, [h("span", { class: "ops-dot", style: { background: (typeof UI !== "undefined" && UI.color) ? UI.color(r.run + " " + frac(r)) : col.acc() } }), r.run, stepGap(r, PR.steps)])));
-  /* the round's comparisons first: they carry the stop decision */
-  const crow = cs.concat((PR.comparisons || []).filter(c => cs.indexOf(c) < 0)).map(c => Object.assign({ id: c.variant + "·" + c.baseline, p: c.mcnemar_p }, c));
-  const cmpTable = table({
-    columns: [
-      { key: "pair", mono: true, fmt: (v, r) => r.variant + " vs " + r.baseline }, { key: "succ", align: "right", mono: true, fmt: (v, r) => r.variant_succ + " vs " + r.baseline_succ },
-      { key: "diff", label: L_D, align: "right", mono: true, fmt: v => v == null ? "—" : (v > 0 ? "+" : "") + (v * 100).toFixed(1) },
-      { key: "ci", label: L_CI, align: "right", mono: true, fmt: v => v ? (v[0] * 100).toFixed(1) + "–" + (v[1] * 100).toFixed(1) : "—" },
-      { key: "p", label: L_MCN, align: "right", mono: true, fmt: v => v == null ? "—" : String(v) },
-      { key: "outcome", fmt: v => stateTag(v === OUT_F ? "failed" : "ok", dash(v)) }
-    ], rows: crow, qsKey: "cmp"
-  });
-  const labels = []; R.forEach(r => Object.keys(r.failures || {}).forEach(k => { if (labels.indexOf(k) < 0) labels.push(k); }));
-  const sBox = box(170), fBox = box(170), src = h("span", { class: "ops-mono", style: { textTransform: "none", letterSpacing: 0, color: col.t3() } }, PR.source || "");
-  main.appendChild(h("div", { class: "ops-wrap" }, [
-    h("div", { class: "ops-grid", style: { gridTemplateColumns: "repeat(2,minmax(0,1fr))" } }, [panel(P_SUCC, sBox, src), panel(P_STACK, fBox)]),
-    panel(P_EVALS, runTable),
-    h("div", { class: "ops-grid", style: { gridTemplateColumns: GR.w32 } }, [panel(P_FUN, h("div", null, [legend, funBox])), panel(P_CMP, cmpTable)])
-  ]));
-  succChart(sBox, R.map(r => r.run), R.map(r => r.successes), R.map(r => r.n));
-  ec(fBox, { grid: { left: 36, right: 10, top: 10, bottom: 22 }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" } }, xAxis: axis({ type: "category", data: R.map(r => r.run), axisLabel: { color: col.t2(), fontSize: 11, interval: 0 } }), yAxis: axis({ type: "value" }),
-    series: labels.map((k, i) => ({ name: k, type: "bar", stack: "f", barMaxWidth: 36, data: R.map(r => (r.failures || {})[k] || 0), itemStyle: { color: ser(i) } })) });
-  setPanel({ method: [{ step: "run", cmd: CMD.evalRun }, { step: "read", cmd: CMD.evalRead }], log: null, sources: [{ label: (PR.source || "").split("/").pop(), path: PR.source }] });
-  ctx({ route: "eval", selection: { run: best.run } });
-}
-
-async function evalPage(main, params, qs) {
-  css(); chartsDispose(); main.replaceChildren();
-  const S = await story();
-  if (S.pair && (S.pair.runs || []).length) return evalPair(main, S.pair);
-  main.appendChild(TASK.empty(4));
-}
-
-/* ============================================================ LOOP */
-/* the C70_R1 round: cited chain (tray.md §20.11–20.16) plus its stage-1 read from fwdata; null when either is missing */
-function roundLoop(S) {
-  const RC = S.round || {}, c = RC.chain, { rr, cs, out } = pairRound(S.pair || {});
-  if (!c || !rr) return null;
-  const tr = (S.runs || []).find(r => r.branch === rr.run), stop = out === OUT_F;
-  const vs = cs.map(x => x.variant_succ + " vs " + x.baseline_succ + " " + x.baseline).join(" · ");
-  const chain = [
-    [String(c.targets), "targets", "bad", "loop"], [String(c.generated), "generated", "ok", "data"], [String(c.recorded), "recorded", "ok", "data"],
-    [String(c.qa_pass), "qa", "ok", "qa"], [String(c.quality), "quality", "ok", "data"], [String(c.selected), "selected", "ok", "data"],
-    [tr ? Math.round(tr.step / 1000) + "k" : "—", rr.run, "ok", "runs"], [rr.successes + "/" + rr.n, "re-eval", "ok", "eval", vs], [stop ? "STOP" : dash(out), "stage1 " + dash(out), stop ? "bad" : "ok", "eval", vs]
-  ];
-  const rows = (RC.clusters || []).map(k => ({ id: k.id, stage: k.stage, n: k.n, diag: k.diagnosis, data: k.failures != null, interv: k.intervention + (k.failures != null ? "" : " · soạn sẵn, chưa mở"), eps: k.failures }));
-  const flow = lk => {
-    const [gen, rec, qa, q, sel] = [c.generated, c.recorded, c.qa_pass, c.quality, c.selected], R = rr.run;
-    const nodes = ["generated", "failed", "recorded", "rejected", "passed", "filtered", "quality", "spare", "selected", R, "stop"].map(name => ({ name }));
-    const links = [lk("generated", "recorded", rec), lk("generated", "failed", gen - rec), lk("recorded", "passed", qa), lk("recorded", "rejected", rec - qa), lk("passed", "quality", q), lk("passed", "filtered", qa - q),
-      lk("quality", "selected", sel), lk("quality", "spare", q - sel), lk("selected", R, sel), lk(R, "stop", sel)];
-    return { nodes, links, cols: { generated: 0, recorded: 1, passed: 2, quality: 3, selected: 4, [R]: 5, stop: 6 }, warn: "", bad: "stop" };
-  };
-  const src = h("span", { class: "ops-mono", style: { textTransform: "none", letterSpacing: 0, color: col.t3() }, title: RC.plan || "" }, RC.source || "");
-  return { chain, rows, flow, src };
-}
-
-async function loopPage(main, params, qs, mode) {
-  css(); chartsDispose(); main.replaceChildren();
-  const S = await story();
-  const cost = mode === "cost";
-  if (cost) return costPage(main, S);
-  const RD = roundLoop(S);
-  if (!RD) { main.appendChild(TASK.empty(6)); return; }
-  const strip = h("div", { class: "ops-strip" }, RD.chain.map(([v, l, st, link, m]) => h("a", { class: "ops-node", href: "#/" + link, title: m || "" }, [
-    h("span", { class: "v ops-mono", style: { color: st === "bad" ? col.bad() : st === "pending" ? col.warn() : col.text() }, text: v }), h("span", { class: "l", text: lab(l) }), st === "pending" ? stateTag("pending", "wait") : null])));
-  const clusters = table({
-    columns: [{ key: "id", label: "cluster", mono: true }, { key: "stage", mono: true, fmt: v => TASK.stageName(v) }, { key: "n", label: "n", align: "right", mono: true },
-      { key: "diag", label: "diagnosis", fmt: (v, r) => stateTag(r.data ? "run" : "todo", v) }, { key: "interv", label: "intervention" }, { key: "eps", label: "targets", mono: true }],
-    rows: RD.rows, qsKey: "cluster", onRow: r => ctx({ route: "loop", selection: { cluster: r.id } })
-  });
-  const flowBox = box(360);
-  main.appendChild(h("div", { class: "ops-wrap" }, [strip, panel("Flow", flowBox, RD.src), panel("Clusters", clusters)]));
-  const lk = (source, target, value) => ({ source, target, value });
-  const { nodes, links, cols, warn, bad } = RD.flow(lk);
-  const CHAIN = { ...cols };
-  ec(flowBox, { tooltip: { trigger: "item" }, series: [{ type: "sankey", left: 24, right: 60, top: 40, bottom: 40, nodeWidth: 10, nodeGap: 14, emphasis: { focus: "adjacency" },
-    label: { color: col.text(), fontSize: 11, formatter: p => (p.value != null ? p.value + "\n" : "") + lab(p.name) }, lineStyle: { color: "gradient", opacity: .35 }, itemStyle: { borderWidth: 0 },
-    /* main chain alternates label side by column so neighbours never share a row; sinks sit in the last column, labelled to the right */
-    data: nodes.map((n, i) => Object.assign(n, { label: { position: n.name in CHAIN ? (CHAIN[n.name] % 2 ? "top" : "bottom") : "right" }, itemStyle: { color: n.name === warn ? col.warn() : n.name === bad ? col.bad() : ser(i) } })),
-    links }] });
-  setPanel({ method: [{ step: "eval", cmd: CMD.evalRun }, { step: "generate", cmd: CMD.gen }, { step: "train", cmd: CMD.train }], log: null, sources: [{ label: S.round.source, path: EV_SRC }] });
-  ctx({ route: "loop" });
-}
-
-/* ============================================================ COST LEDGER (stage 0): estimates and measurements as separate rows */
-async function costPage(main, S) {
-  if (!S.ledger) { main.appendChild(TASK.empty(0)); return; }
-  const live = await tryApi("/api/status");
-  const bal = (live && live.machines && live.machines.colab && live.machines.colab.balance) || ((S.colab_balance || []).at(-1) || [])[1];
-  const L = S.ledger.filter(r => r[1] || r[2]);
-  const est = S.ledger.reduce((a, r) => a + r[1], 0), meas = S.ledger.reduce((a, r) => a + r[2], 0);
-  main.appendChild(pageHead("Ledger", [{ label: "measured", value: num(meas, "float1"), unit: "$" }, { label: "estimated", value: num(est, "float1"), unit: "$" }, { label: "CU", value: num(bal, "float1") }]));
-  const lrows = [];
-  L.forEach(r => { if (r[1]) lrows.push({ id: r[0] + "·e", story: r[0], kind: "estimated", usd: r[1] }); if (r[2]) lrows.push({ id: r[0] + "·m", story: r[0], kind: "measured", usd: r[2] }); });
-  const ledger = table({
-    columns: [{ key: "story", mono: true }, { key: "kind", fmt: v => stateTag(v === "measured" ? "ok" : "todo", lab(v)) }, { key: "usd", label: "USD", align: "right", mono: true, fmt: v => num(v, "float1") }],
-    rows: lrows, qsKey: "ledger"
-  });
-  const costBox = box(260);
-  main.appendChild(h("div", { class: "ops-wrap" }, [panel("Cost", costBox), panel("Ledger", ledger)]));
-  ec(costBox, { grid: { left: 54, right: 10, top: 24, bottom: 22, containLabel: true }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" } }, legend: { top: 0, right: 0, textStyle: { color: col.t2(), fontSize: 11 } },
-    xAxis: axis({ type: "category", data: L.map(r => r[0]), axisLabel: { color: col.t2(), fontSize: 10, interval: 0, rotate: 30 } }), yAxis: axis({ type: "value", name: "USD" }),
-    series: [{ name: lab("estimated"), type: "bar", barMaxWidth: 12, data: L.map(r => r[1]), itemStyle: { color: col.t3() } }, { name: lab("measured"), type: "bar", barMaxWidth: 12, data: L.map(r => r[2]), itemStyle: { color: col.ok() } }] });
-  setPanel({ method: [], log: null, sources: [{ label: "ledger", path: "docs/g0/ledger" }] });
-  ctx({ route: "cost" });
-}
-
-/* ============================================================ QA */
-async function qaPage(main) {
-  css(); chartsDispose(); main.replaceChildren();
-  const S = await story();
-  const [jobs, bench, traces] = await Promise.all([tryApi("/api/jobs?limit=200"), tryApi("/api/chat/bench"), UI.locked ? Promise.resolve(null) : tryApi("/api/chat/traces?limit=20")]);
-  const runBy = job => S.runs.find(r => r.job === job);
-  /* LLM findings: latest agentqa.run per subject */
-  const aq = (jobs || []).filter(j => j.kind === "agentqa.run" && j.state === "ok" && j.outputs && j.outputs.out).sort((a, b) => (b.created > a.created ? 1 : -1));
-  const results = (await Promise.all(aq.slice(0, 8).map(j => tryApi("/api/agent_result?out=" + encodeURIComponent(j.outputs.out)).then(r => r && { job: j, r })))).filter(Boolean);
-  const seen = new Set(), reports = [], reviewed = {};
-  results.forEach(({ r }) => (r.reviews || []).forEach(rv => { try { const d = JSON.parse(rv.text); (d.decisions || []).forEach(x => { reviewed[d.report_id + "/" + x.finding_id] = x; }); } catch (e) { /* truncated */ } }));
-  results.forEach(({ job, r }) => r.reports.forEach(rep => { if (seen.has(rep.subject_ref)) return; seen.add(rep.subject_ref); reports.push({ job, rep, path: r.reports_path }); }));
-  const rows = [], dec = {};
-  reports.forEach(({ job, rep, path }) => {
-    const facts = {}; (rep.facts || []).forEach(f => facts[f.fact_id] = f);
-    const tgt = String(rep.subject_ref).match(/\/([^/]+)\/metrics\.jsonl$/); const run = tgt && runBy(tgt[1]);
-    const lastStep = (rep.facts || []).find(f => f.name === "train_last_step");
-    (rep.findings || []).forEach(f => {
-      const key = rep.report_id + "/" + f.finding_id, prev = reviewed[key];
-      rows.push({ id: key, source: "llm", code: f.code, rank: f.rank, subject: run ? run.branch : (f.target_ref || rep.stage), insight: f.insight, report: rep, report_path: path, fid: f.finding_id,
-        link: run ? "runs?sel=" + run.branch + (lastStep ? "&step=" + lastStep.value : "") : "jobs?job=" + job.id, decided: prev ? (prev.decision === "agree" ? "agree" : "override") : null, reason: prev && prev.reason });
-      if (prev) dec[key] = { finding_id: f.finding_id, decide: prev.decision, reason: prev.reason || null, locked: true };
-    });
-  });
-  /* rule layer: QA reasons from the egocentric pipeline */
-  (S.reasons || []).forEach(([code, n]) => rows.push({ id: "rule/" + code, source: "rule", code: code.replace(/ \(.*\)$/, ""), rank: null, subject: n + " ep", n, insight: "", link: "data?qa=flag&reason=" + encodeURIComponent(code.replace(/ \(.*\)$/, "")), decided: null, rule: true }));
-  const nLlm = rows.filter(r => r.source === "llm").length;
-  const B = bench && bench.n != null ? bench : null, pc = v => v == null ? "—" : (v * 100).toFixed(1) + "%";
-  main.appendChild(pageHead("QA", [{ label: "findings", value: String(rows.length) }, { label: "llm", value: String(nLlm) }, { label: "rule", value: String(rows.length - nLlm) }]));
-
-  /* inbox */
-  const codeBox = box(150), decBox = box(150), benchBox = box(150); let cCode, cDec, cBench;
-  const state = { cur: null };
-  const reasonIn = h("input", { class: "ops-in", placeholder: "reason", style: { width: "200px" } });
-  const msg = h("span", { class: "ops-mono", style: { color: col.t2() } });
-  const tbox = h("div"), nlab = h("div", { class: "ops-mono", style: { fontSize: "11px", color: col.t2(), padding: "4px 0" } });
-  let tbl = null;
-  function drawInbox() {
-    const dn = rows.filter(r => r.source === "llm" && dec[r.id]).length;
-    if (tbl && tbl.table) { tbl.table.setRows(rows); nlab.textContent = dn + " of " + nLlm + " decided"; drawCharts(); return; }
-    tbl = table({
-      columns: [
-        { key: "source", fmt: v => h("span", { class: "ops-tag", style: { color: v === "llm" ? col.llm() : col.code() } }, v === "llm" ? "LLM" : "CODE") },
-        { key: "code", mono: true }, { key: "rank", align: "right", mono: true, fmt: v => v == null ? "—" : String(v) },
-        { key: "subject", mono: true },
-        { key: "insight", label: "finding", fmt: v => v ? v.slice(0, 80) + (v.length > 80 ? "…" : "") : "—" },
-        { key: "decided", label: "decision", fmt: (v, r) => r.rule ? "—" : (dec[r.id] ? stateTag(dec[r.id].decide, dec[r.id].decide === "agree" ? "accept" : "reject") : stateTag("todo", "open")) },
-        { key: "link", label: "evidence", fmt: v => h("a", { href: "#/" + v, class: "ops-mono", style: { color: col.acc() }, onclick: e => e.stopPropagation() }, "open") }
-      ], rows, qsKey: "finding", onRow: r => { state.cur = r; ctx({ route: "qa", selection: { finding: r.fid || r.code, source: r.source } }); }
-    });
-    tbox.replaceChildren(tbl, nlab); nlab.textContent = dn + " of " + nLlm + " decided"; drawCharts();
+function formatVal(val) {
+  if (val === null || val === undefined) return t("state.na");
+  if (typeof val === "number") return formatNumber(val, { maximumFractionDigits: 4 });
+  if (typeof val === "boolean") return val ? t("common.yes") : t("common.no");
+  if (Array.isArray(val)) return val.join(", ");
+  if (typeof val === "object") {
+    return Object.entries(val)
+      .map(([k, v]) => `${k}: ${typeof v === "number" ? formatNumber(v, { maximumFractionDigits: 3 }) : v}`)
+      .join(" · ");
   }
-  function decide(kind) {
-    const cr = tbl && tbl.table && tbl.table.cursor, r = cr || state.cur; if (!r || r.rule) return;
-    if (dec[r.id] && dec[r.id].locked) { msg.textContent = "locked"; return; }
-    if (kind === "override") { const why = reasonIn.value.trim(); if (!why) { reasonIn.focus(); msg.textContent = "reason?"; return; } dec[r.id] = { finding_id: r.fid, decide: "override", reason: why }; reasonIn.value = ""; }
-    else dec[r.id] = { finding_id: r.fid, decide: "agree", reason: null };
-    msg.textContent = ""; drawInbox();
+  return String(val);
+}
+
+function computeEmaPoints(pts, alpha = 0.14) {
+  const out = [];
+  let ema = null;
+  for (const pt of pts) {
+    if (!Array.isArray(pt) || pt[1] === null || !Number.isFinite(pt[1])) continue;
+    ema = ema === null ? pt[1] : alpha * pt[1] + (1 - alpha) * ema;
+    out.push([pt[0], Number(ema.toFixed(4))]);
   }
-  const submit = h("button", { class: "ops-btn pri wbtn", text: lab("Submit"), onclick: async () => {
-    const byRep = {};
-    rows.filter(r => r.source === "llm").forEach(r => { (byRep[r.report.report_id] = byRep[r.report.report_id] || { r, ds: [], total: 0 }).total++; if (dec[r.id] && !dec[r.id].locked) byRep[r.report.report_id].ds.push(dec[r.id]); });
-    const todo = Object.values(byRep).filter(b => b.ds.length);
-    if (!todo.length) { msg.textContent = "none"; return; }
-    const out = [];
-    for (const b of todo) {
-      const all = rows.filter(r => r.report && r.report.report_id === b.r.report.report_id);
-      if (all.some(r => !dec[r.id])) { msg.textContent = "open"; return; }
-      try { const j = await startJob("agentqa.review", { reports: b.r.report_path, report_id: b.r.report.report_id, decisions: all.map(r => ({ finding_id: r.fid, decide: dec[r.id].decide, reason: dec[r.id].reason })) }); out.push(j.id); all.forEach(r => { dec[r.id].locked = true; }); }
-      catch (e) { msg.textContent = e.message; return; }
+  return out;
+}
+
+// ============================================================================
+// #/runs — Model Training
+// ============================================================================
+export function renderRunsPage() {
+  const wrap = el("div", {});
+  wrap.appendChild(renderLoadingView(t("runs.title")));
+  let activeMetric = "loss";
+  let campFilter = "all";
+  let useEma = true;
+  let selectedBranch = null;
+
+  const load = async () => {
+    try {
+      const rawStory = await ensureStoryRaw();
+      const story = scopeStoryForTask(rawStory);
+      const round = getCurrentRound();
+
+      if (!hasIndexAccess("story.runs")) {
+        setChildren(
+          wrap,
+          ...renderCrumbHeading({
+            crumbs: [{ label: t("app.crumbRoot"), href: "#/tasks" }, { label: t("runs.title") }],
+            title: t("runs.title"),
+          }),
+          renderProcessEmptyBlock(3, t("runs.title"))
+        );
+        return;
+      }
+
+      const rawRuns = Array.isArray(story.runs) ? story.runs : [];
+      const validRuns = rawRuns.filter((r) => r && !String(r.branch || "").includes(".attempt"));
+      const jigRunsList = validRuns.filter((r) => r.scene === "jig2");
+      const r1RunsList = validRuns.filter((r) => r.scene !== "jig2");
+      const filteredRuns =
+        campFilter === "jig" ? jigRunsList : campFilter === "r1" ? r1RunsList : validRuns;
+
+      if (!selectedBranch || !validRuns.some((r) => r.branch === selectedBranch)) {
+        selectedBranch =
+          (jigRunsList.length > 0 && jigRunsList[jigRunsList.length - 1].branch) ||
+          (round && round.baseline) ||
+          (validRuns[0] && validRuns[0].branch) ||
+          null;
+      }
+      const selectedRun = validRuns.find((r) => r.branch === selectedBranch) || validRuns[0] || null;
+
+      const chartSlot = el("div", {});
+
+      const redrawCurve = () => {
+        if (filteredRuns.length === 0) {
+          setChildren(chartSlot, el("div", { className: "empty", text: t("state.empty") }));
+          return;
+        }
+        const smoothActive = useEma && (activeMetric === "loss" || activeMetric === "gn");
+        setChildren(
+          chartSlot,
+          renderChartBlock({
+            title: `${t("runs.curvesTitle")} · ${activeMetric}${smoothActive ? " (EMA)" : ""}`,
+            height: 300,
+            buildOption: ({ soft, line, colors }) => {
+              const series = [];
+              filteredRuns.forEach((r, idx) => {
+                const col = colors[idx % colors.length];
+                const rawPts = (r[activeMetric] || []).filter(
+                  (pt) =>
+                    Array.isArray(pt) &&
+                    pt[1] !== null &&
+                    (!(activeMetric === "loss") || pt[1] > 0)
+                );
+                if (smoothActive && rawPts.length > 6) {
+                  series.push({
+                    name: `${r.branch || r.job} (raw)`,
+                    type: "line",
+                    showSymbol: false,
+                    silent: true,
+                    tooltip: { show: false },
+                    data: rawPts,
+                    lineStyle: { width: 1, color: col, opacity: 0.18 },
+                    itemStyle: { color: col, opacity: 0.18 },
+                  });
+                  series.push({
+                    name: r.branch || r.job,
+                    type: "line",
+                    showSymbol: false,
+                    data: computeEmaPoints(rawPts),
+                    lineStyle: { width: 2.4, color: col },
+                    itemStyle: { color: col },
+                  });
+                } else {
+                  series.push({
+                    name: r.branch || r.job,
+                    type: "line",
+                    showSymbol: activeMetric === "val",
+                    symbolSize: 5,
+                    data: rawPts,
+                    lineStyle: { width: 2.2, color: col },
+                    itemStyle: { color: col },
+                  });
+                }
+              });
+              return {
+                grid: { left: 54, right: 20, top: 36, bottom: 32 },
+                tooltip: { trigger: "axis" },
+                legend: {
+                  top: 0,
+                  textStyle: { color: soft },
+                  data: filteredRuns.map((r) => r.branch || r.job),
+                },
+                xAxis: {
+                  type: "value",
+                  name: "step",
+                  axisLabel: { color: soft },
+                  splitLine: { lineStyle: { color: line } },
+                },
+                yAxis: {
+                  type: activeMetric === "loss" ? "log" : "value",
+                  axisLabel: { color: soft },
+                  splitLine: { lineStyle: { color: line } },
+                },
+                series,
+              };
+            },
+            tableNode: el("table", { className: "table" }, [
+              el("thead", {}, [
+                el("tr", {}, [
+                  el("th", { text: t("follow.colModel") }),
+                  el("th", { text: "job" }),
+                  el("th", { className: "num", text: "step" }),
+                  el("th", { className: "num", text: "loss_last" }),
+                  el("th", { className: "num", text: "val_last" }),
+                ]),
+              ]),
+              el(
+                "tbody",
+                {},
+                filteredRuns.map((r) =>
+                  el("tr", {}, [
+                    el("td", { className: "mono", text: r.branch }),
+                    el("td", { className: "mono", text: r.job }),
+                    el("td", {
+                      className: "num",
+                      text: `${formatNumber(r.ckpt_step || r.step)} / ${formatNumber(r.max_steps)}`,
+                    }),
+                    el("td", {
+                      className: "num",
+                      text: formatNumber(r.loss_last, { maximumFractionDigits: 4 }),
+                    }),
+                    el("td", {
+                      className: "num",
+                      text: formatNumber(r.val_last, { maximumFractionDigits: 4 }),
+                    }),
+                  ])
+                )
+              ),
+            ]),
+          })
+        );
+      };
+
+      const roundRuns = round && Array.isArray(round.runs) ? round.runs : [];
+      const roundIdsSet = new Set(roundRuns.map((rr) => rr.id));
+      const extraRuns = validRuns
+        .filter((r) => r && r.branch && !roundIdsSet.has(r.branch))
+        .map((r) => ({
+          id: r.branch,
+          train_set: r.scene || "-",
+          role: "current",
+        }));
+      const allTableRows =
+        roundRuns.length > 0
+          ? [...extraRuns, ...roundRuns]
+          : validRuns.map((r) => ({ id: r.branch, train_set: r.scene || "-", role: "info" }));
+      const displayRoundRuns = allTableRows.filter((rr) => {
+        if (campFilter === "jig") return extraRuns.some((e) => e.id === rr.id);
+        if (campFilter === "r1") return roundIdsSet.has(rr.id);
+        return true;
+      });
+
+      const jigInfo = story.jig || null;
+      const liveEvalList =
+        jigInfo && Array.isArray(jigInfo.live_evals) ? jigInfo.live_evals : [];
+      const jigColab =
+        jigInfo && Array.isArray(jigInfo.active_sessions) && jigInfo.active_sessions.length > 0
+          ? t("ux.homeColabActive", {
+              session: jigInfo.active_sessions[0].session || "",
+              gpu: jigInfo.active_sessions[0].gpu || "GPU",
+            })
+          : "";
+      const modelRuns =
+        story.demo && story.demo.models && story.demo.models.runs ? story.demo.models.runs : {};
+
+      const selPhasesObj =
+        selectedRun && selectedRun.vm_phases && Object.keys(selectedRun.vm_phases).length > 0
+          ? selectedRun.vm_phases
+          : story.vm_phases || {};
+      const vmPhases = Object.entries(selPhasesObj);
+      const logTail =
+        selectedRun && Array.isArray(selectedRun.log_tail) && selectedRun.log_tail.length > 0
+          ? selectedRun.log_tail
+          : Array.isArray(story.train_log_tail)
+            ? story.train_log_tail
+            : [];
+
+      const groupsFirst = (selectedRun && selectedRun.groups_first) || {};
+      const groupsLast = (selectedRun && selectedRun.groups_last) || {};
+      const groupKeys = Object.keys(groupsLast);
+
+      const thrList = validRuns.map((r) => r.thr_med).filter(Number.isFinite);
+      const vramList = validRuns.map((r) => r.vram_max).filter(Number.isFinite);
+      const maxVram = vramList.length ? Math.max(...vramList) : null;
+      const latestThr =
+        (selectedRun && selectedRun.thr_med) || (thrList.length ? thrList[thrList.length - 1] : null);
+
+      setChildren(
+        wrap,
+        ...renderCrumbHeading({
+          crumbs: [{ label: t("app.crumbRoot"), href: "#/tasks" }, { label: t("runs.title") }],
+          title: t("runs.title"),
+        }),
+
+        liveEvalList.length > 0
+          ? el("div", { className: cls("attention-banner", "is-warn") }, [
+              el("span", {
+                text: t("exp.liveEvalBanner", {
+                  session: liveEvalList[0].session || "-",
+                  gpu: liveEvalList[0].gpu || "L4",
+                  lanes: formatNumber(liveEvalList[0].lanes ?? 0),
+                  done: formatNumber(liveEvalList[0].complete ?? 0),
+                }),
+              }),
+              el("a", { className: cls("btn", "primary"), href: "#/eval" }, [t("nav.item.eval")]),
+            ])
+          : jigInfo && jigInfo.next_cut && jigInfo.next_cut.name
+            ? el("div", { className: cls("attention-banner", "is-ok") }, [
+                el("span", {
+                  text: t("ux.runsJigBanner", {
+                    cut: jigInfo.next_cut.name,
+                    files: formatNumber(jigInfo.next_cut.files),
+                    colab: jigColab,
+                  }),
+                }),
+                el("a", { className: "link", href: "#/eval" }, [t("nav.item.eval")]),
+              ])
+            : null,
+
+        renderStatStrip([
+          {
+            label: t("exp.statValidRuns"),
+            value: formatNumber(validRuns.length),
+            sub: t("exp.statValidRunsSub"),
+          },
+          {
+            label: t("exp.statLatestCamp"),
+            value: jigRunsList.map((r) => r.branch).join(" · ") || t("state.na"),
+            sub:
+              jigRunsList.length > 0
+                ? `${formatNumber(jigRunsList[0].max_steps)} steps`
+                : round
+                  ? round.id
+                  : "",
+          },
+          {
+            label: t("exp.statPerf"),
+            value: latestThr != null ? `${formatNumber(latestThr, { maximumFractionDigits: 1 })} step/s` : t("state.na"),
+            sub: maxVram != null ? `VRAM ${formatNumber(maxVram, { maximumFractionDigits: 1 })} GB` : "",
+          },
+        ]),
+
+        el(
+          "div",
+          { className: "tabs", role: "tablist", style: "margin-bottom:8px" },
+          [
+            { id: "all", label: t("exp.campAll", { count: formatNumber(validRuns.length) }) },
+            { id: "jig", label: t("exp.campJig", { count: formatNumber(jigRunsList.length) }) },
+            { id: "r1", label: t("exp.campR1", { count: formatNumber(r1RunsList.length) }) },
+          ].map((cf) =>
+            el(
+              "button",
+              {
+                type: "button",
+                role: "tab",
+                className: cls("tab", campFilter === cf.id && "active"),
+                onClick: () => {
+                  campFilter = cf.id;
+                  load();
+                },
+              },
+              [cf.label]
+            )
+          )
+        ),
+
+        el("div", { className: "toolbar" }, [
+          el("span", { className: "muted", text: t("runs.metricLabel") }),
+          ...RUN_METRICS.map((m) =>
+            el(
+              "button",
+              {
+                type: "button",
+                className: cls("tab", activeMetric === m && "active"),
+                onClick: () => {
+                  activeMetric = m;
+                  load();
+                },
+              },
+              [m]
+            )
+          ),
+          el("span", { className: "grow" }),
+          activeMetric === "loss" || activeMetric === "gn"
+            ? el(
+                "button",
+                {
+                  type: "button",
+                  className: cls("topbtn", useEma && "active"),
+                  onClick: () => {
+                    useEma = !useEma;
+                    redrawCurve();
+                  },
+                },
+                [`${useEma ? "✓ " : ""}${t("exp.emaToggle")}`]
+              )
+            : null,
+        ]),
+
+        chartSlot,
+
+        el("section", { className: cls("card", "table-wrap") }, [
+          el("h2", { text: t("runs.roundRunsTitle") }),
+          el("table", { className: "table" }, [
+            el("thead", {}, [
+              el("tr", {}, [
+                el("th", { text: t("follow.colModel") }),
+                el("th", { text: t("runs.colRole") }),
+                el("th", { text: `${t("runs.colTrainSet")} · ${t("exp.colScale")}` }),
+                el("th", { className: "num", text: t("exp.colStepProg") }),
+                el("th", { className: "num", text: t("exp.colLossVal") }),
+                el("th", { className: "num", text: t("exp.colSysPerf") }),
+                el("th", { text: t("runs.colReleaseJob") }),
+              ]),
+            ]),
+            el(
+              "tbody",
+              {},
+              displayRoundRuns.map((rr) => {
+                const matched = validRuns.find((x) => x.branch === rr.id);
+                const mInfo = modelRuns[rr.id] || {};
+                const epCount = (matched && matched.episodes) ?? mInfo.episodes ?? null;
+                const frCount = matched && matched.frames ? matched.frames : null;
+                const scaleTxt =
+                  epCount != null
+                    ? frCount
+                      ? `${formatNumber(epCount)} ep · ${formatNumber(Math.round(frCount / 1000))}k fr`
+                      : `${formatNumber(epCount)} ep`
+                    : t("state.na");
+                const effStep = matched ? matched.ckpt_step || matched.step : null;
+                const hasRemoteCkpt =
+                  matched && matched.ckpt_step && matched.step && matched.ckpt_step > matched.step + 10;
+                const isSel = selectedRun && selectedRun.branch === rr.id;
+
+                return el(
+                  "tr",
+                  {
+                    className: cls("is-clickable-row", isSel && "is-selected-row"),
+                    onClick: () => {
+                      selectedBranch = rr.id;
+                      setSelection({ run_id: rr.id });
+                      load();
+                    },
+                  },
+                  [
+                    el("td", { className: "mono" }, [el("b", { text: rr.id })]),
+                    el("td", {}, [renderStateChip(rr.role || "info")]),
+                    el(
+                      "td",
+                      {
+                        className: "mono",
+                        title: rr.train_set || mInfo.data || "-",
+                      },
+                      [
+                        el("b", { text: compactPath(rr.train_set || mInfo.data || "-") }),
+                        el("div", { className: "tiny", text: scaleTxt }),
+                      ]
+                    ),
+                    el("td", { className: "num" }, [
+                      matched
+                        ? el("div", {}, [
+                            el("b", {
+                              className: "mono",
+                              text: `${formatNumber(effStep)} / ${formatNumber(matched.max_steps)}`,
+                            }),
+                            hasRemoteCkpt
+                              ? el("div", {
+                                  className: "tiny",
+                                  text: t("exp.ckptDoneRemote", {
+                                    ckpt: formatNumber(matched.ckpt_step),
+                                    local: formatNumber(matched.step),
+                                  }),
+                                })
+                              : null,
+                          ])
+                        : t("state.na"),
+                    ]),
+                    el("td", { className: cls("num", "mono") }, [
+                      matched
+                        ? `${formatNumber(matched.loss_last, { maximumFractionDigits: 3 })} / ${
+                            matched.val_last != null
+                              ? formatNumber(matched.val_last, { maximumFractionDigits: 3 })
+                              : "-"
+                          }`
+                        : t("state.na"),
+                    ]),
+                    el("td", { className: cls("num", "mono") }, [
+                      matched && matched.thr_med != null
+                        ? `${formatNumber(matched.thr_med, { maximumFractionDigits: 1 })} s/s · ${
+                            matched.vram_max != null
+                              ? `${formatNumber(matched.vram_max, { maximumFractionDigits: 1 })}G`
+                              : "-"
+                          }`
+                        : t("state.na"),
+                    ]),
+                    el("td", {}, [
+                      matched
+                        ? el("div", { className: "tag-row" }, [
+                            el("span", { className: "mono", text: matched.job }),
+                            matched.run_plan_id
+                              ? el("span", {
+                                  className: cls("short-hash", "mono"),
+                                  text: matched.run_plan_id,
+                                })
+                              : null,
+                          ])
+                        : el("span", { className: "mono", text: rr.session || "-" }),
+                    ]),
+                  ]
+                );
+              })
+            ),
+          ]),
+        ]),
+
+        selectedRun && groupKeys.length > 0
+          ? el("section", { className: "card" }, [
+              el("h2", {
+                text: t("exp.selectedRunGroupsTitle", { run: selectedRun.branch }),
+              }),
+              el("p", {
+                className: "muted",
+                style: "margin-top:3px",
+                text: t("exp.selectedRunGroupsSub"),
+              }),
+              el(
+                "div",
+                { className: "joint-group-grid" },
+                groupKeys.map((gk) => {
+                  const g0 = Number(groupsFirst[gk] || 0);
+                  const g1 = Number(groupsLast[gk] || 0);
+                  const dropPct = g0 > 0 ? Math.max(0, Math.min(100, ((g0 - g1) / g0) * 100)) : 0;
+                  return el("div", { className: "joint-group-card" }, [
+                    el("div", { className: "task-head" }, [
+                      el("b", { className: "mono", text: gk }),
+                      el("span", {
+                        className: cls("short-hash", "mono"),
+                        text: `-${formatNumber(dropPct, { maximumFractionDigits: 1 })}%`,
+                      }),
+                    ]),
+                    el("div", {
+                      className: cls("tiny", "mono"),
+                      text: `${t("exp.groupFirst")}: ${formatNumber(g0, { maximumFractionDigits: 3 })} → ${t("exp.groupLast")}: ${formatNumber(g1, { maximumFractionDigits: 4 })}`,
+                    }),
+                    el("div", { className: "stream-track" }, [
+                      el("div", {
+                        className: "stream-fill",
+                        style: `width:${dropPct.toFixed(1)}%`,
+                      }),
+                    ]),
+                  ]);
+                })
+              ),
+            ])
+          : null,
+
+        vmPhases.length > 0
+          ? el("section", { className: "card" }, [
+              el("h2", {
+                text: selectedRun
+                  ? t("exp.vmPhasesForRun", { run: selectedRun.branch })
+                  : t("runs.vmPhasesTitle"),
+              }),
+              el(
+                "div",
+                { className: "meta-strip" },
+                vmPhases.map(([k, v]) =>
+                  el("div", { className: "meta-box" }, [
+                    el("span", { className: "mono", text: k }),
+                    el("b", { text: `${formatNumber(v, { maximumFractionDigits: 1 })} s` }),
+                  ])
+                )
+              ),
+            ])
+          : null,
+
+        logTail.length > 0
+          ? el("section", { className: "card" }, [
+              el("h2", {
+                text: selectedRun
+                  ? t("exp.logTailForRun", { run: selectedRun.branch })
+                  : t("runs.logTailTitle"),
+              }),
+              el("pre", { className: cls("log-box", "mono"), text: logTail.join("\n") }),
+            ])
+          : null
+      );
+
+      redrawCurve();
+    } catch (err) {
+      setChildren(wrap, renderErrorBlock(err, load));
     }
-    msg.textContent = "job " + out.join(","); drawInbox();
-  } });
-  const bar = h("div", { class: "ops-row" }, [h("button", { class: "ops-btn", text: lab("Accept"), onclick: () => decide("agree") }), h("button", { class: "ops-btn", text: lab("Reject"), onclick: () => decide("override") }), reasonIn, submit, msg]);
+  };
 
-  /* bench + traces */
-  const traceBox = h("div"), treeBox = h("div");
-  function drawTraces() {
-    const list = Array.isArray(traces) ? traces : (traces && traces.traces) || [];
-    if (UI.locked) { traceBox.replaceChildren(h("span", { class: "dim", text: t("lock.off") })); return; }
-    if (!list.length) { traceBox.replaceChildren(h("span", { class: "ops-mono", style: { color: col.t2() }, text: "—" })); return; }
-    traceBox.replaceChildren(table({
-      columns: [{ key: "ts", label: "time", mono: true, fmt: v => v ? hhmm(String(v)) : "—" }, { key: "question", fmt: v => v ? String(v).slice(0, 48) : "—" },
-        { key: "tools", align: "right", mono: true, fmt: v => Array.isArray(v) ? (v.join(",") || "—") : dash(v) },
-        { key: "ms_total", label: "ms", align: "right", mono: true, fmt: v => v == null ? "—" : num(v, "int") }, { key: "tokens_out", label: "tok out", align: "right", mono: true, fmt: v => v == null ? "—" : num(v, "int") },
-        { key: "error", label: "err", mono: true, fmt: v => v ? stateTag("fail", String(v).slice(0, 20)) : "—" }],
-      rows: list.map(t => Object.assign({ id: t.turn_id }, t)), qsKey: "trace", onRow: r => { showTrace(r.turn_id); setQs({ trace: r.turn_id }); }
-    }));
-  }
-  async function showTrace(id) {
-    const t = await tryApi("/api/chat/traces/" + encodeURIComponent(id)); treeBox.replaceChildren();
-    if (!t) { treeBox.appendChild(h("span", { class: "ops-mono", text: "—" })); return; }
-    const nodes = t.nodes || [];
-    treeBox.appendChild(panel("Trace " + String(id).slice(-8), h("table", { class: "ops-tbl" }, [h("thead", null, h("tr", null, ["node", "name", "ms", "tok in", "tok out"].map(x => h("th", { text: x })))),
-      h("tbody", null, nodes.map(n => h("tr", null, [h("td", { class: "ops-mono", style: { paddingLeft: (8 + (n.type === "tool" ? 16 : 0)) + "px", color: n.type === "tool" ? col.code() : col.llm() }, text: n.type === "tool" ? "tool" : "gen"  }),
-        h("td", { class: "ops-mono", text: n.type === "tool" ? n.name + (n.ok === false ? " ✕" : "") : "round " + dash(n.round) }),
-        h("td", { class: NUMCLS, text: n.ms == null ? "—" : num(n.ms, "int") }), h("td", { class: NUMCLS, text: n.tokens_in == null ? "—" : num(n.tokens_in, "int") }), h("td", { class: NUMCLS, text: n.tokens_out == null ? "—" : num(n.tokens_out, "int") })])))])));
-  }
-  drawInbox(); drawTraces();
-  function drawCharts() {
-    const codes = [...new Set(rows.map(r => r.code))], cnt = src => codes.map(c => rows.filter(r => r.code === c && r.source === src).reduce((a, r) => a + (r.n || 1), 0));
-    if (!cCode) { cCode = ec(codeBox, {}); cDec = ec(decBox, {}); cBench = ec(benchBox, {}); }
-    cCode.setOption({ grid: { left: 110, right: 10, top: 4, bottom: 18 }, tooltip: { trigger: "axis", axisPointer: { type: "shadow" } }, xAxis: axis({ type: "log", min: .5 }), yAxis: axis({ type: "category", data: codes, inverse: true, splitLine: { show: false } }),
-      series: [{ name: "CODE", type: "bar", stack: "s", barMaxWidth: 12, data: cnt("rule"), itemStyle: { color: col.code() } }, { name: "LLM", type: "bar", stack: "s", barMaxWidth: 12, data: cnt("llm"), itemStyle: { color: col.llm() } }] }, true);
-    const d = Object.values(dec), acc = d.filter(x => x.decide === "agree").length, rej = d.filter(x => x.decide === "override").length;
-    cDec.setOption({ tooltip: {}, series: [{ type: "pie", radius: ["55%", "78%"], label: { color: col.text(), fontSize: 11, formatter: "{b} {c}" }, data: [{ name: "accept", value: acc, itemStyle: { color: col.ok() } }, { name: "reject", value: rej, itemStyle: { color: col.bad() } }, { name: "open", value: Math.max(0, nLlm - acc - rej), itemStyle: { color: col.t3() } }].filter(x => x.value) }] }, true);
-    const QB = EXPLAIN.read.bench(), bars = [QB ? ["defects", QB.caught / QB.planted * 100, QB.caught + "/" + QB.planted] : null, QB && QB.clean != null ? ["false pos", QB.clean ? 100 - QB.false_alarms / QB.clean * 100 : 0, QB.false_alarms + "/" + QB.clean] : null, ["tool acc", B ? B.tool_acc * 100 : 0, B ? pc(B.tool_acc) : "—"], ["guardrail", B && B.guardrail ? B.guardrail.pass / B.guardrail.n * 100 : 0, B && B.guardrail ? B.guardrail.pass + "/" + B.guardrail.n : "—"], ["grounded", B ? B.grounded_rate * 100 : 0, B ? pc(B.grounded_rate) : "—"]].filter(Boolean);
-    cBench.setOption({ grid: { left: 70, right: 56, top: 4, bottom: 4 }, xAxis: { type: "value", min: 0, max: 100, show: false }, yAxis: axis({ type: "category", data: bars.map(b => b[0]), inverse: true, splitLine: { show: false } }),
-      series: [{ type: "bar", barMaxWidth: 10, showBackground: true, backgroundStyle: { color: col.line() }, data: bars.map(b => ({ value: b[1], itemStyle: { color: col.ok(), borderRadius: 2 } })), label: { show: true, position: "right", color: col.text(), fontSize: 11, formatter: p => bars[p.dataIndex][2] } }] }, true);
-  }
-  const root = h("div", { class: "ops-wrap" }, [
-    h("div", { class: "ops-grid", style: { gridTemplateColumns: "repeat(3,minmax(0,1fr))" } }, [panel("By code", codeBox), panel("Decisions", decBox), panel("Bench", benchBox)]),
-    panel("Inbox", h("div", { class: "ops-wrap", style: { gap: "6px" } }, [bar, tbox])),
-    panel("Traces", h("div", { class: "ops-wrap", style: { gap: "6px" } }, [traceBox, treeBox]))
-  ]);
-  main.appendChild(root);
-  setPanel({ method: [{ step: "run", cmd: CMD.qaRun }, { step: "review", cmd: CMD.qaReview }, { step: "bench", cmd: CMD.qaBench }], log: aq[0] ? { jobId: aq[0].id } : null,
-    sources: [{ label: "agent.yaml", path: "configs/eval/agentqa/agent.yaml" }, { label: "reports", path: aq[0] ? aq[0].outputs.out + "/reports.jsonl" : "fwdata/console/agentqa" }] });
-  bindKeys({ a: () => decide("agree"), r: () => decide("override") }, root);
+  load();
+  return wrap;
 }
 
-/* ------------------------------------------------------------ routes */
-if (typeof UI !== "undefined" && UI.route) {
-  UI.route("runs", runsPage);
-  UI.route("eval", evalPage);
-  UI.route("loop", loopPage);
-  UI.route("cost", (main, params, qs) => loopPage(main, params, qs, "cost"));
-  UI.route("qa", qaPage);
+// ============================================================================
+// #/eval — Evaluation & Paired Comparisons
+// ============================================================================
+export function renderEvalPage() {
+  const wrap = el("div", {});
+  wrap.appendChild(renderLoadingView(t("eval.title")));
+
+  const load = async () => {
+    try {
+      const rawStory = await ensureStoryRaw();
+      const story = scopeStoryForTask(rawStory);
+      const task = getCurrentTask();
+      const pair = story.pair || null;
+      const jig = story.jig || null;
+      const jigRuns = jig && Array.isArray(jig.runs) ? jig.runs : [];
+      const jigBest =
+        jigRuns.find((r) => jig && r.run === jig.best) || jigRuns[0] || null;
+      const jigRollouts = jig && Array.isArray(jig.rollouts) ? jig.rollouts : [];
+      const jigLiveEvals = jig && Array.isArray(jig.live_evals) ? jig.live_evals : [];
+      const jigSteps =
+        (jig && Array.isArray(jig.steps) && jig.steps.length > 0
+          ? jig.steps
+          : jigBest && jigBest.step_pass
+            ? Object.keys(jigBest.step_pass)
+            : []) || [];
+      const ladderR1 = story.demo && story.demo.ladder ? story.demo.ladder : null;
+      const earlyEval = story.eval || null;
+      const taskEvals = task && Array.isArray(task.evals) ? task.evals : [];
+
+      const pairRuns = pair && Array.isArray(pair.runs) ? pair.runs : [];
+      const pairComps = pair && Array.isArray(pair.comparisons) ? pair.comparisons : [];
+      const stepKeys =
+        pairRuns[0] && pairRuns[0].step_pass
+          ? Object.keys(pairRuns[0].step_pass)
+          : (pair && pair.steps) || [];
+
+      const renderJigScorecard = (jr) => {
+        const lv1 = (jr.levels && jr.levels["1"]) || {};
+        const lv2 = (jr.levels && jr.levels["2"]) || {};
+        const placeRate = jr.step_pass && jr.step_pass.place != null ? jr.step_pass.place : null;
+        const placePassCount = placeRate != null ? Math.round(placeRate * jr.n) : null;
+        // Wilson over rollouts is descriptive only: tray-jig.md section 2 reads the targets at the
+        // lower bound of a bootstrap over conditions, which the index does not carry yet (DA-53)
+        const wilsonText = (w) =>
+          Array.isArray(w) ? `${t("exp.wilsonDescr")} ${formatPercent(w[0])}–${formatPercent(w[1])}` : "";
+
+        const cards = [
+          {
+            title: t("exp.ruleAllTitle"),
+            val: formatPercent(jr.p),
+            frac: `${formatNumber(jr.successes)} / ${formatNumber(jr.n)}`,
+            ci: wilsonText(jr.wilson),
+            target: t("exp.targetGe80"),
+          },
+          {
+            title: t("exp.ruleL1Title"),
+            val: formatPercent(lv1.p),
+            frac: `${formatNumber(lv1.successes)} / ${formatNumber(lv1.n)}`,
+            ci: wilsonText(lv1.wilson),
+            target: t("exp.targetGe70"),
+          },
+          {
+            title: t("exp.ruleL2Title"),
+            val: formatPercent(lv2.p),
+            frac: `${formatNumber(lv2.successes)} / ${formatNumber(lv2.n)}`,
+            ci: wilsonText(lv2.wilson),
+            target: t("exp.targetGe70"),
+          },
+          {
+            title: t("exp.rulePlaceTitle"),
+            val: formatPercent(placeRate),
+            frac:
+              placePassCount != null
+                ? `${formatNumber(placePassCount)} / ${formatNumber(jr.n)}`
+                : "-",
+            ci: "",
+            target: t("exp.targetGt50", {
+              reachB: `${formatNumber(jr.reach_b ?? 0)}/${formatNumber(jr.n)}`,
+            }),
+          },
+        ];
+
+        const grid = el(
+          "div",
+          { className: "scorecard-grid-4" },
+          cards.map((c) =>
+            el("div", { className: "scorecard-box" }, [
+              el("div", { className: "task-head" }, [el("span", { className: "tiny", text: c.title })]),
+              el("div", { className: "actions" }, [
+                el("span", { className: cls("scorecard-val", "mono"), text: c.val }),
+                el("span", { className: cls("muted", "mono"), text: c.frac }),
+              ]),
+              c.ci ? el("div", { className: cls("tiny", "mono"), text: c.ci }) : null,
+              el("div", { className: "tiny muted", text: c.target }),
+            ])
+          )
+        );
+        return el("div", {}, [grid, el("p", { className: "tiny muted", text: t("exp.verdictNote") })]);
+      };
+
+      const jigStepChart =
+        jigBest && jigSteps.length > 0
+          ? renderChartBlock({
+              title: t("exp.jigStepChartTitle"),
+              subtitle: jigBest.source || "",
+              height: 305,
+              buildOption: ({ soft, line, colors }) => {
+                const lvStep = jigBest.levels_step_pass || {};
+                const lv1Obj = (jigBest.levels && jigBest.levels["1"]) || {};
+                const lv2Obj = (jigBest.levels && jigBest.levels["2"]) || {};
+                const series = [
+                  {
+                    name: t("exp.jigStepAll", { run: jigBest.run, n: formatNumber(jigBest.n) }),
+                    type: "line",
+                    data: jigSteps.map((sk) =>
+                      jigBest.step_pass && jigBest.step_pass[sk] != null
+                        ? Number((jigBest.step_pass[sk] * 100).toFixed(1))
+                        : null
+                    ),
+                    lineStyle: { width: 3, color: colors[0] },
+                    itemStyle: { color: colors[0] },
+                  },
+                ];
+                if (lvStep["1"]) {
+                  series.push({
+                    name: t("exp.jigStepLv", {
+                      run: jigBest.run,
+                      lv: "1",
+                      n: formatNumber(lv1Obj.n),
+                    }),
+                    type: "line",
+                    data: jigSteps.map((sk) =>
+                      lvStep["1"][sk] != null ? Number((lvStep["1"][sk] * 100).toFixed(1)) : null
+                    ),
+                    lineStyle: { width: 2, type: "dashed", color: colors[1] },
+                    itemStyle: { color: colors[1] },
+                  });
+                }
+                if (lvStep["2"]) {
+                  series.push({
+                    name: t("exp.jigStepLv", {
+                      run: jigBest.run,
+                      lv: "2",
+                      n: formatNumber(lv2Obj.n),
+                    }),
+                    type: "line",
+                    data: jigSteps.map((sk) =>
+                      lvStep["2"][sk] != null ? Number((lvStep["2"][sk] * 100).toFixed(1)) : null
+                    ),
+                    lineStyle: { width: 2, type: "dotted", color: colors[3] },
+                    itemStyle: { color: colors[3] },
+                  });
+                }
+                return {
+                  grid: { left: 48, right: 20, top: 54, bottom: 32 },
+                  tooltip: { trigger: "axis" },
+                  legend: { top: 0, textStyle: { color: soft } },
+                  xAxis: { type: "category", data: jigSteps, axisLabel: { color: soft, rotate: 18 } },
+                  yAxis: {
+                    type: "value",
+                    max: 100,
+                    axisLabel: { color: soft, formatter: "{value}%" },
+                    splitLine: { lineStyle: { color: line } },
+                  },
+                  series,
+                };
+              },
+              tableNode: el("table", { className: "table" }, [
+                el("thead", {}, [
+                  el("tr", {}, [
+                    el("th", { text: t("eval.colStep") }),
+                    el("th", { className: "num", text: jigBest.run }),
+                    el("th", { className: "num", text: "L1" }),
+                    el("th", { className: "num", text: "L2" }),
+                  ]),
+                ]),
+                el(
+                  "tbody",
+                  {},
+                  jigSteps.map((sk) =>
+                    el("tr", {}, [
+                      el("td", { className: "mono", text: sk }),
+                      el("td", {
+                        className: "num",
+                        text: formatPercent(jigBest.step_pass ? jigBest.step_pass[sk] : null),
+                      }),
+                      el("td", {
+                        className: "num",
+                        text: formatPercent(
+                          jigBest.levels_step_pass && jigBest.levels_step_pass["1"]
+                            ? jigBest.levels_step_pass["1"][sk]
+                            : null
+                        ),
+                      }),
+                      el("td", {
+                        className: "num",
+                        text: formatPercent(
+                          jigBest.levels_step_pass && jigBest.levels_step_pass["2"]
+                            ? jigBest.levels_step_pass["2"][sk]
+                            : null
+                        ),
+                      }),
+                    ])
+                  )
+                ),
+              ]),
+            })
+          : null;
+
+      const jigScatterChart =
+        jigRollouts.length > 0
+          ? renderChartBlock({
+              title: t("exp.jigScatterTitle"),
+              subtitle: t("exp.jigScatterSub"),
+              height: 305,
+              buildOption: ({ soft, line, colors }) => {
+                const okPts = [];
+                const posePts = [];
+                const otherPts = [];
+                for (const r of jigRollouts) {
+                  if (r.dist_cm == null || r.yaw_deg == null) continue;
+                  const pt = [
+                    Math.min(35, r.dist_cm),
+                    Math.min(35, r.yaw_deg),
+                    r.ep,
+                    r.dist_cm,
+                    r.yaw_deg,
+                    r.failure || "OK",
+                  ];
+                  if (r.success) okPts.push(pt);
+                  else if (r.failure === "L-PLACE-POSE") posePts.push(pt);
+                  else otherPts.push(pt);
+                }
+                return {
+                  grid: { left: 48, right: 22, top: 54, bottom: 36 },
+                  tooltip: {
+                    formatter: (p) => {
+                      const d = p.data || [];
+                      return `${d[2]} (${d[5]})<br/>Δxy: ${d[3]} cm · Δyaw: ${d[4]}°`;
+                    },
+                  },
+                  legend: { top: 0, textStyle: { color: soft } },
+                  xAxis: {
+                    type: "value",
+                    name: "cm",
+                    max: 35,
+                    axisLabel: { color: soft },
+                    splitLine: { lineStyle: { color: line } },
+                  },
+                  yAxis: {
+                    type: "value",
+                    name: "deg",
+                    max: 35,
+                    axisLabel: { color: soft },
+                    splitLine: { lineStyle: { color: line } },
+                  },
+                  series: [
+                    {
+                      name: t("exp.scatterOk"),
+                      type: "scatter",
+                      symbolSize: 7,
+                      data: okPts,
+                      itemStyle: { color: colors[0], opacity: 0.78 },
+                      markLine: {
+                        silent: true,
+                        symbol: "none",
+                        lineStyle: { type: "dashed", color: soft },
+                        data: [{ xAxis: 5 }, { yAxis: 10 }],
+                      },
+                    },
+                    {
+                      name: t("exp.scatterPose"),
+                      type: "scatter",
+                      symbolSize: 8.5,
+                      data: posePts,
+                      itemStyle: { color: colors[3], opacity: 0.88 },
+                    },
+                    {
+                      name: t("exp.scatterOther"),
+                      type: "scatter",
+                      symbolSize: 8,
+                      data: otherPts,
+                      itemStyle: { color: colors[2], opacity: 0.85 },
+                    },
+                  ],
+                };
+              },
+            })
+          : null;
+
+      const jigRepeatAndRelaxed =
+        jigBest && (jigBest.repeat_dist || jigBest.relaxed)
+          ? el("div", { className: "grid" }, [
+              jigBest.repeat_dist
+                ? el("section", { className: "card" }, [
+                    el("h2", { text: t("exp.repeatCardTitle") }),
+                    el("p", { className: "muted", text: t("exp.repeatCardSub") }),
+                    el(
+                      "div",
+                      { className: "repeat-bars" },
+                      Object.entries(jigBest.repeat_dist).map(([lvKey, arr]) => {
+                        const [k3 = 0, k2 = 0, k1 = 0, k0 = 0] = Array.isArray(arr) ? arr : [];
+                        const tot = Math.max(1, k3 + k2 + k1 + k0);
+                        const segs = [
+                          { clsName: "k3", count: k3, lbl: `3/3: ${k3}` },
+                          { clsName: "k2", count: k2, lbl: `2/3: ${k2}` },
+                          { clsName: "k1", count: k1, lbl: `1/3: ${k1}` },
+                          { clsName: "k0", count: k0, lbl: `0/3: ${k0}` },
+                        ].filter((s) => s.count > 0);
+                        return el("div", {}, [
+                          el("div", { className: "task-head", style: "margin-bottom:4px" }, [
+                            el("b", {
+                              text: t("exp.repeatLevelHead", {
+                                lv: lvKey,
+                                count: formatNumber(tot),
+                              }),
+                            }),
+                            el("span", {
+                              className: cls("tiny", "mono"),
+                              text: `3/3=${k3} · 2/3=${k2} · 1/3=${k1} · 0/3=${k0}`,
+                            }),
+                          ]),
+                          el(
+                            "div",
+                            { className: "repeat-stack-bar" },
+                            segs.map((sg) =>
+                              el("div", {
+                                className: cls("repeat-seg", sg.clsName),
+                                style: `width:${((sg.count / tot) * 100).toFixed(1)}%`,
+                                title: sg.lbl,
+                                text: sg.count / tot >= 0.12 ? sg.lbl : String(sg.count),
+                              })
+                            )
+                          ),
+                        ]);
+                      })
+                    ),
+                  ])
+                : null,
+              jigBest.relaxed
+                ? el("section", { className: "card" }, [
+                    el("h2", { text: t("exp.relaxedJigTitle") }),
+                    el("p", { className: "muted", text: t("exp.relaxedJigSub") }),
+                    comparisonPlot(
+                      jigBest.run,
+                      [
+                        ...Object.entries(jigBest.relaxed).map(([cm, cnt]) => ({
+                          name: `≤ ${cm} cm`,
+                          value: (Number(cnt) / Math.max(1, jigBest.n)) * 100,
+                          label: `${formatPercent(Number(cnt) / Math.max(1, jigBest.n))} (${cnt}/${jigBest.n})`,
+                        })),
+                        {
+                          name: t("exp.reachTableB"),
+                          value: (Number(jigBest.reach_b || 0) / Math.max(1, jigBest.n)) * 100,
+                          label: `${formatPercent(Number(jigBest.reach_b || 0) / Math.max(1, jigBest.n))} (${jigBest.reach_b || 0}/${jigBest.n})`,
+                        },
+                      ],
+                      { bound: 100, unit: "%" }
+                    ),
+                  ])
+                : null,
+            ])
+          : null;
+
+      setChildren(
+        wrap,
+        ...renderCrumbHeading({
+          crumbs: [{ label: t("app.crumbRoot"), href: "#/tasks" }, { label: t("eval.title") }],
+          title: t("eval.title"),
+        }),
+        renderReportSubnav("eval"),
+
+        jigLiveEvals.length > 0
+          ? el("div", { className: cls("attention-banner", "is-warn") }, [
+              el("span", {
+                text: t("exp.liveEvalBanner", {
+                  session: jigLiveEvals[0].session || "-",
+                  gpu: jigLiveEvals[0].gpu || "L4",
+                  lanes: formatNumber(jigLiveEvals[0].lanes ?? 0),
+                  done: formatNumber(jigLiveEvals[0].complete ?? 0),
+                }),
+              }),
+              el("a", { className: "link", href: "#/sim" }, [t("nav.item.sim")]),
+            ])
+          : null,
+
+        jigRuns.length > 0
+          ? el("section", { className: cls("card", "table-wrap") }, [
+              el("div", { className: "task-head" }, [
+                el("h2", { text: t("ux.jigEvalCardTitle") }),
+                el("span", {
+                  className: cls("muted", "mono"),
+                  text: jigRuns[0].source || "",
+                }),
+              ]),
+              el("p", {
+                className: "muted",
+                style: "margin:4px 0 12px",
+                text: t("ux.jigEvalSceneNote", {
+                  scorer: jigRuns[0].scorer_version || "v2",
+                }),
+              }),
+              jigBest ? renderJigScorecard(jigBest) : null,
+              successPlot(jigRuns),
+              el("table", { className: "table", style: "margin-top:10px" }, [
+                el("thead", {}, [
+                  el("tr", {}, [
+                    el("th", { text: t("follow.colModel") }),
+                    el("th", { className: "num", text: t("eval.colSuccN") }),
+                    el("th", { className: "num", text: t("eval.colRate") }),
+                    el("th", { text: t("ux.jigColLevels") }),
+                    el("th", { className: "num", text: t("ux.jigColPlace") }),
+                    el("th", { text: t("eval.colTopFail") }),
+                  ]),
+                ]),
+                el(
+                  "tbody",
+                  {},
+                  jigRuns.map((jr) => {
+                    const lvText = Object.entries(jr.levels || {})
+                      .map(
+                        ([lk, lv]) =>
+                          `L${lk}: ${formatNumber(lv.successes)}/${formatNumber(lv.n)}`
+                      )
+                      .join(" · ");
+                    const placeRate =
+                      jr.step_pass && jr.step_pass.place != null
+                        ? formatPercent(jr.step_pass.place)
+                        : t("state.na");
+                    return el("tr", {}, [
+                      el("td", { className: "mono" }, [el("b", { text: jr.run })]),
+                      el("td", {
+                        className: "num",
+                        text: `${formatNumber(jr.successes)} / ${formatNumber(jr.n)}`,
+                      }),
+                      el("td", { className: "num", text: formatPercent(jr.p) }),
+                      el("td", { className: "mono", text: lvText || t("state.na") }),
+                      el("td", { className: "num", text: placeRate }),
+                      el("td", {
+                        className: "mono",
+                        text: Object.entries(jr.failures || {})
+                          .map(([fk, fv]) => `${fk}: ${fv}`)
+                          .join(" · "),
+                      }),
+                    ]);
+                  })
+                ),
+              ]),
+            ])
+          : null,
+
+        jigStepChart || jigScatterChart
+          ? el("div", { className: "grid" }, [jigStepChart, jigScatterChart])
+          : null,
+
+        jigRepeatAndRelaxed,
+
+        pairRuns.length > 0
+          ? el("section", { className: cls("card", "table-wrap") }, [
+              el("div", { className: "task-head" }, [
+                el("h2", { text: t("eval.pairRunsTitle") }),
+                el("span", { className: cls("muted", "mono"), text: pair.source || "" }),
+              ]),
+              successPlot(pairRuns),
+              el("table", { className: "table", style: "margin-top:10px" }, [
+                el("thead", {}, [
+                  el("tr", {}, [
+                    el("th", { text: t("follow.colModel") }),
+                    el("th", { className: "num", text: t("eval.colSuccN") }),
+                    el("th", { className: "num", text: t("eval.colRate") }),
+                    el("th", { className: "num", text: t("eval.colWilson") }),
+                    el("th", { text: t("eval.colTopFail") }),
+                  ]),
+                ]),
+                el(
+                  "tbody",
+                  {},
+                  pairRuns.map((r) =>
+                    el("tr", {}, [
+                      el("td", { className: "mono", text: r.run }),
+                      el("td", {
+                        className: "num",
+                        text: `${formatNumber(r.successes)} / ${formatNumber(r.n)}`,
+                      }),
+                      el("td", { className: "num", text: formatPercent(r.p) }),
+                      el("td", {
+                        className: "num",
+                        text: Array.isArray(r.wilson)
+                          ? `${formatPercent(r.wilson[0])} – ${formatPercent(r.wilson[1])}`
+                          : t("state.na"),
+                      }),
+                      el("td", {
+                        className: "mono",
+                        text: Object.entries(r.failures || {})
+                          .map(([fk, fv]) => `${fk}: ${fv}`)
+                          .join(" · "),
+                      }),
+                    ])
+                  )
+                ),
+              ]),
+            ])
+          : null,
+
+        pairRuns.length > 0 && stepKeys.length > 0
+          ? renderChartBlock({
+              title: t("eval.stepPassTitle"),
+              subtitle: pair.source || "",
+              height: 260,
+              buildOption: ({ soft, line, colors }) => ({
+                grid: { left: 48, right: 20, top: 34, bottom: 32 },
+                tooltip: { trigger: "axis" },
+                legend: { top: 0, textStyle: { color: soft } },
+                xAxis: { type: "category", data: stepKeys, axisLabel: { color: soft } },
+                yAxis: {
+                  type: "value",
+                  max: 100,
+                  axisLabel: { color: soft, formatter: "{value}%" },
+                  splitLine: { lineStyle: { color: line } },
+                },
+                series: pairRuns.map((r, idx) => ({
+                  name: r.run,
+                  type: "line",
+                  data: stepKeys.map((sk) =>
+                    r.step_pass && r.step_pass[sk] != null
+                      ? Number((r.step_pass[sk] * 100).toFixed(1))
+                      : null
+                  ),
+                  lineStyle: { width: 2, color: colors[idx % colors.length] },
+                  itemStyle: { color: colors[idx % colors.length] },
+                })),
+              }),
+              tableNode: el("table", { className: "table" }, [
+                el("thead", {}, [
+                  el("tr", {}, [
+                    el("th", { text: t("eval.colStep") }),
+                    ...pairRuns.map((r) => el("th", { className: "num", text: r.run })),
+                  ]),
+                ]),
+                el(
+                  "tbody",
+                  {},
+                  stepKeys.map((sk) =>
+                    el("tr", {}, [
+                      el("td", { className: "mono", text: sk }),
+                      ...pairRuns.map((r) =>
+                        el("td", {
+                          className: "num",
+                          text: formatPercent(r.step_pass ? r.step_pass[sk] : null),
+                        })
+                      ),
+                    ])
+                  )
+                ),
+              ]),
+            })
+          : null,
+
+        pairComps.length > 0
+          ? el("section", { className: cls("card", "table-wrap") }, [
+              el("h2", { text: t("eval.pairCompTitle") }),
+              el("table", { className: "table" }, [
+                el("thead", {}, [
+                  el("tr", {}, [
+                    el("th", { text: t("eval.colPair") }),
+                    el("th", { className: "num", text: "n" }),
+                    el("th", { className: "num", text: t("eval.colSuccN") }),
+                    el("th", { className: "num", text: t("eval.colDiffCi") }),
+                    el("th", { className: "num", text: "McNemar p" }),
+                    el("th", { text: t("eval.colOutcome") }),
+                  ]),
+                ]),
+                el(
+                  "tbody",
+                  {},
+                  pairComps.map((c) =>
+                    el("tr", {}, [
+                      el("td", { className: "mono", text: `${c.variant} vs ${c.baseline}` }),
+                      el("td", { className: "num", text: formatNumber(c.n) }),
+                      el("td", { className: "num", text: `${c.variant_succ} vs ${c.baseline_succ}` }),
+                      el("td", {
+                        className: "num",
+                        text: `${formatPercent(c.diff)} (${Array.isArray(c.ci) ? `${formatPercent(c.ci[0])}..${formatPercent(c.ci[1])}` : "-"})`,
+                      }),
+                      el("td", {
+                        className: "num",
+                        text: formatNumber(c.mcnemar_p, { maximumFractionDigits: 4 }),
+                      }),
+                      el("td", {}, [renderStateChip(c.outcome)]),
+                    ])
+                  )
+                ),
+              ]),
+            ])
+          : null,
+
+        ladderR1 && ladderR1.runs && Object.keys(ladderR1.runs).length > 0
+          ? el("section", { className: cls("card", "table-wrap") }, [
+              el("div", { className: "task-head" }, [
+                el("h2", { text: t("exp.relaxedR1Title") }),
+                el("span", { className: cls("muted", "mono"), text: ladderR1.source || "" }),
+              ]),
+              el("table", { className: "table" }, [
+                el("thead", {}, [
+                  el("tr", {}, [
+                    el("th", { text: t("follow.colModel") }),
+                    el("th", { className: "num", text: t("exp.reachTableB") }),
+                    ...(ladderR1.relaxed_cm || []).map((cm) =>
+                      el("th", { className: "num", text: `≤ ${cm} cm` })
+                    ),
+                  ]),
+                ]),
+                el(
+                  "tbody",
+                  {},
+                  Object.entries(ladderR1.runs).map(([mId, mRow]) =>
+                    el("tr", {}, [
+                      el("td", { className: "mono", text: mId }),
+                      el("td", {
+                        className: "num",
+                        text: `${formatNumber(mRow.on_table_b)} / ${formatNumber(ladderR1.n)}`,
+                      }),
+                      ...(ladderR1.relaxed_cm || []).map((cm) =>
+                        el("td", {
+                          className: "num",
+                          text: formatNumber(mRow.relaxed ? mRow.relaxed[cm] : null),
+                        })
+                      ),
+                    ])
+                  )
+                ),
+              ]),
+            ])
+          : null,
+
+        taskEvals.length > 0
+          ? el("section", { className: cls("card", "table-wrap") }, [
+              el("h2", { text: t("eval.taskEvalsTitle") }),
+              el("table", { className: "table" }, [
+                el("thead", {}, [
+                  el("tr", {}, [
+                    el("th", { text: t("ds.attrName") }),
+                    el("th", { className: "num", text: t("eval.colSuccN") }),
+                    el("th", { className: "num", text: t("eval.colRate") }),
+                    el("th", { text: t("eval.colModeLevel") }),
+                    el("th", { text: t("common.source") }),
+                  ]),
+                ]),
+                el(
+                  "tbody",
+                  {},
+                  taskEvals.map((ev) =>
+                    el("tr", {}, [
+                      el("td", { text: pickLang(ev.label) || ev.id }),
+                      el("td", {
+                        className: "num",
+                        text:
+                          ev.n != null
+                            ? `${formatNumber(ev.successes)} / ${formatNumber(ev.n)}`
+                            : t("state.na"),
+                      }),
+                      el("td", {
+                        className: "num",
+                        text:
+                          ev.n && ev.successes != null
+                            ? formatPercent(ev.successes / ev.n)
+                            : t("state.na"),
+                      }),
+                      el("td", {
+                        className: "mono",
+                        text: `${ev.sim_mode || "-"} · L${ev.level ?? "-"}`,
+                      }),
+                      el("td", { className: "mono", text: ev.source || ev.doc || "-" }),
+                    ])
+                  )
+                ),
+              ]),
+            ])
+          : null,
+
+        earlyEval && Array.isArray(earlyEval.levels)
+          ? el("section", { className: cls("card", "table-wrap") }, [
+              el("h2", { text: t("eval.earlyPolicyTitle") }),
+              renderSourceCitation(earlyEval.source, earlyEval.policy),
+              el("table", { className: "table" }, [
+                el("thead", {}, [
+                  el("tr", {}, [
+                    el("th", { text: "Level" }),
+                    el("th", { className: "num", text: t("eval.colSuccN") }),
+                    el("th", { className: "num", text: t("eval.colWilson") }),
+                  ]),
+                ]),
+                el(
+                  "tbody",
+                  {},
+                  earlyEval.levels.map((lv) =>
+                    el("tr", {}, [
+                      el("td", { className: "mono", text: lv.level }),
+                      el("td", { className: "num", text: lv.succ || `${lv.successes}/${lv.n}` }),
+                      el("td", { className: "num", text: lv.wilson || "-" }),
+                    ])
+                  )
+                ),
+              ]),
+            ])
+          : null,
+
+        !pair ? renderProcessEmptyBlock(4) : null
+      );
+    } catch (err) {
+      setChildren(wrap, renderErrorBlock(err, load));
+    }
+  };
+
+  load();
+  return wrap;
 }
-Object.assign(P, { runsPage, evalPage, loopPage, costPage, qaPage, chartsDispose });
-})();
+
+// ============================================================================
+// #/diagnose — System Check & Failure Diagnosis
+// ============================================================================
+export function renderDiagnosePage() {
+  const wrap = el("div", {});
+  wrap.appendChild(renderLoadingView(t("diagnose.title")));
+
+  const load = async () => {
+    try {
+      const rawStory = await ensureStoryRaw();
+      const story = scopeStoryForTask(rawStory);
+      const task = getCurrentTask();
+      const round = getCurrentRound();
+
+      const taskClusters =
+        task && task.clusters && typeof task.clusters === "object" ? task.clusters : {};
+      const taskClusterItems = Array.isArray(taskClusters.items) ? taskClusters.items : [];
+      const diagDemo = story.demo && story.demo.diagnose ? story.demo.diagnose : null;
+      const roundClusters =
+        story.round && Array.isArray(story.round.clusters) ? story.round.clusters : [];
+      const jigAgentQa =
+        story.jig && Array.isArray(story.jig.agentqa) ? story.jig.agentqa : [];
+      const latestAsm = jigAgentQa.length > 0 ? jigAgentQa[jigAgentQa.length - 1] : null;
+      const asmClusters = latestAsm && Array.isArray(latestAsm.clusters) ? latestAsm.clusters : [];
+
+      setChildren(
+        wrap,
+        ...renderCrumbHeading({
+          crumbs: [{ label: t("app.crumbRoot"), href: "#/tasks" }, { label: t("diagnose.title") }],
+          title: t("diagnose.title"),
+          lead: t("diagnose.lead"),
+          actions: round
+            ? [el("a", { className: cls("btn", "primary"), href: "#/loop" }, [t("nav.item.loop")])]
+            : [],
+        }),
+        renderReportSubnav("diagnose"),
+
+        latestAsm && asmClusters.length > 0
+          ? el("section", { className: cls("card", "table-wrap") }, [
+              el("div", { className: "task-head" }, [
+                el("h2", { text: t("exp.diagJigTitle", { caseId: latestAsm.case_id || "-" }) }),
+                renderStateChip(latestAsm.status || "info"),
+              ]),
+              el("p", {
+                className: cls("muted", "mono"),
+                style: "margin:4px 0 10px",
+                text: t("exp.diagJigSub", {
+                  source: latestAsm.source || "-",
+                  status: latestAsm.status || "-",
+                }),
+              }),
+              comparisonPlot(
+                t("diagnose.clustersTitle"),
+                asmClusters
+                  .filter((c) => Number(c.size) > 0)
+                  .slice(0, 8)
+                  .map((c) => ({
+                    name: `${c.label || "-"} (L${c.level ?? "-"})`,
+                    value: c.size,
+                  }))
+              ),
+              el("table", { className: "table", style: "margin-top:10px" }, [
+                el("thead", {}, [
+                  el("tr", {}, [
+                    el("th", { text: t("diagnose.colCluster") }),
+                    el("th", { className: "num", text: "n" }),
+                    el("th", { text: t("exp.diagColHyp") }),
+                    el("th", { text: t("exp.diagColFacts") }),
+                  ]),
+                ]),
+                el(
+                  "tbody",
+                  {},
+                  asmClusters.map((ac) =>
+                    el("tr", {}, [
+                      el("td", {}, [
+                        el("b", { className: "mono", text: ac.label || ac.cluster_id || "-" }),
+                        el("div", {
+                          className: cls("tiny", "mono"),
+                          text: `${ac.run || "-"} · ${ac.step || "-"} · L${ac.level ?? "-"}`,
+                        }),
+                      ]),
+                      el("td", { className: "num", text: formatNumber(ac.size) }),
+                      el("td", {}, [
+                        ac.rule_id
+                          ? el("span", {
+                              className: cls("tax-badge", "mono"),
+                              style: "margin-bottom:3px",
+                              text: `${ac.hypothesis_id || "H1"} · ${ac.rule_id}`,
+                            })
+                          : null,
+                        el("div", {
+                          text:
+                            (ac.rule_id &&
+                              {
+                                place_rests_raised: t("exp.ruleDesc.place_rests_raised"),
+                                near_miss_placement: t("exp.ruleDesc.near_miss_placement"),
+                                scorer_latch_too_strict: t("exp.ruleDesc.scorer_latch_too_strict"),
+                                label_signal_missing: t("exp.ruleDesc.label_signal_missing"),
+                                model: t("exp.ruleDesc.model"),
+                                none: t("exp.ruleDesc.none"),
+                              }[String(ac.rule_id).toLowerCase()]) ||
+                            ac.title ||
+                            ac.diagnosis ||
+                            t("state.na"),
+                        }),
+                      ]),
+                      el("td", {
+                        className: "mono",
+                        text: ac.support_count ? `${ac.support_count} facts` : "-",
+                      }),
+                    ])
+                  )
+                ),
+              ]),
+            ])
+          : null,
+
+        taskClusters.diagnosis === "unknown"
+          ? el("section", { className: "card" }, [
+              el("span", { className: cls("chip", "warning"), text: t("diagnose.verdictUnknown") }),
+              renderSourceCitation(
+                taskClusters.diagnosis_source,
+                taskClusters.diagnosis_quote,
+                taskClusters.origin
+              ),
+            ])
+          : null,
+
+        diagDemo && Array.isArray(diagDemo.checks)
+          ? el("section", { className: "card" }, [
+              el("h2", { text: t("diagnose.checksTitle") }),
+              renderSourceCitation(diagDemo.source),
+              el(
+                "div",
+                { className: "row-list" },
+                // Use .check-row + .check-badge so long check IDs (e.g. delay_sync_camera) wrap cleanly (F3)
+                diagDemo.checks.map((chk) =>
+                  el("div", { className: "check-row" }, [
+                    el("span", { className: cls("check-badge", "mono"), text: chk.id }),
+                    el("div", { className: "row-body" }, [
+                      el("b", { text: formatVal(chk.value) }),
+                      renderSourceCitation(chk.source, chk.quote),
+                    ]),
+                  ])
+                )
+              ),
+            ])
+          : null,
+
+        roundClusters.length > 0
+          ? el("section", { className: cls("card", "table-wrap") }, [
+              comparisonPlot(t("diagnose.clustersTitle"), roundClusters.map((cluster) => ({
+                name: cluster.id, value: cluster.n,
+              }))),
+              el("h2", { text: t("diagnose.colDiag") }),
+              el("table", { className: "table" }, [
+                el("thead", {}, [
+                  el("tr", {}, [
+                    el("th", { text: t("diagnose.colCluster") }),
+                    el("th", { text: t("diagnose.colStage") }),
+                    el("th", { className: "num", text: "n" }),
+                    el("th", { text: t("diagnose.colDiag") }),
+                    el("th", { text: t("diagnose.colInterv") }),
+                  ]),
+                ]),
+                el(
+                  "tbody",
+                  {},
+                  roundClusters.map((c) =>
+                    el("tr", {}, [
+                      el("td", { className: "mono", text: c.id }),
+                      el("td", { className: "mono", text: c.stage }),
+                      el("td", { className: "num", text: formatNumber(c.n) }),
+                      el("td", { text: c.diagnosis }),
+                      el("td", { text: c.intervention }),
+                    ])
+                  )
+                ),
+              ]),
+            ])
+          : null,
+
+        taskClusterItems.length > 0
+          ? el("section", { className: cls("card", "table-wrap") }, [
+              el("h2", { text: t("diagnose.clustersTitle") }),
+              el("table", { className: "table" }, [
+                el("thead", {}, [
+                  el("tr", {}, [
+                    el("th", { text: t("common.id") }),
+                    el("th", { text: t("diagnose.colCheckpoint") }),
+                    el("th", { text: t("diagnose.colStage") }),
+                    el("th", { className: "num", text: t("diagnose.colMembers") }),
+                    el("th", { text: t("common.source") }),
+                  ]),
+                ]),
+                el(
+                  "tbody",
+                  {},
+                  taskClusterItems.map((it) =>
+                    el("tr", {}, [
+                      el("td", { className: "mono", text: it.id }),
+                      el("td", { className: "mono", text: it.checkpoint }),
+                      el("td", { text: `${it.step ?? "-"} · ${it.stage || "-"}` }),
+                      el("td", { className: "num", text: formatNumber(it.members) }),
+                      el("td", {
+                        className: "mono",
+                        text: [it.source, cleanInlineMarkdown(it.quote)].filter(Boolean).join(" — "),
+                      }),
+                    ])
+                  )
+                ),
+              ]),
+            ])
+          : null,
+
+        task && task.process && task.process["5"] && task.process["5"].missing
+          ? renderProcessEmptyBlock(5)
+          : null
+      );
+    } catch (err) {
+      setChildren(wrap, renderErrorBlock(err, load));
+    }
+  };
+
+  load();
+  return wrap;
+}
+
+// ============================================================================
+// #/loop — Failure -> Data Loop
+// ============================================================================
+export function renderLoopPage() {
+  const wrap = el("div", {});
+  wrap.appendChild(renderLoadingView(t("loop.title")));
+
+  const load = async () => {
+    try {
+      const rawStory = await ensureStoryRaw();
+      const story = scopeStoryForTask(rawStory);
+      const round = getCurrentRound();
+
+      if (!round || !story.round) {
+        setChildren(
+          wrap,
+          ...renderCrumbHeading({
+            crumbs: [{ label: t("app.crumbRoot"), href: "#/tasks" }, { label: t("loop.title") }],
+            title: t("loop.title"),
+          }),
+          renderReportSubnav("loop"),
+          renderProcessEmptyBlock(6, t("loop.title"))
+        );
+        return;
+      }
+
+      const sr = story.round;
+      const chain = sr.chain || {};
+      const presentChain = CHAIN_KEYS.filter((k) => chain[k] != null);
+      const withheld = Array.isArray(round.withhold_eval) ? round.withhold_eval : [];
+
+      const stepLabelMap = {
+        targets: "loop.stepTargets",
+        generated: "loop.stepGenerated",
+        recorded: "loop.stepRecorded",
+        qa_pass: "loop.stepQaPass",
+        quality: "loop.stepQuality",
+        selected: "loop.stepSelected",
+      };
+      const maxChainVal = Math.max(1, ...presentChain.map((k) => Number(chain[k]) || 0));
+
+      setChildren(
+        wrap,
+        ...renderCrumbHeading({
+          crumbs: [{ label: t("app.crumbRoot"), href: "#/tasks" }, { label: t("loop.title") }],
+          title: pickLang(round.title) || t("loop.title"),
+        }),
+        renderReportSubnav("loop"),
+
+        withheld.length > 0
+          ? el("div", {
+              className: "empty",
+              text: t("loop.withheldNote", { runs: withheld.join(", ") }),
+            })
+          : null,
+
+        el("div", { className: "sect" }, [el("h2", { text: t("loop.visualFlowTitle") })]),
+        el("div", { className: "loop-evo-strip" }, [
+          el("div", { className: "loop-evo-node" }, [
+            el("span", { className: "tax-badge", text: "01" }),
+            el("span", { className: "tiny", text: t("loop.statBaseline") }),
+            el("b", { className: "mono", text: round.baseline || t("state.na") }),
+          ]),
+          el("div", { className: "loop-evo-node" }, [
+            el("span", { className: "tax-badge", text: "02" }),
+            el("span", { className: "tiny", text: t("nav.item.diagnose") }),
+            el("b", {
+              className: "mono",
+              text: `${formatNumber(chain.targets)} ${t("loop.stepTargets").toLowerCase()}`,
+            }),
+          ]),
+          el("div", { className: "loop-evo-node" }, [
+            el("span", { className: "tax-badge", text: "03" }),
+            el("span", { className: "tiny", text: t("loop.stepSelected") }),
+            el("b", { className: "mono", text: `+${formatNumber(chain.selected)} ep` }),
+            round.cut
+              ? el("span", {
+                  className: cls("tiny", "mono"),
+                  title: round.cut,
+                  text: compactPath(round.cut),
+                })
+              : null,
+          ]),
+          el("div", { className: cls("loop-evo-node", "is-accent") }, [
+            el("span", { className: "tax-badge", text: "04" }),
+            el("span", { className: "tiny", text: t("loop.statAfter") }),
+            el("b", { className: "mono", text: round.after_round || t("state.na") }),
+          ]),
+        ]),
+
+        presentChain.length > 0
+          ? el(
+              "div",
+              { className: "funnel-cards" },
+              presentChain.map((k, idx) => {
+                const val = Number(chain[k]) || 0;
+                const prevVal = idx > 0 ? Number(chain[presentChain[idx - 1]]) || 0 : val;
+                const conv =
+                  idx === 0 || prevVal <= 0
+                    ? "100%"
+                    : val > prevVal
+                      ? `×${formatNumber(val / prevVal, { maximumFractionDigits: 1 })}`
+                      : formatPercent(val / prevVal);
+                const barPct = Math.max(6, Math.min(100, (val / maxChainVal) * 100));
+                return el("div", { className: "funnel-card" }, [
+                  el("div", { className: "task-head" }, [
+                    el("span", {
+                      className: "tiny",
+                      text: t(stepLabelMap[k] || "common.status"),
+                    }),
+                    el("span", { className: cls("short-hash", "mono"), text: conv }),
+                  ]),
+                  el("b", { className: "mono", text: formatNumber(val) }),
+                  el("div", { className: "stream-track" }, [
+                    el("div", { className: "stream-fill", style: `width:${barPct.toFixed(1)}%` }),
+                  ]),
+                ]);
+              })
+            )
+          : null,
+
+        presentChain.length > 0
+          ? renderChartBlock({
+              title: t("loop.funnelTitle"),
+              subtitle: sr.source || "",
+              height: 235,
+              buildOption: ({ soft, line, colors }) => ({
+                grid: { left: 48, right: 20, top: 24, bottom: 32 },
+                tooltip: { trigger: "axis" },
+                xAxis: {
+                  type: "category",
+                  data: presentChain.map((k) => t(stepLabelMap[k] || "common.status")),
+                  axisLabel: { color: soft },
+                },
+                yAxis: {
+                  type: "value",
+                  axisLabel: { color: soft },
+                  splitLine: { lineStyle: { color: line } },
+                },
+                series: [
+                  {
+                    type: "bar",
+                    data: presentChain.map((k) => chain[k]),
+                    itemStyle: { color: colors[0], borderRadius: [6, 6, 0, 0] },
+                    label: { show: true, position: "top", color: soft },
+                  },
+                ],
+              }),
+              tableNode: el("table", { className: "table" }, [
+                el(
+                  "tbody",
+                  {},
+                  presentChain.map((k) =>
+                    el("tr", {}, [
+                      el("td", { text: t(stepLabelMap[k] || "common.status") }),
+                      el("td", { className: "num", text: formatNumber(chain[k]) }),
+                    ])
+                  )
+                ),
+              ]),
+            })
+          : null,
+
+        story.loop_detail || story.loop_chain
+          ? el("section", { className: "card" }, [
+              el("h2", { text: t("loop.altChainTitle") }),
+              el("p", {
+                className: cls("muted", "mono"),
+                text: `loop_chain: ${formatVal(story.loop_chain)} · loop_detail: ${formatVal(story.loop_detail)}`,
+              }),
+            ])
+          : null
+      );
+    } catch (err) {
+      setChildren(wrap, renderErrorBlock(err, load));
+    }
+  };
+
+  load();
+  return wrap;
+}
+
+// ============================================================================
+// #/base — Baseline & Controls
+// ============================================================================
+export function renderBasePage() {
+  const wrap = el("div", {});
+  wrap.appendChild(renderLoadingView(t("base.title")));
+
+  const load = async () => {
+    try {
+      const rawStory = await ensureStoryRaw();
+      const story = scopeStoryForTask(rawStory);
+      const round = getCurrentRound();
+
+      if (!round) {
+        setChildren(
+          wrap,
+          ...renderCrumbHeading({
+            crumbs: [{ label: t("app.crumbRoot"), href: "#/tasks" }, { label: t("base.title") }],
+            title: t("base.title"),
+          }),
+          renderReportSubnav("base"),
+          renderProcessEmptyBlock(6, t("base.title"))
+        );
+        return;
+      }
+
+      const models = story.demo && story.demo.models ? story.demo.models : {};
+      const modelRuns = models.runs || {};
+      const cites = models.cites ? Object.entries(models.cites) : [];
+
+      setChildren(
+        wrap,
+        ...renderCrumbHeading({
+          crumbs: [{ label: t("app.crumbRoot"), href: "#/tasks" }, { label: t("base.title") }],
+          title: t("base.title"),
+        }),
+        renderReportSubnav("base"),
+
+        renderStatStrip([
+          { label: t("loop.statBaseline"), value: round.baseline || t("state.na"), sub: round.id },
+          {
+            label: t("base.statControls"),
+            value: (round.controls || []).join(", ") || t("state.na"),
+            sub: models.source || "",
+          },
+          {
+            label: t("base.statMaxSteps"),
+            value: formatNumber(round.max_steps),
+            sub: round.train_dir || "",
+          },
+        ]),
+
+        el("section", { className: cls("card", "table-wrap") }, [
+          el("h2", { text: t("base.modelsTitle") }),
+          el("table", { className: "table" }, [
+            el("thead", {}, [
+              el("tr", {}, [
+                el("th", { text: t("follow.colModel") }),
+                el("th", { text: t("runs.colRole") }),
+                el("th", { text: t("base.colCut") }),
+                el("th", { className: "num", text: t("data.colEpisodes") }),
+                el("th", { className: "num", text: t("base.colHumanClips") }),
+              ]),
+            ]),
+            el(
+              "tbody",
+              {},
+              (round.runs || []).map((rr) => {
+                const m = modelRuns[rr.id] || {};
+                return el("tr", {}, [
+                  el("td", { className: "mono", text: rr.id }),
+                  el("td", {}, [renderStateChip(rr.role)]),
+                  el("td", { className: "mono", text: m.data || rr.train_set || "-" }),
+                  el("td", {
+                    className: "num",
+                    text:
+                      m.base_episodes != null
+                        ? `${formatNumber(m.episodes)} (${formatNumber(m.base_episodes)}+${formatNumber(m.targeted_episodes)})`
+                        : formatNumber(m.episodes),
+                  }),
+                  el("td", { className: "num", text: formatNumber(m.human_clips) }),
+                ]);
+              })
+            ),
+          ]),
+        ]),
+
+        cites.length > 0
+          ? el("section", { className: "card" }, [
+              el("h2", { text: t("base.citesTitle") }),
+              el(
+                "div",
+                { className: "row-list" },
+                cites.map(([ck, cv]) =>
+                  el("div", { className: "row" }, [
+                    el("div", { className: "row-body" }, [
+                      el("b", { className: "mono", text: ck }),
+                      renderSourceCitation(cv.source, cv.quote),
+                    ]),
+                  ])
+                )
+              ),
+            ])
+          : null
+      );
+    } catch (err) {
+      setChildren(wrap, renderErrorBlock(err, load));
+    }
+  };
+
+  load();
+  return wrap;
+}
+
+// ============================================================================
+// #/follow — Follow One Case
+// ============================================================================
+export function renderFollowPage(ctx) {
+  const wrap = el("div", {});
+  wrap.appendChild(renderLoadingView(t("follow.title")));
+  const q = (ctx && ctx.query) || new URLSearchParams();
+  let filterMode = q.get("seed") ? "all" : "fail";
+  let selectedKey =
+    q.get("seed") && q.get("level") ? `${q.get("level")}:${q.get("seed")}` : null;
+
+  const load = async () => {
+    try {
+      const rawStory = await ensureStoryRaw();
+      const story = scopeStoryForTask(rawStory);
+      const fol = story.follow || null;
+      const runEntries = fol && fol.runs ? Object.entries(fol.runs) : [];
+      const jigConds =
+        story.jig && Array.isArray(story.jig.conditions) ? story.jig.conditions : [];
+      const failConds = jigConds.filter((c) => c.pass_k < c.n_rep);
+      const visibleConds = filterMode === "fail" && failConds.length > 0 ? failConds : jigConds;
+
+      if (!selectedKey || !visibleConds.some((c) => `${c.level}:${c.seed}` === selectedKey)) {
+        const pick = visibleConds[0] || jigConds[0] || null;
+        selectedKey = pick ? `${pick.level}:${pick.seed}` : null;
+      }
+      const activeCond =
+        visibleConds.find((c) => `${c.level}:${c.seed}` === selectedKey) ||
+        jigConds[0] ||
+        null;
+
+      setChildren(
+        wrap,
+        ...renderCrumbHeading({
+          crumbs: [{ label: t("app.crumbRoot"), href: "#/tasks" }, { label: t("follow.title") }],
+          title: t("follow.title"),
+        }),
+        renderReportSubnav("follow"),
+
+        jigConds.length > 0 && activeCond
+          ? el("section", { className: cls("card", "table-wrap") }, [
+              el("div", { className: "task-head", style: "margin-bottom:10px" }, [
+                el("h2", { text: t("exp.followJigTitle") }),
+                el("span", {
+                  className: cls("chip", activeCond.pass_k === activeCond.n_rep ? "" : "warning"),
+                  text: `${activeCond.pass_k}/${activeCond.n_rep} pass`,
+                }),
+              ]),
+              el("div", { className: "toolbar" }, [
+                el(
+                  "select",
+                  {
+                    className: "field",
+                    onChange: (ev) => {
+                      filterMode = ev.target.value;
+                      selectedKey = null;
+                      load();
+                    },
+                  },
+                  [
+                    el("option", {
+                      value: "fail",
+                      selected: filterMode === "fail",
+                      text: t("exp.followFilterFailOnly", { count: formatNumber(failConds.length) }),
+                    }),
+                    el("option", {
+                      value: "all",
+                      selected: filterMode === "all",
+                      text: t("exp.followFilterAllConds", { count: formatNumber(jigConds.length) }),
+                    }),
+                  ]
+                ),
+                el(
+                  "select",
+                  {
+                    className: cls("field", "mono"),
+                    onChange: (ev) => {
+                      selectedKey = ev.target.value;
+                      load();
+                    },
+                  },
+                  visibleConds.map((c) => {
+                    const k = `${c.level}:${c.seed}`;
+                    return el("option", {
+                      value: k,
+                      selected: k === selectedKey,
+                      text: `L${c.level} · seed ${c.seed} (${c.pass_k}/${c.n_rep}${c.top_failure ? ` · ${c.top_failure}` : ""})`,
+                    });
+                  })
+                ),
+              ]),
+              el("div", { className: "comparison-grid" }, [
+                comparisonPlot(
+                  t("exp.axisDistCm"),
+                  (activeCond.trials || []).map((tr) => ({
+                    name: `#${tr.repeat}`,
+                    value: tr.dist_cm,
+                  })),
+                  { threshold: 5, unit: " cm" }
+                ),
+                comparisonPlot(
+                  t("follow.colYaw"),
+                  (activeCond.trials || []).map((tr) => ({
+                    name: `#${tr.repeat}`,
+                    value: tr.yaw_deg,
+                  })),
+                  { threshold: 10, unit: "°" }
+                ),
+              ]),
+              el("table", { className: "table" }, [
+                el("thead", {}, [
+                  el("tr", {}, [
+                    el("th", { text: t("exp.colRepeatIdx") }),
+                    el("th", { text: t("follow.colSuccess") }),
+                    el("th", { className: "num", text: t("exp.axisDistCm") }),
+                    el("th", { className: "num", text: t("follow.colYaw") }),
+                    el("th", { className: "num", text: t("common.time") }),
+                    el("th", { text: t("follow.colFailure") }),
+                  ]),
+                ]),
+                el(
+                  "tbody",
+                  {},
+                  (activeCond.trials || []).map((tr) =>
+                    el("tr", {}, [
+                      el("td", { className: "mono", text: `#${tr.repeat}` }),
+                      el("td", {}, [renderStateChip(tr.success ? "pass" : "failed")]),
+                      el("td", {
+                        className: "num",
+                        text: tr.dist_cm != null ? `${formatNumber(tr.dist_cm, { maximumFractionDigits: 2 })} cm` : "-",
+                      }),
+                      el("td", {
+                        className: "num",
+                        text: tr.yaw_deg != null ? `${formatNumber(tr.yaw_deg, { maximumFractionDigits: 2 })}°` : "-",
+                      }),
+                      el("td", {
+                        className: "num",
+                        text: tr.sim_s != null ? `${formatNumber(tr.sim_s, { maximumFractionDigits: 1 })} s` : "-",
+                      }),
+                      el("td", { className: "mono", text: tr.failure || "-" }),
+                    ])
+                  )
+                ),
+              ]),
+            ])
+          : null,
+
+        !fol || runEntries.length === 0
+          ? el("div", { className: "empty", text: t("state.empty") })
+          : el("section", { className: cls("card", "table-wrap") }, [
+              el("div", { className: "task-head" }, [
+                el("h2", {
+                  text: t("follow.caseMeta", {
+                    level: fol.level ?? "-",
+                    seed: fol.seed ?? "-",
+                    dist: fol.tol ? fol.tol.distance_m : "-",
+                    yaw: fol.tol ? fol.tol.yaw_error_deg : "-",
+                  }),
+                }),
+                el("span", { className: cls("muted", "mono"), text: fol.source || "" }),
+              ]),
+              el("div", { className: "comparison-grid" }, [
+                comparisonPlot(t("follow.colDist"), runEntries.map(([name, run]) =>
+                  ({ name, value: run.distance_m })), { threshold: fol.tol?.distance_m, unit: " m" }),
+                comparisonPlot(t("follow.colYaw"), runEntries.map(([name, run]) =>
+                  ({ name, value: run.yaw_error_deg })), { threshold: fol.tol?.yaw_error_deg, unit: "°" }),
+              ]),
+              el("table", { className: "table" }, [
+                el("thead", {}, [
+                  el("tr", {}, [
+                    el("th", { text: t("follow.colModel") }),
+                    el("th", { text: t("follow.colSuccess") }),
+                    el("th", { text: t("follow.colReachB") }),
+                    el("th", { className: "num", text: t("follow.colDist") }),
+                    el("th", { className: "num", text: t("follow.colYaw") }),
+                    el("th", { text: t("follow.colFailure") }),
+                  ]),
+                ]),
+                el(
+                  "tbody",
+                  {},
+                  runEntries.map(([rId, rv]) =>
+                    el("tr", {}, [
+                      el("td", { className: "mono", text: rId }),
+                      el("td", {}, [renderStateChip(rv.success ? "pass" : "failed")]),
+                      el("td", { text: rv.reach_b ? t("common.yes") : t("common.no") }),
+                      el("td", {
+                        className: "num",
+                        text: `${formatNumber(rv.distance_m, { maximumFractionDigits: 4 })} m`,
+                      }),
+                      el("td", {
+                        className: "num",
+                        text: `${formatNumber(rv.yaw_error_deg, { maximumFractionDigits: 2 })}°`,
+                      }),
+                      el("td", { className: "mono", text: rv.failure || "-" }),
+                    ])
+                  )
+                ),
+              ]),
+            ])
+      );
+    } catch (err) {
+      setChildren(wrap, renderErrorBlock(err, load));
+    }
+  };
+
+  load();
+  return wrap;
+}
+
+// ============================================================================
+// #/design — Experiment Design
+// ============================================================================
+export function renderDesignPage() {
+  const wrap = el("div", {});
+  wrap.appendChild(renderLoadingView(t("design.title")));
+
+  const load = async () => {
+    try {
+      const rawStory = await ensureStoryRaw();
+      const story = scopeStoryForTask(rawStory);
+      const task = getCurrentTask();
+      const design = story.demo && story.demo.design ? story.demo.design : null;
+
+      const sections = ["input", "output", "environment", "devices", "resource"];
+
+      setChildren(
+        wrap,
+        ...renderCrumbHeading({
+          crumbs: [{ label: t("app.crumbRoot"), href: "#/tasks" }, { label: t("design.title") }],
+          title: t("design.title"),
+        }),
+        renderReportSubnav("design"),
+
+        task
+          ? el("section", { className: "card" }, [
+              el("h2", { text: pickLang(task.name) || task.id }),
+              el("p", { className: "muted", text: pickLang(task.description) }),
+              el("strong", { text: pickLang(task.success) }),
+              renderSourceCitation(task.success && task.success.source),
+            ])
+          : null,
+
+        design
+          ? el(
+              "div",
+              { className: "stack" },
+              sections
+                .filter((sec) => Array.isArray(design[sec]) && design[sec].length > 0)
+                .map((sec) =>
+                  el("section", { className: "card" }, [
+                    el("h2", {
+                      className: "eyebrow",
+                      text: hasI18nKey("design.sec." + sec) ? t("design.sec." + sec) : sec,
+                    }),
+                    el(
+                      "div",
+                      { className: "row-list" },
+                      design[sec].map((item) =>
+                        el("div", { className: "row" }, [
+                          el("div", { className: "row-body" }, [
+                            el("b", { className: "mono", text: item.id }),
+                            el("p", {
+                              className: "muted",
+                              text: formatVal(item.value ?? item.per_model_cu),
+                            }),
+                            renderSourceCitation(item.source, item.quote, item.kind),
+                          ]),
+                        ])
+                      )
+                    ),
+                  ])
+                )
+            )
+          : null,
+
+        design && Array.isArray(design.unsourced) && design.unsourced.length > 0
+          ? el("section", { className: "card" }, [
+              el("h2", { text: t("design.unsourcedTitle") }),
+              el(
+                "ul",
+                { className: "missing-list" },
+                design.unsourced.map((u) => el("li", { className: "missing-item", text: u }))
+              ),
+            ])
+          : null
+      );
+    } catch (err) {
+      setChildren(wrap, renderErrorBlock(err, load));
+    }
+  };
+
+  load();
+  return wrap;
+}
+
+// ============================================================================
+// #/cost — Cost & Ledger
+// ============================================================================
+export function renderCostPage() {
+  const wrap = el("div", {});
+  wrap.appendChild(renderLoadingView(t("cost.title")));
+
+  const load = async () => {
+    try {
+      const [rawStory, estimates] = await Promise.all([
+        ensureStoryRaw(),
+        getJSON("/api/estimates"),
+      ]);
+      const story = scopeStoryForTask(rawStory);
+      const task = getCurrentTask();
+      const roundCost = story.demo && story.demo.round_cost ? story.demo.round_cost : null;
+      const colabMach =
+        state.statusDoc && state.statusDoc.machines && state.statusDoc.machines.colab
+          ? state.statusDoc.machines.colab
+          : {};
+      const ledger = Array.isArray(story.ledger) ? story.ledger : [];
+      const colabHist = Array.isArray(story.colab_balance) ? story.colab_balance : [];
+
+      setChildren(
+        wrap,
+        ...renderCrumbHeading({
+          crumbs: [{ label: t("app.crumbRoot"), href: "#/tasks" }, { label: t("cost.title") }],
+          title: t("cost.title"),
+          lead: t("cost.lead"),
+        }),
+        renderReportSubnav("cost"),
+
+        renderStatStrip([
+          {
+            label: t("jobs.machinesColab"),
+            value:
+              colabMach.balance != null
+                ? `${formatNumber(colabMach.balance, { maximumFractionDigits: 2 })} CU`
+                : t("state.na"),
+            sub: colabMach.fresh === false ? t("jobs.colabStale") : formatDateTime(colabMach.time),
+          },
+          {
+            label: t("cost.roundCostTitle"),
+            value:
+              roundCost && roundCost.total_cu != null
+                ? `${formatNumber(roundCost.total_cu, { maximumFractionDigits: 2 })} CU`
+                : t("state.na"),
+            sub:
+              roundCost && roundCost.total_usd != null
+                ? `~$${formatNumber(roundCost.total_usd, { maximumFractionDigits: 2 })}`
+                : "",
+          },
+          {
+            label: t("cost.estimatesTitle"),
+            value: formatNumber((estimates || []).length),
+            sub: "/api/estimates",
+          },
+        ]),
+
+        task && task.process && task.process["0"] && task.process["0"].missing
+          ? renderProcessEmptyBlock(0)
+          : null,
+
+        roundCost
+          ? el("section", { className: "card" }, [
+              el("h2", { text: t("cost.roundCostTitle") }),
+              renderSourceCitation(roundCost.source, roundCost.total_note, roundCost.kind),
+              el(
+                "div",
+                { className: "row-list" },
+                (roundCost.lines || []).map((ln) =>
+                  el("div", { className: "row" }, [
+                    el("div", { className: "row-body" }, [
+                      el("b", { className: "mono", text: `${ln.id}: ${formatNumber(ln.value)} CU` }),
+                      renderSourceCitation(ln.source, ln.quote),
+                    ]),
+                  ])
+                )
+              ),
+            ])
+          : null,
+
+        colabHist.length > 0
+          ? renderChartBlock({
+              title: t("cost.colabHistoryTitle"),
+              height: 220,
+              buildOption: ({ soft, line, colors }) => ({
+                grid: { left: 48, right: 20, top: 18, bottom: 32 },
+                tooltip: { trigger: "axis" },
+                xAxis: {
+                  type: "category",
+                  data: colabHist.map((p) => formatDateTime(p[0])),
+                  axisLabel: { color: soft },
+                },
+                yAxis: {
+                  type: "value",
+                  axisLabel: { color: soft },
+                  splitLine: { lineStyle: { color: line } },
+                },
+                series: [
+                  {
+                    type: "line",
+                    data: colabHist.map((p) => p[1]),
+                    lineStyle: { width: 2, color: colors[0] },
+                  },
+                ],
+              }),
+              tableNode: el("table", { className: "table" }, [
+                el(
+                  "tbody",
+                  {},
+                  colabHist.map(([tm, bal]) =>
+                    el("tr", {}, [
+                      el("td", { text: formatDateTime(tm) }),
+                      el("td", { className: "num", text: `${formatNumber(bal)} CU` }),
+                    ])
+                  )
+                ),
+              ]),
+            })
+          : null,
+
+        ledger.length > 0
+          ? el("section", { className: cls("card", "table-wrap") }, [
+              comparisonPlot(t("cost.ledgerTitle"), ledger.map(([name, value]) => ({ name, value })), { unit: " CU" }),
+              el("details", { className: "studio-details" }, [
+                el("summary", { text: t("chart.showTable") }),
+                el("table", { className: "table" }, [
+                el(
+                  "tbody",
+                  {},
+                  ledger.map(([stId, cu]) =>
+                    el("tr", {}, [
+                      el("td", { className: "mono", text: stId }),
+                      el("td", { className: "num", text: `${formatNumber(cu)} CU` }),
+                    ])
+                  )
+                ),
+              ]),
+              ]),
+            ])
+          : null,
+
+        Array.isArray(estimates) && estimates.length > 0
+          ? el("section", { className: "card" }, [
+              el("h2", { text: t("cost.estimatesTitle") }),
+              el(
+                "div",
+                { className: "row-list" },
+                estimates.map((es) =>
+                  el("div", { className: "row" }, [
+                    el("div", { className: "row-body" }, [
+                      el("b", { text: es.label }),
+                      el("p", { className: cls("muted", "mono"), text: es.path }),
+                    ]),
+                  ])
+                )
+              ),
+            ])
+          : null
+      );
+    } catch (err) {
+      setChildren(wrap, renderErrorBlock(err, load));
+    }
+  };
+
+  load();
+  return wrap;
+}
+
+// ============================================================================
+// #/report — Summary Round Report
+// ============================================================================
+export function renderReportPage() {
+  const wrap = el("div", {});
+  wrap.appendChild(renderLoadingView(t("report.title")));
+
+  const load = async () => {
+    try {
+      const [rawStory, exportsList] = await Promise.all([
+        ensureStoryRaw(),
+        getJSON("/api/exports"),
+      ]);
+      const story = scopeStoryForTask(rawStory);
+      const task = getCurrentTask();
+      const round = getCurrentRound();
+      const demo = story.demo || {};
+      const clip = demo.success_clip || null;
+      const failShare = demo.fail_share || null;
+      const pairComps =
+        story.pair && Array.isArray(story.pair.comparisons) ? story.pair.comparisons : [];
+
+      let clipUrl = null;
+      if (clip && typeof clip.path === "string" && clip.path.startsWith("console/media/demo/")) {
+        clipUrl = `/demomedia/${clip.path.slice("console/media/demo/".length)}`;
+      }
+
+      setChildren(
+        wrap,
+        ...renderCrumbHeading({
+          crumbs: [{ label: t("app.crumbRoot"), href: "#/tasks" }, { label: t("report.title") }],
+          title: t("report.title"),
+        }),
+        renderReportSubnav("report"),
+
+        task
+          ? el("section", { className: "card" }, [
+              el("h2", { text: pickLang(task.name) || task.id }),
+              el("p", { className: "muted", text: pickLang(task.success) }),
+              renderSourceCitation(task.success && task.success.source),
+            ])
+          : null,
+
+        clip
+          ? el("section", { className: "card" }, [
+              el("h2", { text: t("report.clipTitle") }),
+              el("p", {
+                className: "muted",
+                text: t("report.clipMeta", {
+                  model: clip.model || "-",
+                  prov: clip.provenance || "-",
+                  level: clip.level != null ? clip.level : t("state.na"),
+                  seed: clip.seed != null ? clip.seed : t("state.na"),
+                }),
+              }),
+              clipUrl
+                ? el("video", {
+                    className: "video-player",
+                    controls: true,
+                    preload: "metadata",
+                    src: clipUrl,
+                  })
+                : null,
+              clip.note ? el("p", { className: "sources-note", text: clip.note }) : null,
+              renderSourceCitation(clip.source, clip.deck_caption),
+            ])
+          : null,
+
+        pairComps.length > 0
+          ? el("section", { className: cls("card", "table-wrap") }, [
+              el("h2", { text: t("eval.pairCompTitle") }),
+              el("table", { className: "table" }, [
+                el(
+                  "tbody",
+                  {},
+                  pairComps.map((c) =>
+                    el("tr", {}, [
+                      el("td", { className: "mono", text: `${c.variant} vs ${c.baseline}` }),
+                      el("td", {
+                        className: "num",
+                        text: `n=${c.n} · ${c.variant_succ} vs ${c.baseline_succ}`,
+                      }),
+                      el("td", {
+                        className: "num",
+                        text: `${formatPercent(c.diff)} (p=${formatNumber(c.mcnemar_p, { maximumFractionDigits: 3 })})`,
+                      }),
+                      el("td", {}, [renderStateChip(c.outcome)]),
+                    ])
+                  )
+                ),
+              ]),
+            ])
+          : null,
+
+        failShare && failShare.runs
+          ? el("section", { className: "card" }, [
+              el("h2", { text: t("report.failShareTitle") }),
+              renderSourceCitation(failShare.source),
+              el(
+                "div",
+                { className: "meta-strip" },
+                Object.entries(failShare.runs).map(([rk, rv]) =>
+                  el("div", { className: "meta-box" }, [
+                    el("span", { text: rk }),
+                    el("b", { text: formatPercent(rv.share) }),
+                    el("small", { text: `${rv.place_pose + rv.tray_tilt} / ${rv.failed}` }),
+                  ])
+                )
+              ),
+            ])
+          : null,
+
+        Array.isArray(exportsList) && exportsList.length > 0
+          ? el("section", { className: "card" }, [
+              el("h2", { text: t("jobs.exportsTitle") }),
+              el(
+                "div",
+                { className: "row-list" },
+                exportsList.map((ex) =>
+                  el("div", { className: "row" }, [
+                    el("div", { className: "row-body" }, [
+                      el("b", { className: "mono", text: ex.name }),
+                      el("p", {
+                        className: "muted",
+                        text: `${formatBytes(ex.size)} · ${formatDateTime(ex.time)}`,
+                      }),
+                    ]),
+                    !state.locked && ex.url && String(ex.url).startsWith("/api/exports/")
+                      ? el("a", { className: "link", href: ex.url, download: ex.name }, [
+                          t("jobs.downloadZip"),
+                        ])
+                      : null,
+                  ])
+                )
+              ),
+            ])
+          : null,
+
+        !round ? renderProcessEmptyBlock(6) : null
+      );
+    } catch (err) {
+      setChildren(wrap, renderErrorBlock(err, load));
+    }
+  };
+
+  load();
+  return wrap;
+}

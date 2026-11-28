@@ -28,6 +28,14 @@ def story(doc: dict[str, Any], ids: set[str]) -> dict[str, Any]:
             "comparisons": [c for c in pair.get("comparisons") or []
                             if c.get("variant") not in ids and c.get("baseline") not in ids],
         }  # fmt: skip
+    jig = out.get("jig")
+    if isinstance(jig, dict):
+        out["jig"] = {
+            **jig,
+            "runs": [r for r in jig.get("runs") or [] if r.get("run") not in ids],
+            "rollouts": [r for r in jig.get("rollouts") or [] if r.get("run") not in ids],
+            "conditions": [c for c in jig.get("conditions") or [] if c.get("run") not in ids],
+        }
     follow = out.get("follow")
     if isinstance(follow, dict):
         out["follow"] = {k: v for k, v in follow.items() if k != "r3"} | {

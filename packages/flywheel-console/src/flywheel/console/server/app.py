@@ -142,6 +142,15 @@ class Handler(BaseHTTPRequestHandler):
             parts = u.path.strip("/").split("/")
             if u.path == "/api/chat":
                 return self.chat_sse(body)
+            if u.path == "/api/chat/config":
+                if os.environ.get("FW_CHAT_BASE_URL"):
+                    if body.get("base_url"):
+                        os.environ["FW_CHAT_BASE_URL"] = str(body["base_url"]).strip()
+                    if body.get("model"):
+                        os.environ["FW_CHAT_MODEL"] = str(body["model"]).strip()
+                    if body.get("api_key"):
+                        os.environ["FW_CHAT_API_KEY"] = str(body["api_key"]).strip()
+                return self.jok(_chat("providers").set_runtime_config(body))
             if u.path == "/api/models/prewarm":
                 return self.jok(_chat("llm").prewarm())
             if u.path == "/api/jobs":
@@ -324,7 +333,7 @@ class Handler(BaseHTTPRequestHandler):
         if code == 206:
             self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
         if fp.suffix in (".json", ".html", ".js", ".css"):
-            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         self.end_headers()
         if self.command == "HEAD":
             return
@@ -415,12 +424,49 @@ class Handler(BaseHTTPRequestHandler):
                 d["nemotron"] = llm.nemotron_status()
                 if hasattr(llm, "provider"):
                     p = llm.provider()
-                    d["chat"] = {"provider": p.name, "model": p.model, "hosted": p.hosted}
+                    prov_mod = _chat("providers")
+                    prob = prov_mod.problem(p) if hasattr(prov_mod, "problem") else None
+                    d["chat"] = {
+                        "provider": p.name,
+                        "kind": p.kind,
+                        "model": p.model,
+                        "hosted": p.hosted,
+                        "ready": p.kind != "ollama" and prob is None,
+                        "problem": prob,
+                    }
             except ModuleNotFoundError as e:
                 if not _chat_missing(e):
                     raise
                 d["nemotron"] = "down"
             self.jok(d)
+        elif path == "/api/chat/config":
+            llm = _chat("llm")
+            prov_mod = _chat("providers")
+            self.jok(prov_mod.get_runtime_config(llm.ENDPOINT, llm.MODEL))
+        elif path == "/api/chat/remote_models":
+            import urllib.request
+
+            llm = _chat("llm")
+            p = llm.provider()
+            if p.kind == "ollama" or not p.key:
+                self.jok({"models": []})
+                return True
+            m_url = p.base_url.rstrip("/") + "/models"
+            req = urllib.request.Request(
+                m_url,
+                headers={"Authorization": f"Bearer {p.key}", "User-Agent": "curl/8.0"},
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=6.0) as resp:
+                    raw_m = json.load(resp)
+                    m_ids = [
+                        str(it["id"])
+                        for it in (raw_m.get("data") or [])
+                        if isinstance(it, dict) and it.get("id")
+                    ]
+                    self.jok({"models": m_ids[:40]})
+            except Exception:
+                self.jok({"models": [p.model] if p.model else []})
         elif path == "/api/work_episodes":
             self.jok(media.work_episodes(arg("work")))
         elif path == "/api/poster":
