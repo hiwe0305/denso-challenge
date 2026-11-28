@@ -94,8 +94,8 @@ def test_jig_round_reads_story_jig_with_its_reading_rules(idx: ConsolePaths) -> 
     assert res["ok"] and res["round"] == "jig-r1"
     # W6 / W1: the rule-1 sentence, read at the CI lower bound
     assert "cả task 75,6 % (136/180 lượt thành công), CI 70,0–81,1: chưa đạt mốc 80 %" in t
-    assert "mức 1: 85,6 % (77/90), CI 78,9–92,2, đạt mốc 70 %" in t
-    assert "mức 2: 65,6 % (59/90), CI 55,6–75,6, chưa đạt mốc 70 %" in t
+    assert "Mức 1: 85,6 % (77/90), CI 78,9–92,2, đạt mốc 70 %." in t
+    assert "Mức 2: 65,6 % (59/90), CI 55,6–75,6, chưa đạt mốc 70 %." in t
     assert "chưa có CI nên chưa đọc theo mốc 50 %" in t  # no CI of the placing step in the index
     # rule 4 and rule 5, the limits, and the descriptive Wilson interval
     assert "M 47/60" in t and "chỉ đặt cạnh nhau" in t and "C_70 10/60" in t
@@ -493,7 +493,7 @@ def test_the_rule_verdicts_are_quoted_from_the_index_never_recomputed(idx: Conso
     _edit_story(idx, jig=s["jig"])
     t = ask("M có đạt mốc 80% không?", "jig-r1")["model"]
     assert "lượt qua bước đặt), CI 50,0–60,0, đạt mốc 50 %" in t
-    assert "mức 1: 85,6 % (77/90), CI 78,9–92,2, chưa đạt mốc 70 %" in t
+    assert "Mức 1: 85,6 % (77/90), CI 78,9–92,2, chưa đạt mốc 70 %" in t
     ev.pop("readings")
     _edit_story(idx, jig=s["jig"])
     assert "index chưa ghi kết quả đọc theo mốc 80 %" in ask("M có đạt mốc 80% không?", "jig-r1")["model"]
@@ -705,3 +705,19 @@ def test_an_answer_streaming_past_the_turn_cap_is_not_cut(idx: ConsolePaths, mon
     monkeypatch.setattr(llm, "TURN_CAP_S", 0.0)
     evs = list(llm.events(_body("Vòng 1 so với vòng đồ gá khác nhau thế nào?", "r1")))
     assert evs[-1][0] == "error" and evs[-1][1]["code"] == "timeout"
+
+
+def test_each_level_is_its_own_sentence_with_its_own_verdict(idx: ConsolePaths) -> None:
+    _two_rounds(idx)
+    t = ask("Mức 1 và mức 2 có đạt mốc 70% không?", "jig-r1")["model"]
+    line = next(ln for ln in t.splitlines() if "luật 2" in ln)
+    assert "giữ kết luận của mỗi mức ngay sau số của mức đó" in line
+    assert "Mức 1: 85,6 % (77/90), CI 78,9–92,2, đạt mốc 70 %. Mức 2: 65,6 % (59/90), CI 55,6–75,6, chưa đạt mốc 70 %." in line
+    en = ask("Do levels 1 and 2 meet the 70% mark?", "jig-r1", "en")["model"]
+    assert "Level 1: 85.6% (77/90), CI 78.9–92.2, meets the 70% mark. Level 2: 65.6% (59/90), CI 55.6–75.6, below the 70% mark." in en
+    side = registry.call("rounds_side_by_side", {}, {"task": "tray", "round": "r1", "lang": "vi", "question": "Vòng 1 so với vòng đồ gá?"})["model"]
+    assert "Mức 1: 85,6 % (77/90), CI 78,9–92,2, đạt mốc 70 %." in side
+    assert "kết luận đạt hay chưa đạt mốc của mỗi mức ngay sau số của mức đó" in side
+    # the closing instructions reach the model: no next-step options, no cut at the text cap
+    assert "[truncated]" not in side and "PHƯƠNG ÁN BƯỚC TIẾP" not in side and side.rstrip().endswith("ngay sau số của mức đó.")
+    assert "never one verdict after two levels" in llm.SYSTEM

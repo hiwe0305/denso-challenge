@@ -32,7 +32,9 @@ from flywheel.console.paths import active
 
 from .common import (
     HOSTED,
+    MODEL_CHARS,
     Result,
+    cap,
     catalog,
     cols,
     fail,
@@ -490,14 +492,27 @@ def rounds_side_by_side(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
             parts.append(say(f"VÒNG {rid}: index chưa có số liệu của vòng này.", f"ROUND {rid}: the index has no numbers for this round."))
             continue
         how = _how(say, "all")
-        body = [ln for ln in str(res["model"]).splitlines() if ln.strip() and ln != how]
+        body, opts = [], False
+        for ln in str(res["model"]).splitlines():
+            # next-step options are not part of a side-by-side; they would push the closing
+            # instructions past the model text cap
+            if ln.startswith(("PHƯƠNG ÁN BƯỚC TIẾP", "OPTIONS FOR NEXT STEPS")):
+                opts = True
+                continue
+            if opts and (ln.startswith("- ") and not ln.startswith(("- Nguồn", "- Source"))):
+                continue
+            opts = False
+            if ln.startswith(("ĐÃ LÀM RỒI", "ALREADY DONE")) or not ln.strip() or ln == how:
+                continue
+            body.append(ln)
         # each round's own "direct answer" is one of its points here; the answer opens with W6
         body = [re.sub(r"^(CÂU TRẢ LỜI THẲNG|DIRECT ANSWER)\b[^:]*:", say("Ý CHÍNH CỦA VÒNG NÀY:", "KEY POINT OF THIS ROUND:"), ln) for ln in body]
         parts.append("\n".join(body))
-    parts.append(say("CÁCH TRẢ LỜI: câu trả lời thẳng ở trên, rồi với mỗi vòng một hoặc hai câu (kết quả, chỗ hỏng, chi phí), nêu tên vòng và run cho mọi số; giữ số của mỗi vòng dưới tên vòng đó.",
-                     "HOW TO ANSWER: the direct answer above, then one or two sentences per round (result, where it fails, cost), naming the round and run for every number; keep each round's numbers under its own name."))  # fmt: skip
+    parts.append(say("CÁCH TRẢ LỜI: câu trả lời thẳng ở trên, rồi với mỗi vòng một hoặc hai câu (kết quả, chỗ hỏng, chi phí), nêu tên vòng và run cho mọi số; giữ số của mỗi vòng dưới tên vòng đó, và kết luận đạt hay chưa đạt mốc của mỗi mức ngay sau số của mức đó.",
+                     "HOW TO ANSWER: the direct answer above, then one or two sentences per round (result, where it fails, cost), naming the round and run for every number; keep each round's numbers under its own name, and each level's met or not-met verdict next to that level's number."))  # fmt: skip
     text = "\n\n".join(parts)
     out = result({"type": "text", "text": text}, text)
+    out["model"] = cap(text, len(want) * MODEL_CHARS)  # one round's room per round
     out["round"] = want[0]  # the selected round; the others are named in the text
     out["rounds"] = want
     return out
@@ -593,7 +608,10 @@ def _jig_report(task: dict[str, Any], rnd: dict[str, Any], say: Say, focus: str,
         lvl_txt.append(say(f"mức {key}: {say.pct(x.get('p'))} % ({x.get('successes')}/{x.get('n')}), CI {say.ci(x.get('ci'))}, {_verdict(say, _reading(ev, 'level', key), rules.get('per_level', 0.7), 'level')}",
                            f"level {key}: {say.pct(x.get('p'))}% ({x.get('successes')}/{x.get('n')}), CI {say.ci(x.get('ci'))}, {_verdict(say, _reading(ev, 'level', key), rules.get('per_level', 0.7), 'level')}"))  # fmt: skip
     if lvl_txt:
-        F["levels"] = say("Từng mức (luật 2): ", "Per level (rule 2): ") + "; ".join(lvl_txt) + "."
+        # one sentence per level, each with its own verdict, so a shortened answer cannot carry one
+        # verdict over both levels ("mức 1 …, mức 2 …, chưa đạt mốc 70 %"; Website, 28/11/2026)
+        F["levels"] = say("Từng mức (luật 2), giữ kết luận của mỗi mức ngay sau số của mức đó: ",
+                          "Per level (rule 2), keep each level's verdict next to its own number: ") + " ".join(_cap(t) + "." for t in lvl_txt)  # fmt: skip
     pl = ev.get("place") or {}
     if pl.get("n"):
         ci_txt = say(f", CI {say.ci(pl['ci'])}", f", CI {say.ci(pl['ci'])}") if pl.get("ci") else ""
