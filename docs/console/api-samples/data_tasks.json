@@ -55,7 +55,11 @@
     "story.colab_sessions",
     "story.ds",
     "story.loop_chain",
-    "story.loop_detail"
+    "story.loop_detail",
+    "story.timeline",
+    "story.latest",
+    "story.next_steps",
+    "story.failure_table"
    ],
    "evals": [],
    "clusters": {},
@@ -278,7 +282,8 @@
      "episodes": 153,
      "status": "current"
     }
-   ]
+   ],
+   "default_round": "tray-jig-r1"
   },
   {
    "id": "two_table",
@@ -614,7 +619,19 @@
     "story.vm_phases",
     "story.eval",
     "story.diag"
-   ]
+   ],
+   "links": {
+    "prev": null,
+    "next": {
+     "round": "tray-jig-r1",
+     "run": "M",
+     "successes": 136,
+     "n": 180,
+     "scene_differs": true,
+     "scorer_differs": true
+    }
+   },
+   "scorer_version": 1
   },
   {
    "id": "tray-jig-r1",
@@ -675,7 +692,20 @@
    "index": [
     "story.jig",
     "sim"
-   ]
+   ],
+   "links": {
+    "prev": {
+     "round": "tray-r1",
+     "run": "C_70",
+     "successes": 10,
+     "n": 60,
+     "scene_differs": true,
+     "scorer_differs": true,
+     "carried": 50,
+     "placed": 10
+    },
+    "next": null
+   }
   }
  ]
 }
