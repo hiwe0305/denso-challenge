@@ -21,6 +21,9 @@ import {
   setSessionMode,
   subscribeChatStore,
 } from "./chat.js";
+// renderSourceChips arrives with the answer-shape change of chat.js (#267); a namespace import
+// keeps this page loading in either merge order (a missing named export would not).
+import * as chatApi from "./chat.js";
 import {
   canonicalDatasetTaxonomy,
   cls,
@@ -55,6 +58,19 @@ const MODES = [
   { id: "investigate", labelKey: "studio.modeInvestigate", subKey: "studio.modeInvestigateSub" },
   { id: "operate", labelKey: "studio.modeOperate", subKey: "studio.modeOperateSub" },
 ];
+
+// Readable name of a chat tool step (tool.label.<name>), the raw name otherwise.
+function toolLabel(step) {
+  const name = step && step.name ? String(step.name) : "";
+  const key = "tool.label." + name;
+  if (name && hasI18nKey(key)) return t(key);
+  return (step && step.ui && step.ui.title) || name;
+}
+
+// Source chips under a finished answer (done.sources), when chat.js provides them.
+function sourceChips(sources) {
+  return typeof chatApi.renderSourceChips === "function" ? chatApi.renderSourceChips(sources) : null;
+}
 
 export function renderChatStudioPage() {
   const root = el("div", { className: "studio-page" });
@@ -451,7 +467,7 @@ export function renderChatStudioPage() {
       panel.appendChild(el("select", { className: "field", "aria-label": t("analysis.result"),
         onChange: (event) => draw(Number(event.target.value)) },
         results.map(({ step, ui }, index) => el("option", { value: String(index),
-          text: ui.title || step.name, selected: index === results.length - 1 }))));
+          text: toolLabel(step), selected: index === results.length - 1 }))));
     }
     panel.appendChild(output);
     draw(results.length - 1);
@@ -513,6 +529,7 @@ export function renderChatStudioPage() {
       ]),
 
       tr.answer || isRunning ? mdZone : null,
+      isRunning ? null : sourceChips(tr.sources),
       tr.steps?.some((step) => step.ok === false)
         ? el("p", { className: "missing-item", text: t("analysis.partial") }) : null,
       Array.isArray(tr.unverified) && tr.unverified.length > 0
@@ -539,7 +556,7 @@ export function renderChatStudioPage() {
                     st.ms !== null && !st.ok && "err"
                   ),
                 }, [st.ms === null ? icon("dot") : st.ok ? "✓" : "!"]),
-                el("b", { text: st.ui?.title || st.name }),
+                el("b", { text: toolLabel(st), title: st.name || "" }),
                 st.ui?.type === "text" && st.ui.text ? el("small", { text: st.ui.text }) : null,
                 el("span", {
                   className: cls("step-ms", "mono"),
@@ -767,7 +784,7 @@ export function renderChatStudioPage() {
               facts.map((f) =>
                 el("tr", {}, [
                   el("td", {}, [el("span", { className: "tax-badge", text: `{${f.id}}` })]),
-                  el("td", { className: "mono", text: `${f.source} · ${f.tool}` }),
+                  el("td", { className: "mono", text: `${f.source} · ${toolLabel({ name: f.tool })}` }),
                   el("td", { text: f.label }),
                   el("td", { className: "mono", text: f.value }),
                 ])
@@ -943,7 +960,7 @@ export function renderChatStudioPage() {
                     window.setTimeout(resizeChatCharts, 60);
                   },
                 },
-                [`#${idx + 1} ${a.name}`]
+                [`#${idx + 1} ${toolLabel({ name: a.name })}`]
               )
             )
           )
@@ -951,7 +968,7 @@ export function renderChatStudioPage() {
       el("div", { className: "card" }, [
         el("div", { className: "task-head", style: "margin-bottom:10px" }, [
           el("div", {}, [
-            el("b", { className: "mono", text: activeArt.name }),
+            el("b", { text: toolLabel({ name: activeArt.name }), title: activeArt.name }),
             el("div", {
               className: cls("tiny", "mono"),
               text: formatArgsChip(Object.fromEntries(Object.entries(activeArt.args || {}).filter(

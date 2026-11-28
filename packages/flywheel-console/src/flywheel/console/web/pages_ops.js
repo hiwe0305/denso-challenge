@@ -87,6 +87,15 @@ function advancedBlock(children, label = t("ux.advanced")) {
   ]);
 }
 
+function isLiveSession(sess) {
+  return Boolean(
+    sess &&
+      String(sess.state || "").toLowerCase() === "running" &&
+      sess.stale !== true &&
+      sess.fresh !== false
+  );
+}
+
 function runTrained(run) {
   const max = Number(run && run.max_steps);
   const reached = Number(
@@ -948,8 +957,11 @@ export function renderHomePage() {
         withheldList.length > 0
           ? t("ux.homeEvalWithheldNote")
           : "";
-      const activeColabList =
-        jigDoc && Array.isArray(jigDoc.active_sessions) ? jigDoc.active_sessions : [];
+      // "running" only for a live record: state running and not marked stale by the index
+      // (an 11/11 batch record still said running on 28/11; managing session, 28/11 evening)
+      const activeColabList = (
+        jigDoc && Array.isArray(jigDoc.active_sessions) ? jigDoc.active_sessions : []
+      ).filter(isLiveSession);
       const colabSuffix =
         activeColabList.length > 0
           ? t("ux.homeColabActive", {
