@@ -975,7 +975,7 @@ export function renderEvalPage() {
         ]);
         let body;
         if (status === "withheld") {
-          body = el("div", { className: "empty", text: t("exp.evalWithheld") });
+          body = el("div", { className: "empty", text: t("loop.withheldNote") });
         } else if (status === "missing") {
           body = el("div", {}, [
             el("div", { className: "empty", text: t("exp.evalMissing", { run: ev.run }) }),
@@ -1873,7 +1873,7 @@ function renderJigLoop(round, jig) {
           pct: formatPercent(head.p),
         })
       : ev.status === "withheld"
-        ? t("exp.evalWithheld")
+        ? t("loop.withheldNote")
         : t("exp.evalMissing", { run: ev.run });
   const evalSub = !ev
     ? ""
@@ -2547,7 +2547,9 @@ function normalizeLedger(rows) {
         return { story, name: String(story ?? ""), est: numOrNull(est), mea: numOrNull(mea) };
       }
       if (!r || typeof r !== "object") return null;
-      const label = pickLang(r.label);
+      // The hidden-stories row is named by the dictionary so the en page reads in English;
+      // other labels are story titles from the index (Vietnamese only for now).
+      const label = r.story === "other" ? t("cost.otherHidden") : pickLang(r.label);
       return {
         story: r.story,
         name: label || String(r.story ?? ""),
@@ -2589,7 +2591,7 @@ function renderLedgerCard(rawLedger) {
         {},
         rows.map((r) =>
           el("tr", {}, [
-            el("td", { text: r.name, title: r.story && r.story !== r.name ? String(r.story) : null }),
+            el("td", { text: r.name, title: r.story && r.story !== "other" && r.story !== r.name ? String(r.story) : null }),
             el("td", { className: "num", text: fmt(r.est) }),
             el("td", { className: "num", text: fmt(r.mea) }),
           ])

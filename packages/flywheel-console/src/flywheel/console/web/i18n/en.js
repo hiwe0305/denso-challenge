@@ -55,7 +55,7 @@ export default {
   "nav.group.plan": "Plan & report",
   "nav.item.tasks": "Select task",
   "nav.item.home": "Overview",
-  "nav.item.chat": "Agent Studio",
+  "nav.item.chat": "Analysis assistant",
   "nav.item.data": "Data library",
   "nav.item.import": "Import data",
   "nav.item.pipeline": "Process data",
@@ -839,7 +839,6 @@ export default {
   "exp.verdictNoteRules": "A reading compares the lower bound of the bootstrap over conditions with the rule's target. The Wilson interval over rollouts is descriptive only.",
   "exp.evalMissing": "No results.json yet for run {run}",
   "exp.evalMissingHow": "Run this from the repo root to write the file, then rebuild the index (fw console index):",
-  "exp.evalWithheld": "This run's result is withheld and not presented",
   "exp.evalBlocked": "Not read by the rules because the file misses a condition: {problems}. The figures stay for reference.",
   "exp.scopeWhole": "Whole task",
   "exp.scopeLevel": "Level {lv}",
@@ -1140,4 +1139,5 @@ export default {
   "ux.kindReadyChip": "Ready",
   "job.kind.eval.diag_train": "Train diagnosis",
   "ux.advancedNamed": "Advanced: {name}",
+  "cost.otherHidden": "Other experiments (not presented)",
 };
