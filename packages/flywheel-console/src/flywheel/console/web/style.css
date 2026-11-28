@@ -2575,6 +2575,18 @@ main {
   margin-top: 6px;
 }
 
+.md-chart {
+  margin: 8px 0;
+}
+
+.md-chart-pending {
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  padding: 18px 10px;
+  text-align: center;
+  color: var(--soft);
+}
+
 .trace-lines {
   list-style: none;
   margin: 5px 0 0;

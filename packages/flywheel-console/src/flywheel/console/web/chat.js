@@ -513,10 +513,100 @@ export function renderSourceChips(sources) {
   );
 }
 
-export function renderMarkdownInto(container, rawText, isStreaming = false) {
+// ```chart blocks in an answer: a small, fixed spec (chat/charts.py holds the same rules).
+// {"type": "bar"|"line", "title", "unit", "x": [labels], "series": [{"name", "data": [numbers]}]}
+const CHART_MAX = 2;
+const CHART_MAX_X = 12;
+const CHART_MAX_SERIES = 6;
+const CHART_KEYS = new Set(["type", "title", "unit", "x", "series"]);
+
+// a value as the server's number check writes it (136, 75.6, 0.842)
+const chartNum = (v) => String(v);
+
+export function parseChartSpec(raw) {
+  let obj = raw;
+  if (typeof raw === "string") {
+    try {
+      obj = JSON.parse(raw);
+    } catch (_e) {
+      return { spec: null, obj: null, error: "json" };
+    }
+  }
+  const bad = (error) => ({ spec: null, obj, error });
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return bad("shape");
+  if (Object.keys(obj).some((k) => !CHART_KEYS.has(k))) return bad("keys");
+  if (obj.type !== "bar" && obj.type !== "line") return bad("type");
+  if ((obj.title != null && typeof obj.title !== "string") || (obj.unit != null && typeof obj.unit !== "string")) return bad("text");
+  const x = obj.x;
+  if (!Array.isArray(x) || x.length === 0 || x.length > CHART_MAX_X) return bad("x");
+  if (!x.every((lb) => typeof lb === "string" || (typeof lb === "number" && Number.isFinite(lb)))) return bad("x");
+  const ser = obj.series;
+  if (!Array.isArray(ser) || ser.length === 0 || ser.length > CHART_MAX_SERIES) return bad("series");
+  for (const sr of ser) {
+    if (!sr || typeof sr !== "object" || Object.keys(sr).some((k) => k !== "name" && k !== "data")) return bad("series");
+    if (sr.name != null && typeof sr.name !== "string") return bad("series");
+    if (!Array.isArray(sr.data) || sr.data.length !== x.length) return bad("data");
+    if (!sr.data.every((v) => typeof v === "number" && Number.isFinite(v))) return bad("data");
+  }
+  return { spec: obj, obj, error: null };
+}
+
+// the numbers of a block as a plain table: what an invalid block shows instead of a chart
+function chartTable(obj) {
+  const x = Array.isArray(obj?.x) ? obj.x.slice(0, 24) : [];
+  const ser = (Array.isArray(obj?.series) ? obj.series : []).filter((sr) => sr && Array.isArray(sr.data)).slice(0, 12);
+  if (ser.length === 0) return null;
+  const width = Math.max(x.length, ...ser.map((sr) => sr.data.length));
+  const cell = (v) => (typeof v === "number" && Number.isFinite(v) ? chartNum(v) : typeof v === "string" ? v : "");
+  const head = el("tr", {}, [el("th", { text: "" }), ...Array.from({ length: width }, (_, k) => el("th", { text: cell(x[k]) }))]);
+  const rows = ser.map((sr) =>
+    el("tr", {}, [
+      el("td", { text: typeof sr.name === "string" ? sr.name : "" }),
+      ...Array.from({ length: width }, (_, k) => el("td", { text: cell(sr.data[k]) })),
+    ])
+  );
+  return el("div", { className: "md-table-wrap" }, [
+    el("table", { className: "md-table" }, [el("thead", {}, [head]), el("tbody", {}, rows)]),
+  ]);
+}
+
+// Draws one ```chart block (its text or parsed object) with the console's bar/line path, or a
+// note and a table when the block breaks a rule; never the raw JSON. opts.unverified marks the
+// chart's numbers the server could not check; opts.index > 2 is over the limit.
+export function renderChartSpec(raw, opts = {}) {
+  const vien2 = (vi, en) => (state.lang === "en" ? en : vi);
+  const parsed = parseChartSpec(raw);
+  const over = (opts.index || 1) > CHART_MAX;
+  if (!parsed.spec || over) {
+    return el("div", { className: "md-chart md-chart-invalid" }, [
+      el("div", { className: "missing-item", text: vien2("Không vẽ được biểu đồ.", "The chart could not be drawn.") }),
+      chartTable(parsed.obj),
+    ]);
+  }
+  const sp = parsed.spec;
+  const title = [sp.title, sp.unit ? `(${sp.unit})` : ""].filter(Boolean).join(" ");
+  const ui = {
+    type: sp.type,
+    title,
+    unit: sp.unit || "",
+    categories: sp.x.map((lb) => String(lb)),
+    series: sp.series.map((sr) => ({ name: sr.name || "", values: sr.data.slice() })),
+  };
+  const unverified = new Set((Array.isArray(opts.unverified) ? opts.unverified : []).map(String));
+  const flagged = [...new Set(sp.series.flatMap((sr) => sr.data.map(chartNum)).filter((n) => unverified.has(n)))];
+  return el("div", { className: "md-chart" }, [
+    renderToolUi(ui),
+    flagged.length > 0
+      ? el("div", { className: "missing-item", text: t("chat.unverifiedWarn", { nums: flagged.join(", ") }) })
+      : null,
+  ]);
+}
+
+export function renderMarkdownInto(container, rawText, isStreaming = false, opts = {}) {
   const lines = String(rawText || "").replace(/\r\n/g, "\n").split("\n");
   const blocks = [];
   let i = 0;
+  let charts = 0;
 
   while (i < lines.length) {
     const ln = lines[i];
@@ -529,8 +619,19 @@ export function renderMarkdownInto(container, rawText, isStreaming = false) {
         codeLines.push(lines[i]);
         i += 1;
       }
+      const closed = i < lines.length;
       i += 1;
       const codeStr = codeLines.join("\n");
+      if (lang === "chart") {
+        charts += 1;
+        if (!closed && isStreaming) {
+          // the block is still arriving: a placeholder until its fence closes
+          blocks.push(el("div", { className: cls("md-chart", "md-chart-pending", "tiny"), text: state.lang === "en" ? "Drawing the chart…" : "Đang vẽ biểu đồ…" }));
+        } else {
+          blocks.push(renderChartSpec(codeStr, { unverified: opts.unverified, index: charts }));
+        }
+        continue;
+      }
       const copyBtn = el("button", { type: "button", className: "mono", text: t("chat.copyBtn") });
       copyBtn.addEventListener("click", () => copyText(codeStr, copyBtn));
       blocks.push(
@@ -639,8 +740,9 @@ function mountInlineChart(ui, large = false) {
       const ser = Array.isArray(ui.series) ? ui.series : [];
       inst.setOption({
         animation: false,
-        grid: { left: 44, right: 16, top: 26, bottom: 28 },
+        grid: { left: 44, right: 16, top: ser.length > 1 ? 30 : 26, bottom: 28 },
         tooltip: { trigger: "axis" },
+        legend: ser.length > 1 ? { top: 0, textStyle: { color: soft, fontSize: 10.5 } } : undefined,
         xAxis: { type: "category", data: cats, axisLabel: { color: soft, fontSize: 10.5 } },
         yAxis: {
           type: "value",
@@ -652,6 +754,24 @@ function mountInlineChart(ui, large = false) {
           type: "bar",
           data: s.values || [],
           itemStyle: { color: palette[idx % palette.length], borderRadius: [4, 4, 0, 0] },
+        })),
+      });
+    } else if (Array.isArray(ui.categories)) {
+      // a line over labelled points (a chart block): one value per label
+      const ser = Array.isArray(ui.series) ? ui.series : [];
+      inst.setOption({
+        animation: false,
+        grid: { left: 48, right: 16, top: 28, bottom: 28 },
+        tooltip: { trigger: "axis" },
+        legend: { top: 0, textStyle: { color: soft, fontSize: 10.5 } },
+        xAxis: { type: "category", data: ui.categories, axisLabel: { color: soft, fontSize: 10.5 } },
+        yAxis: { type: "value", axisLabel: { color: soft, fontSize: 10.5 }, splitLine: { lineStyle: { color: line } } },
+        series: ser.map((s, idx) => ({
+          name: s.name || "",
+          type: "line",
+          data: s.values || [],
+          lineStyle: { width: large ? 2 : 1.6, color: palette[idx % palette.length] },
+          itemStyle: { color: palette[idx % palette.length] },
         })),
       });
     } else {
@@ -1708,7 +1828,9 @@ function renderSideTurnNode(tr) {
   const isRunning = tr.phase && tr.phase !== "done";
   const mdZone = el("div", { className: "md-body" });
   if (tr.answer || isRunning) {
-    renderMarkdownInto(mdZone, tr.answer || "", isRunning && !tr.steps.some((s) => s.ms === null));
+    renderMarkdownInto(mdZone, tr.answer || "", isRunning && !tr.steps.some((s) => s.ms === null), {
+      unverified: tr.unverified,
+    });
   }
 
   const card = el("div", { className: cls("agent-turn", "bubble") }, [
@@ -1730,6 +1852,9 @@ function renderSideTurnNode(tr) {
     renderTraceBox(tr, isRunning),
     tr.answer || isRunning ? mdZone : null,
     isRunning ? null : renderSourceChips(tr.sources),
+    !isRunning && Array.isArray(tr.unverified) && tr.unverified.length > 0
+      ? el("div", { className: "missing-item", text: t("chat.unverifiedWarn", { nums: tr.unverified.join(", ") }) })
+      : null,
     tr.error ? el("div", { className: "missing-item", text: tr.error }) : null,
     tr.navigate
       ? el(
