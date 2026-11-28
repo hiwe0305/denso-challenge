@@ -37,6 +37,17 @@ DYNAMIC: dict[str, list[str]] = {
     ],
     "proc.stage.": [str(n) for n in range(0, 7)],
     "cat.group.": ["egocentric", "teleop", "s1", "s2", "eval", "other", "all"],
+    # Design page rows (W12, 28/11): ids of story.demo.design; descriptions only for text rows.
+    "design.item.": [
+        "task", "station", "sim_episodes", "human_clips", "keyboard_teleop", "trained_model",
+        "step_scores", "recommendation", "comparison", "sim_stack", "robot_model", "lerobot",
+        "laptop", "rtx3060", "colab_train_gpu", "colab_serve_gpu", "head_camera", "train_cu",
+        "train_cu_estimate", "test_cu", "gen_hours", "qa_hours", "gen_machine_hours", "gen_cu",
+        "deid_first",
+    ],  # fmt: skip
+    "design.desc.": ["task", "station", "keyboard_teleop", "laptop", "head_camera", "deid_first"],
+    "fail.": ["L-PLACE-POSE", "L-TRAY-TILT", "L-TIMEOUT", "L-PART-DROP", "L-ONE-HAND"],
+    "field.": ["episodes", "frames", "clips", "exported", "models", "steps", "hours", "cu"],
     "tasks.inv.": ["store", "task"],
     "job.kind.": [
         "eval.diag_system",

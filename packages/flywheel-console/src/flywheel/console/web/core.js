@@ -66,7 +66,8 @@ export const state = {
   simRawDoc: null,
   kindsDoc: null,
   modelsDoc: null,
-  // Session-only task & round selection; never persisted in localStorage.
+  // Task & round selection: kept for this browser tab only (sessionStorage), never in
+  // localStorage, so a reload mid-recording stays on the same round.
   taskId: null,
   roundId: null,
   selection: null,
@@ -109,6 +110,29 @@ export function pickLang(val) {
     return val[state.lang] ?? val.vi ?? val.en ?? "";
   }
   return String(val);
+}
+
+// Success condition in reader's words (W7) when the dictionary has one for the task;
+// otherwise the seed text.
+export function taskSuccessText(task) {
+  if (!task) return t("state.na");
+  const key = "task.success." + task.id;
+  return hasI18nKey(key) ? t(key) : pickLang(task.success) || t("state.na");
+}
+
+// Reader's name of a task step id ("approach_a" → "tới bàn A") from task.stages in tasks.json;
+// the id itself when the task has no entry (design audit P1-4).
+export function stageLabel(id, task = getCurrentTask()) {
+  const stages = task && Array.isArray(task.stages) ? task.stages : [];
+  const found = stages.find((st) => st && st.id === id);
+  return found ? pickLang(found) || id : id;
+}
+
+// Reader's name of a failure label ("L-PLACE-POSE" → "đặt lệch", W10); the code when the
+// dictionary has no entry. Pages keep the code in a tooltip.
+export function failureLabel(code) {
+  const key = "fail." + code;
+  return code && hasI18nKey(key) ? t(key) : String(code ?? "");
 }
 
 // Pure inline markdown cleaner for document quotes (F1): strips **, backticks,
@@ -329,6 +353,7 @@ export class ApiError extends Error {
 }
 
 let activeBannerRetry = null;
+let activeBannerNetwork = false;
 
 export function showErrorBanner(err, onRetry = null) {
   const banner = document.getElementById("error-banner");
@@ -356,6 +381,7 @@ export function showErrorBanner(err, onRetry = null) {
     t("error.network");
 
   activeBannerRetry = typeof onRetry === "function" ? onRetry : null;
+  activeBannerNetwork = status === 0;
   if (activeBannerRetry) {
     retryBtn.textContent = t("error.retry");
     retryBtn.hidden = false;
@@ -371,6 +397,13 @@ export function hideErrorBanner() {
     banner.hidden = true;
   }
   activeBannerRetry = null;
+  activeBannerNetwork = false;
+}
+
+// A later successful call proves the server is back: drop a stale "cannot reach" banner
+// (stability audit S-P2-14). HTTP errors stay until dismissed or the route changes.
+function clearNetworkBanner() {
+  if (activeBannerNetwork) hideErrorBanner();
 }
 
 export function bindErrorBannerControls() {
@@ -429,18 +462,16 @@ export async function getJSON(url, options = {}) {
       cache: "no-cache",
       signal,
     });
-    return await parseJsonResponse(res, url, notify);
+    const payload = await parseJsonResponse(res, url, notify);
+    clearNetworkBanner();
+    return payload;
   } catch (err) {
     if (err && err.name === "AbortError") throw err;
     if (err instanceof ApiError) {
       if (notify && onRetry) showErrorBanner(err, onRetry);
       throw err;
     }
-    const netErr = new ApiError({
-      status: 0,
-      url,
-      serverMessage: err && err.message ? err.message : t("error.network"),
-    });
+    const netErr = new ApiError({ status: 0, url, serverMessage: t("error.network") });
     if (notify) showErrorBanner(netErr, onRetry);
     throw netErr;
   }
@@ -491,11 +522,7 @@ export async function postJSON(url, body = {}, options = {}) {
       if (notify && onRetry) showErrorBanner(err, onRetry);
       throw err;
     }
-    const netErr = new ApiError({
-      status: 0,
-      url,
-      serverMessage: err && err.message ? err.message : t("error.network"),
-    });
+    const netErr = new ApiError({ status: 0, url, serverMessage: t("error.network") });
     if (notify) showErrorBanner(netErr, onRetry);
     throw netErr;
   }
@@ -607,6 +634,61 @@ export function hasIndexAccess(key) {
   return getAllowedIndexSet().has(key);
 }
 
+function readSession(key) {
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(key, value) {
+  try {
+    if (value) window.sessionStorage.setItem(key, value);
+    else window.sessionStorage.removeItem(key);
+  } catch {
+    // Ignore storage errors (private mode, blocked site data).
+  }
+}
+
+function rememberSelection() {
+  writeSession("fw_task", state.taskId);
+  writeSession("fw_round", state.roundId);
+}
+
+// Picks the task and round after tasks.json loads: the ones remembered for this tab when
+// they still exist, else the first task and its first round (the seed order decides).
+export function restoreSelection() {
+  const tasks = getTasks();
+  if (tasks.length === 0) return;
+  const savedTask = readSession("fw_task");
+  if (!tasks.some((item) => item.id === state.taskId)) {
+    state.taskId = tasks.some((item) => item.id === savedTask) ? savedTask : tasks[0].id;
+  }
+  const rounds = getRoundsForTask(state.taskId);
+  if (!rounds.some((r) => r.id === state.roundId)) {
+    const savedRound = readSession("fw_round");
+    state.roundId = rounds.some((r) => r.id === savedRound)
+      ? savedRound
+      : rounds.length > 0
+        ? rounds[0].id
+        : null;
+  }
+  rememberSelection();
+}
+
+// A `round=<id>` in the hash query (for links in a script) selects that round of the
+// current task without a second render. Returns true when the round changed.
+export function applyRoundParam(roundId) {
+  if (!roundId || roundId === state.roundId) return false;
+  const rounds = getRoundsForTask(state.taskId);
+  if (!rounds.some((r) => r.id === roundId)) return false;
+  state.roundId = roundId;
+  state.selection = null;
+  rememberSelection();
+  return true;
+}
+
 export function selectTask(nextTaskId) {
   const tasks = getTasks();
   const found = tasks.find((item) => item.id === nextTaskId);
@@ -618,6 +700,7 @@ export function selectTask(nextTaskId) {
     state.taskId = found.id;
     const rounds = getRoundsForTask(found.id);
     state.roundId = rounds.length > 0 ? rounds[0].id : null;
+    rememberSelection();
   }
   notifyStateChange("task");
 }
@@ -627,7 +710,51 @@ export function selectRound(nextRoundId) {
   const found = rounds.find((r) => r.id === nextRoundId);
   state.roundId = found ? found.id : null;
   state.selection = null;
+  rememberSelection();
   notifyStateChange("round");
+}
+
+// Rounds of the current task (other than the selected one) whose index grants one of `keys`.
+export function roundsWithIndex(keys) {
+  const want = Array.isArray(keys) ? keys : [keys];
+  return getRoundsForTask(state.taskId).filter(
+    (r) => r.id !== state.roundId && (r.index || []).some((k) => want.includes(k))
+  );
+}
+
+// Empty state for a page whose data belongs to another round: names the round and offers a
+// button that switches to it, instead of a bare "no data" line (design audit P0-1).
+export function renderRoundEmpty({ keys = [], text = null } = {}) {
+  const others = roundsWithIndex(keys);
+  const cur = getCurrentRound();
+  const curName = cur ? pickLang(cur.title) || cur.id : t("state.na");
+  return el("section", { className: cls("card", "round-empty") }, [
+    el("p", {
+      className: "round-empty-text",
+      text:
+        text ||
+        (others.length > 0
+          ? t("round.emptyElsewhere", { round: curName })
+          : t("round.emptyNone", { round: curName })),
+    }),
+    others.length > 0
+      ? el(
+          "div",
+          { className: "actions" },
+          others.map((r) =>
+            el(
+              "button",
+              {
+                type: "button",
+                className: cls("btn", "primary"),
+                onClick: () => selectRound(r.id),
+              },
+              [t("round.switchTo", { round: pickLang(r.title) || r.id })]
+            )
+          )
+        )
+      : null,
+  ]);
 }
 
 export function getAllWithheldRuns() {
@@ -944,6 +1071,8 @@ export function renderStateChip(rawState) {
   return el("span", { className: cls("chip", tone), text: label });
 }
 
+// Source of a number: one small "Nguồn" disclosure instead of a monospace path line, so
+// pages read as a report while every number keeps its source one click away (audit G3).
 export function renderSourceCitation(source, quote = null, kind = null) {
   const cleanedQuote = cleanInlineMarkdown(quote);
   if (!source && !cleanedQuote && !kind) return null;
@@ -954,15 +1083,13 @@ export function renderSourceCitation(source, quote = null, kind = null) {
           text: hasI18nKey("cite.kind." + kind) ? t("cite.kind." + kind) : kind,
         })
       : null,
-    source
-      ? el("span", { className: "sources-note mono", text: `${t("common.source")}: ${source}` })
-      : null,
-    cleanedQuote && source
+    source || cleanedQuote
       ? el("details", { className: "citation-excerpt" }, [
-          el("summary", { text: t("visual.excerpt") }),
-          el("blockquote", { className: "cite-quote", text: cleanedQuote }),
+          el("summary", { text: t("common.source") }),
+          source ? el("span", { className: "sources-note mono", text: scrubPath(source) }) : null,
+          cleanedQuote ? el("blockquote", { className: "cite-quote", text: cleanedQuote }) : null,
         ])
-      : cleanedQuote ? el("blockquote", { className: "cite-quote", text: cleanedQuote }) : null,
+      : null,
   ]);
 }
 
@@ -1172,6 +1299,33 @@ export function compactPath(raw) {
     return `${last.slice(0, 16)}…${last.slice(-6)}`;
   }
   return last;
+}
+
+// Machine paths never reach the screen (design 15/11 §5.3.3, design audit P0-3): a path
+// under fwdata/ or the repo keeps only its relative part; any other absolute path
+// (a user home, /content on Colab, /mnt, /tmp) keeps only its file name.
+const ABS_PATH = /(?:\/(?:home|Users|root|content|mnt|tmp|workspace|opt|srv)\/)[^\s"'`<>()\],;]*/g;
+
+export function scrubPath(raw) {
+  if (raw === null || raw === undefined) return "";
+  return String(raw).replace(ABS_PATH, (m) => {
+    const fw = m.indexOf("/fwdata/");
+    if (fw >= 0) return m.slice(fw + 1);
+    if (m.endsWith("/fwdata")) return "fwdata";
+    const repo = m.search(/\/denso-[a-z0-9-]+\//i);
+    if (repo >= 0) return m.slice(m.indexOf("/", repo + 1) + 1);
+    const segs = m.split("/").filter(Boolean);
+    return segs.length > 2 ? `…/${segs[segs.length - 1]}` : m;
+  });
+}
+
+// Log tail shown on a page: drops W&B lines and any line with a URL (account names ride in
+// them), then hides machine paths in what is left.
+export function cleanLogLines(lines) {
+  const list = Array.isArray(lines) ? lines : String(lines || "").split("\n");
+  return list
+    .filter((ln) => !/wandb|https?:\/\//i.test(String(ln)))
+    .map((ln) => scrubPath(ln));
 }
 
 export function canonicalDatasetTaxonomy(row) {

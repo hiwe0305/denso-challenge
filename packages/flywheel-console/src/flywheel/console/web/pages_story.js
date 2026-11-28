@@ -1,5 +1,6 @@
 import {
   cleanInlineMarkdown,
+  cleanLogLines,
   cls,
   compactPath,
   el,
@@ -21,15 +22,18 @@ import {
   renderLoadingView,
   renderProcessEmptyBlock,
   renderReportSubnav,
+  renderRoundEmpty,
   renderSourceCitation,
   renderStatStrip,
   renderStateChip,
   scopeStoryForTask,
+  scrubPath,
   setChildren,
   setSelection,
   shortHashId,
   state,
   t,
+  taskSuccessText,
 } from "./core.js";
 
 const RUN_METRICS = ["loss", "val", "thr", "vram", "gn"];
@@ -86,6 +90,12 @@ function successPlot(runs) {
   })), { bound: 100, unit: "%" });
 }
 
+// A field name of an index object shown as a reader's word ("field.episodes" → "tập"),
+// the raw name only when the dictionary has no entry.
+function fieldLabel(k) {
+  return hasI18nKey("field." + k) ? t("field." + k) : k;
+}
+
 function formatVal(val) {
   if (val === null || val === undefined) return t("state.na");
   if (typeof val === "number") return formatNumber(val, { maximumFractionDigits: 4 });
@@ -93,10 +103,24 @@ function formatVal(val) {
   if (Array.isArray(val)) return val.join(", ");
   if (typeof val === "object") {
     return Object.entries(val)
-      .map(([k, v]) => `${k}: ${typeof v === "number" ? formatNumber(v, { maximumFractionDigits: 3 }) : v}`)
+      .map(([k, v]) => `${fieldLabel(k)}: ${typeof v === "number" ? formatNumber(v, { maximumFractionDigits: 3 }) : v}`)
       .join(" · ");
   }
   return String(val);
+}
+
+// Design page rows (W12): a Vietnamese title per id; a translated description when the
+// dictionary has one for that id (descriptions in the seed are English).
+function designItemTitle(id) {
+  return hasI18nKey("design.item." + id) ? t("design.item." + id) : id;
+}
+
+function designItemValue(item) {
+  const raw = item.value ?? item.per_model_cu;
+  if (typeof raw === "string" && hasI18nKey("design.desc." + item.id)) {
+    return t("design.desc." + item.id);
+  }
+  return formatVal(raw);
 }
 
 function computeEmaPoints(pts, alpha = 0.14) {
@@ -300,12 +324,13 @@ export function renderRunsPage() {
             ? roundPhases
             : {};
       const vmPhases = Object.entries(selPhasesObj);
-      const logTail =
+      const logTail = cleanLogLines(
         selectedRun && Array.isArray(selectedRun.log_tail) && selectedRun.log_tail.length > 0
           ? selectedRun.log_tail
           : ownLog(selectedRun)
             ? roundLogTail
-            : [];
+            : []
+      );
 
       const groupsFirst = (selectedRun && selectedRun.groups_first) || {};
       const groupsLast = (selectedRun && selectedRun.groups_last) || {};
@@ -587,8 +612,8 @@ export function renderRunsPage() {
           : null,
 
         logTail.length > 0
-          ? el("section", { className: "card" }, [
-              el("h2", {
+          ? el("details", { className: cls("card", "log-details") }, [
+              el("summary", {
                 text: selectedRun
                   ? t("exp.logTailForRun", { run: selectedRun.branch })
                   : t("runs.logTailTitle"),
@@ -1874,7 +1899,7 @@ export function renderLoopPage() {
         withheld.length > 0
           ? el("div", {
               className: "empty",
-              text: t("loop.withheldNote", { runs: withheld.join(", ") }),
+              text: t("loop.withheldNote"),
             })
           : null,
 
@@ -1985,15 +2010,6 @@ export function renderLoopPage() {
             })
           : null,
 
-        story.loop_detail || story.loop_chain
-          ? el("section", { className: "card" }, [
-              el("h2", { text: t("loop.altChainTitle") }),
-              el("p", {
-                className: cls("muted", "mono"),
-                text: `loop_chain: ${formatVal(story.loop_chain)} · loop_detail: ${formatVal(story.loop_detail)}`,
-              }),
-            ])
-          : null
       );
     } catch (err) {
       setChildren(wrap, renderErrorBlock(err, load));
@@ -2356,7 +2372,7 @@ export function renderDesignPage() {
           ? el("section", { className: "card" }, [
               el("h2", { text: pickLang(task.name) || task.id }),
               el("p", { className: "muted", text: pickLang(task.description) }),
-              el("strong", { text: pickLang(task.success) }),
+              el("strong", { text: taskSuccessText(task) }),
               renderSourceCitation(task.success && task.success.source),
             ])
           : null,
@@ -2379,10 +2395,10 @@ export function renderDesignPage() {
                       design[sec].map((item) =>
                         el("div", { className: "row" }, [
                           el("div", { className: "row-body" }, [
-                            el("b", { className: "mono", text: item.id }),
+                            el("b", { text: designItemTitle(item.id) }),
                             el("p", {
                               className: "muted",
-                              text: formatVal(item.value ?? item.per_model_cu),
+                              text: designItemValue(item),
                             }),
                             renderSourceCitation(item.source, item.quote, item.kind),
                           ]),
@@ -2567,7 +2583,7 @@ export function renderCostPage() {
                   el("div", { className: "row" }, [
                     el("div", { className: "row-body" }, [
                       el("b", { text: es.label }),
-                      el("p", { className: cls("muted", "mono"), text: es.path }),
+                      el("p", { className: cls("muted", "mono"), text: scrubPath(es.path) }),
                     ]),
                   ])
                 )
@@ -2622,7 +2638,7 @@ export function renderReportPage() {
         task
           ? el("section", { className: "card" }, [
               el("h2", { text: pickLang(task.name) || task.id }),
-              el("p", { className: "muted", text: pickLang(task.success) }),
+              el("p", { className: "muted", text: taskSuccessText(task) }),
               renderSourceCitation(task.success && task.success.source),
             ])
           : null,

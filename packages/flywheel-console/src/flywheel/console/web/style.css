@@ -225,7 +225,7 @@ pre,
 .brand small {
   display: block;
   color: var(--soft);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.13em;
   text-transform: uppercase;
@@ -293,7 +293,7 @@ pre,
 #lock-badge {
   min-height: 32px;
   padding: 5px 9px;
-  font-size: 11.5px;
+  font-size: 12px;
   background: transparent;
   border-color: transparent;
   color: var(--text-muted);
@@ -334,7 +334,7 @@ pre,
 .top-prefs-group .lang-btn {
   min-height: 28px;
   padding: 4px 7px;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 650;
   color: var(--text-muted);
 }
@@ -356,7 +356,7 @@ pre,
   border-color: transparent;
   background: transparent;
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -391,7 +391,7 @@ pre,
 }
 
 .tiny {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--soft);
   letter-spacing: 0.05em;
   overflow-wrap: anywhere;
@@ -515,7 +515,7 @@ select.topbtn:disabled,
   border: 0;
   background: transparent;
   color: var(--soft);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   padding: 5px 8px;
   border-radius: 7px;
@@ -578,19 +578,26 @@ select.topbtn:disabled,
 .sidebar {
   background: var(--surface);
   border-right: 1px solid var(--line);
-  padding: 14px 12px 24px;
+  padding: 10px 12px 20px;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* Stays in view while the page scrolls and scrolls on its own (design audit P1-1). */
+  position: sticky;
+  top: 65px;
+  align-self: start;
+  height: calc(100dvh - 65px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .group {
   color: var(--soft);
-  font-size: 10px;
-  letter-spacing: 0.12em;
+  font-size: 12px;
+  letter-spacing: 0.08em;
   font-weight: 750;
   text-transform: uppercase;
-  margin: 18px 11px 6px;
+  margin: 14px 10px 4px;
 }
 
 .sidebar .group:first-child {
@@ -610,18 +617,27 @@ select.topbtn:disabled,
   gap: 10px;
   background: none;
   border: 0;
-  padding: 8px 10px;
+  padding: 6px 10px;
+  min-height: 32px;
   border-radius: 8px;
   text-align: left;
   color: var(--soft);
-  font-size: 12.5px;
+  font-size: 13px;
   text-decoration: none;
 }
 
 .nav .icon {
   width: 18px;
-  text-align: center;
-  font-size: 14px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ico {
+  display: inline-block;
+  vertical-align: -3px;
   flex-shrink: 0;
 }
 
@@ -637,27 +653,6 @@ select.topbtn:disabled,
   font-weight: 700;
 }
 
-.side-bottom {
-  margin: 24px 4px 0;
-  padding: 13px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface2);
-  color: var(--soft);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.side-bottom b {
-  display: block;
-  color: var(--ink);
-  margin-bottom: 5px;
-}
-
-.side-bottom p {
-  margin: 0;
-}
-
 /* Main Content */
 main {
   min-width: 0;
@@ -668,7 +663,7 @@ main {
 }
 
 .crumb {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--soft);
   overflow-wrap: anywhere;
 }
@@ -746,7 +741,7 @@ main {
 
 .eyebrow {
   color: var(--green);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.1em;
   font-weight: 750;
   text-transform: uppercase;
@@ -783,7 +778,7 @@ main {
   background: rgba(255, 255, 255, 0.11);
   border-radius: 5px;
   padding: 4px 9px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--hero-ink);
   overflow-wrap: anywhere;
 }
@@ -811,7 +806,7 @@ main {
 
 .stat .label {
   color: var(--soft);
-  font-size: 11px;
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 
@@ -827,7 +822,7 @@ main {
 .stat small {
   display: block;
   color: var(--soft);
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 3px;
   overflow-wrap: anywhere;
 }
@@ -869,7 +864,7 @@ main {
 
 .flow .step small {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--soft);
   line-height: 1.38;
   overflow-wrap: anywhere;
@@ -1038,7 +1033,7 @@ main {
   background: var(--pale);
   color: var(--green);
   font-weight: 700;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.35;
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -1101,7 +1096,7 @@ main {
   border-color: color-mix(in srgb, var(--green) 26%, var(--border));
   color: var(--green);
   padding: 3px 8px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 650;
   line-height: 1.35;
   max-width: 100%;
@@ -1152,7 +1147,7 @@ main {
 
 .meta-box span {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--soft);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1170,7 +1165,7 @@ main {
 .meta-box small {
   display: block;
   margin-top: 3px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--soft);
   overflow-wrap: anywhere;
 }
@@ -1183,7 +1178,7 @@ main {
 }
 
 .step-tag {
-  font-size: 11px;
+  font-size: 12px;
   padding: 3px 8px;
   border-radius: 6px;
   background: var(--surface2);
@@ -1229,7 +1224,7 @@ main {
 
 .sources-note {
   margin-top: 5px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--green);
   overflow-wrap: anywhere;
 }
@@ -1249,7 +1244,7 @@ main {
   border-left: 3px solid var(--green);
   background: var(--surface2);
   border-radius: 0 6px 6px 0;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--soft);
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -1278,7 +1273,7 @@ main {
 
 .table th {
   text-align: left;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--soft);
   font-weight: 650;
   letter-spacing: 0.04em;
@@ -1338,7 +1333,7 @@ main {
   padding: 10px;
   color: var(--green);
   font-weight: 650;
-  font-size: 11.5px;
+  font-size: 12px;
   overflow: hidden;
   position: relative;
 }
@@ -1385,13 +1380,13 @@ main {
 }
 
 .form-field label {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 650;
   overflow-wrap: anywhere;
 }
 
 .form-field small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--soft);
   overflow-wrap: anywhere;
 }
@@ -1403,7 +1398,7 @@ main {
   background: #101b16;
   color: #dff0e5;
   border: 1px solid var(--line);
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.45;
   max-height: 360px;
   max-width: 100%;
@@ -1445,7 +1440,7 @@ main {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 12px;
   padding: 6px 9px;
   border-radius: 7px;
   background: var(--warning-bg);
@@ -1459,7 +1454,7 @@ main {
   border-radius: 8px;
   background: var(--surface2);
   padding: 7px 10px;
-  font-size: 11.5px;
+  font-size: 12px;
   max-width: 100%;
 }
 
@@ -1467,7 +1462,7 @@ main {
   cursor: pointer;
   color: var(--green);
   font-weight: 650;
-  font-size: 11.5px;
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 
@@ -1556,7 +1551,7 @@ main {
   border: 1px solid var(--line);
   padding: 9px 11px;
   border-radius: 9px;
-  font-size: 11px;
+  font-size: 12px;
   flex-shrink: 0;
   overflow-wrap: anywhere;
 }
@@ -1564,7 +1559,7 @@ main {
 .context-label {
   font-weight: 750;
   color: var(--green);
-  font-size: 10px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -1605,7 +1600,7 @@ main {
 }
 
 .b-label {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--soft);
   margin-bottom: 5px;
@@ -1624,7 +1619,7 @@ main {
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--surface);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .tool-call-head {
@@ -1653,7 +1648,7 @@ main {
   border-radius: 8px;
   text-align: left;
   padding: 7px 9px;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--green);
 }
 
@@ -1690,7 +1685,7 @@ main {
 
 .scroll-jump {
   align-self: center;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* Empty, Skeleton & Error Cards */
@@ -1842,7 +1837,7 @@ main {
   .topbtn,
   .btn {
     padding: 7px 10px;
-    font-size: 11.5px;
+    font-size: 12px;
     white-space: normal;
   }
 
@@ -1862,6 +1857,7 @@ main {
     left: 0;
     bottom: 0;
     width: min(250px, 82vw);
+    height: 100dvh;
     z-index: 50;
     transform: translateX(-100%);
     visibility: hidden;
@@ -1942,7 +1938,7 @@ main {
 }
 
 .modality-files {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--green);
   background: var(--pale);
   padding: 4px 8px;
@@ -2008,7 +2004,7 @@ main {
 .schema-sample-cell {
   max-width: 340px;
   overflow-wrap: anywhere;
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .sample-grid-4 {
@@ -2108,7 +2104,7 @@ main {
 }
 
 .mini-tag {
-  font-size: 10.5px;
+  font-size: 12px;
   padding: 2px 7px;
   border-radius: 6px;
   background: var(--surface2);
@@ -2209,7 +2205,7 @@ main {
 
 .ego-controls .ego-time {
   margin-left: auto;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--soft);
   font-variant-numeric: tabular-nums;
 }
@@ -2231,7 +2227,7 @@ main {
   border-right: 2px solid var(--surface);
   background: var(--pale);
   color: var(--green);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   padding: 5px 6px;
   overflow: hidden;
@@ -2284,7 +2280,7 @@ main {
 
 .ego-sub-when {
   color: var(--soft);
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2306,7 +2302,7 @@ main {
   position: absolute;
   left: 10px;
   bottom: 8px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--soft);
   pointer-events: none;
 }
@@ -2316,7 +2312,7 @@ main {
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 8px;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--soft);
 }
 
@@ -2424,7 +2420,7 @@ main {
   border-radius: 9px;
   background: var(--surface2);
   border: 1px solid var(--line);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .model-status-pill {
@@ -2470,7 +2466,7 @@ main {
   gap: 5px;
   padding: 3px 8px;
   border-radius: 999px;
-  font-size: 10.5px;
+  font-size: 12px;
   background: var(--pale);
   color: var(--green);
   font-weight: 600;
@@ -2532,7 +2528,7 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--soft);
 }
 
@@ -2565,7 +2561,7 @@ main {
   border-left: 2px solid var(--line);
   padding-left: 9px;
   margin: 2px 0;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--soft);
 }
 
@@ -2578,7 +2574,7 @@ main {
 .reasoning-body {
   margin-top: 5px;
   white-space: pre-wrap;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -2604,7 +2600,7 @@ main {
   gap: 7px;
   padding: 7px 10px;
   cursor: pointer;
-  font-size: 11.5px;
+  font-size: 12px;
   user-select: none;
 }
 
@@ -2618,7 +2614,7 @@ main {
   border-radius: 50%;
   display: inline-grid;
   place-items: center;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   flex-shrink: 0;
   background: var(--pale);
@@ -2636,7 +2632,7 @@ main {
 
 .step-args-preview {
   color: var(--soft);
-  font-size: 10.5px;
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2645,7 +2641,7 @@ main {
 }
 
 .step-ms {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--soft);
   flex-shrink: 0;
 }
@@ -2672,7 +2668,7 @@ main {
   background: var(--surface);
   text-decoration: none;
   color: var(--ink);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .chat-thumb-item img {
@@ -2727,7 +2723,7 @@ main {
   border-radius: 5px;
   background: var(--surface);
   border: 1px solid var(--line);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .md-route-pill {
@@ -2738,7 +2734,7 @@ main {
   border-radius: 999px;
   background: var(--pale);
   color: var(--green);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 650;
   text-decoration: none;
 }
@@ -2757,7 +2753,7 @@ main {
   align-items: center;
   padding: 4px 9px;
   background: rgba(255, 255, 255, 0.06);
-  font-size: 10.5px;
+  font-size: 12px;
   color: #a8bbb0;
 }
 
@@ -2765,7 +2761,7 @@ main {
   border: 0;
   background: transparent;
   color: #c7ee80;
-  font-size: 10.5px;
+  font-size: 12px;
   padding: 2px 4px;
 }
 
@@ -2773,7 +2769,7 @@ main {
   margin: 0;
   padding: 8px 10px;
   overflow-x: auto;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -2796,7 +2792,7 @@ main {
   gap: 6px;
   padding-top: 6px;
   border-top: 1px solid var(--line);
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--soft);
 }
 
@@ -2817,7 +2813,7 @@ main {
   color: var(--soft);
   border-radius: 6px;
   padding: 2px 7px;
-  font-size: 10.5px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -2848,7 +2844,7 @@ main {
 }
 
 .slash-menu-head {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -2866,7 +2862,7 @@ main {
   background: transparent;
   padding: 6px 8px;
   border-radius: 7px;
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .slash-item:hover,
@@ -2882,7 +2878,7 @@ main {
 
 .slash-desc {
   color: var(--soft);
-  font-size: 11px;
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3093,7 +3089,7 @@ main {
 .repeat-seg {
   display: grid;
   place-items: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -3153,7 +3149,7 @@ main {
   border-radius: 5px;
   padding: 3px 2px;
   text-align: center;
-  font-size: 9.5px;
+  font-size: 12px;
   line-height: 1.2;
   background: var(--surface2);
   border: 1px solid var(--line);
@@ -3371,7 +3367,7 @@ main {
   gap: 4px;
   padding: 2px 7px;
   border-radius: 5px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 750;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -3384,7 +3380,7 @@ main {
   display: inline-block;
   padding: 1px 6px;
   border-radius: 5px;
-  font-size: 10.5px;
+  font-size: 12px;
   background: var(--surface2);
   border: 1px solid var(--line);
   color: var(--soft);
@@ -3411,14 +3407,14 @@ main {
 }
 
 .conveyor-step-num {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   color: var(--green);
   letter-spacing: 0.06em;
 }
 
 .conveyor-step b {
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.25;
 }
 
@@ -3461,7 +3457,7 @@ main {
   border-radius: 5px;
   display: grid;
   place-items: center;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   background: var(--surface2);
   color: var(--soft);
@@ -3788,7 +3784,7 @@ main {
   border: 0;
   background: transparent;
   color: var(--soft);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 650;
   padding: 5px 10px;
   border-radius: 7px;
@@ -3872,7 +3868,7 @@ main {
 }
 
 .harness-phase-pill {
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 650;
   padding: 2px 8px;
   border-radius: 999px;
@@ -3902,7 +3898,7 @@ main {
   border-radius: 8px;
   background: var(--surface2);
   border: 1px solid var(--line);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .studio-composer-zone {

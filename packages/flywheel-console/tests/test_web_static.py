@@ -173,6 +173,8 @@ def test_only_contract_endpoints_used() -> None:
         src = f.read_text(encoding="utf-8")
         for m in url_pat.finditer(src):
             u = m.group(1)
+            if u == "http://www.w3.org/2000/svg":
+                continue  # XML namespace of inline SVG icons (icons.js), never fetched
             assert not u.startswith(("http://", "https://")), f"external URL in {f.name}: {u}"
             assert u.startswith(allowed_prefixes), f"non-contract URL in {f.name}: {u}"
 

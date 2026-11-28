@@ -13,6 +13,7 @@ import {
   selectTask,
   state,
   t,
+  taskSuccessText,
 } from "./core.js";
 
 const STAGE_ORDER = ["1", "2", "3", "4", "5", "6", "0"];
@@ -184,7 +185,7 @@ function renderTaskCard(task, roundsById, media) {
   const isSelected = state.taskId === task.id;
   const stages = Array.isArray(task.stages) ? task.stages : [];
   const roundIds = Array.isArray(task.rounds) ? task.rounds : [];
-  const successText = pickLang(task.success) || t("state.na");
+  const successText = taskSuccessText(task);
   const successSource = task.success && task.success.source ? task.success.source : null;
   const descText = pickLang(task.description) || t("state.na");
   const taskTitle = pickLang(task.name) || task.id;

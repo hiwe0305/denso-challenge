@@ -1,6 +1,7 @@
 import { initChatShell, notifyChatRouteChanged, syncChatShell } from "./chat.js";
 import {
   announce,
+  applyRoundParam,
   bindErrorBannerControls,
   cleanupCurrentPage,
   el,
@@ -10,6 +11,7 @@ import {
   hideErrorBanner,
   notifyStateChange,
   pickLang,
+  restoreSelection,
   selectRound,
   selectTask,
   setChatOpen,
@@ -19,6 +21,7 @@ import {
   subscribe,
   t,
 } from "./core.js";
+import { icon } from "./icons.js";
 import { renderChatStudioPage } from "./pages_chat.js";
 import {
   renderDataCatalogPage,
@@ -68,49 +71,49 @@ const NAV_GROUPS = [
   {
     group: "start",
     items: [
-      { key: "home", icon: "◫", hash: "#/home" },
-      { key: "chat", icon: "✦", hash: "#/chat" },
-      { key: "tasks", icon: "▦", hash: "#/tasks" },
+      { key: "home", hash: "#/home" },
+      { key: "chat", hash: "#/chat" },
+      { key: "tasks", hash: "#/tasks" },
     ],
   },
   {
     group: "data",
     items: [
-      { key: "data", icon: "▤", hash: "#/data" },
-      { key: "import", icon: "⇣", hash: "#/jobs?panel=import" },
-      { key: "pipeline", icon: "↻", hash: "#/jobs?view=pipeline" },
-      { key: "qa", icon: "✓", hash: "#/qa" },
-      { key: "egoflow", icon: "◷", hash: "#/egoflow" },
-      { key: "export", icon: "⇡", hash: "#/jobs?panel=export" },
+      { key: "data", hash: "#/data" },
+      { key: "import", hash: "#/jobs?panel=import" },
+      { key: "pipeline", hash: "#/jobs?view=pipeline" },
+      { key: "qa", hash: "#/qa" },
+      { key: "egoflow", hash: "#/egoflow" },
+      { key: "export", hash: "#/jobs?panel=export" },
     ],
   },
   {
     group: "ops",
-    items: [{ key: "jobs", icon: "≡", hash: "#/jobs" }],
+    items: [{ key: "jobs", hash: "#/jobs" }],
   },
   {
     group: "exp",
     items: [
-      { key: "runs", icon: "⌁", hash: "#/runs" },
-      { key: "eval", icon: "◉", hash: "#/eval" },
-      { key: "sim", icon: "▷", hash: "#/sim" },
+      { key: "runs", hash: "#/runs" },
+      { key: "eval", hash: "#/eval" },
+      { key: "sim", hash: "#/sim" },
     ],
   },
   {
     group: "f2d",
     items: [
-      { key: "diagnose", icon: "⌕", hash: "#/diagnose" },
-      { key: "loop", icon: "⟳", hash: "#/loop" },
-      { key: "base", icon: "◨", hash: "#/base" },
-      { key: "follow", icon: "⊕", hash: "#/follow" },
+      { key: "diagnose", hash: "#/diagnose" },
+      { key: "loop", hash: "#/loop" },
+      { key: "base", hash: "#/base" },
+      { key: "follow", hash: "#/follow" },
     ],
   },
   {
     group: "plan",
     items: [
-      { key: "design", icon: "◇", hash: "#/design" },
-      { key: "cost", icon: "$", hash: "#/cost" },
-      { key: "report", icon: "▧", hash: "#/report" },
+      { key: "design", hash: "#/design" },
+      { key: "cost", hash: "#/cost" },
+      { key: "report", hash: "#/report" },
     ],
   },
 ];
@@ -260,7 +263,7 @@ function renderSidebar(path, query) {
                 onClick: () => setMobileMenu(false),
               },
               [
-                el("span", { className: "icon", "aria-hidden": "true", text: item.icon }),
+                el("span", { className: "icon", "aria-hidden": "true" }, [icon(item.key)]),
                 el("span", { text: t("nav.item." + item.key) }),
               ]
             ),
@@ -270,10 +273,6 @@ function renderSidebar(path, query) {
     ])
   );
 
-  const sideTitle = document.getElementById("side-bottom-title");
-  const sideDesc = document.getElementById("side-bottom-desc");
-  if (sideTitle) sideTitle.textContent = t("nav.sideTitle");
-  if (sideDesc) sideDesc.textContent = t("nav.sideDesc");
 }
 
 function renderHeader() {
@@ -281,7 +280,12 @@ function renderHeader() {
   if (skipLink) skipLink.textContent = t("app.skipToMain");
 
   const menuToggle = document.getElementById("menu-toggle");
-  if (menuToggle) menuToggle.setAttribute("aria-label", t("header.menuToggle"));
+  if (menuToggle) {
+    menuToggle.setAttribute("aria-label", t("header.menuToggle"));
+    if (!menuToggle.querySelector("svg")) menuToggle.replaceChildren(icon("menu"));
+  }
+  const themeGlyph = document.querySelector("#theme-toggle > span[aria-hidden]");
+  if (themeGlyph && !themeGlyph.querySelector("svg")) themeGlyph.replaceChildren(icon("theme"));
 
   const brandTitle = document.getElementById("brand-title");
   const brandSub = document.getElementById("brand-sub");
@@ -347,17 +351,17 @@ function renderHeader() {
     lockBadge.className = "topbtn";
     if (state.statusError && !state.statusLoaded) {
       lockBadge.classList.add("is-error");
-      lockBadge.textContent = `⚠ ${t("header.statusError")}`;
+      lockBadge.replaceChildren(icon("alert"), ` ${t("header.statusError")}`);
       lockBadge.title = state.statusError.serverMessage || "";
     } else if (!state.statusLoaded) {
-      lockBadge.textContent = `◌ ${t("header.statusLoading")}`;
+      lockBadge.textContent = t("header.statusLoading");
       lockBadge.title = "";
     } else if (state.locked) {
       lockBadge.classList.add("is-locked");
-      lockBadge.textContent = `🔒 ${t("header.locked")}`;
+      lockBadge.replaceChildren(icon("lock"), ` ${t("header.locked")}`);
       lockBadge.title = t("header.lockedHint");
     } else {
-      lockBadge.textContent = `◉ ${t("header.unlocked")}`;
+      lockBadge.replaceChildren(icon("dot"), ` ${t("header.unlocked")}`);
       lockBadge.title = t("header.unlockedHint");
     }
   }
@@ -382,6 +386,14 @@ function renderHeader() {
     themeLabel.textContent =
       state.theme === "light" ? t("header.themeLightShort") : t("header.themeDarkShort");
   }
+}
+
+// Browser tab title per page (design audit P2-1): "<page> · Flywheel Console".
+function pageTitle(path) {
+  const navKey = (path || "").split("/")[0];
+  const known = NAV_GROUPS.some((g) => g.items.some((it) => it.key === navKey));
+  const page = known ? t("nav.item." + navKey) : "";
+  return page ? `${page} · ${t("app.productName")}` : t("app.productName");
 }
 
 function renderNotFound(routeText) {
@@ -410,7 +422,10 @@ function renderRoute() {
 
   const fullHash = window.location.hash || "#/tasks";
   const { path, query } = parseHash(fullHash);
+  if (path !== lastRenderedPath) hideErrorBanner();
+  if (applyRoundParam(query.get("round"))) renderHeader();
   renderSidebar(path, query);
+  document.title = pageTitle(path);
 
   const main = document.getElementById("main-content");
   if (!main) return;
@@ -461,12 +476,7 @@ async function loadTasks(emit = true) {
     state.tasksLoading = false;
     state.tasksError = null;
 
-    const tasks = getTasks();
-    if (tasks.length > 0 && !tasks.some((item) => item.id === state.taskId)) {
-      state.taskId = tasks[0].id;
-      const rounds = getRoundsForTask(state.taskId);
-      state.roundId = rounds.length > 0 ? rounds[0].id : null;
-    }
+    restoreSelection();
     hideErrorBanner();
     if (emit) notifyStateChange("tasks");
   } catch (err) {

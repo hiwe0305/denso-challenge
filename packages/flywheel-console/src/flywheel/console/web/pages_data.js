@@ -177,7 +177,7 @@ function renderQuickFormatStrip() {
           "div",
           { className: "actions" },
           links.map(([label, href]) =>
-            el("a", { className: "link", style: "font-size:11.5px", href }, [label])
+            el("a", { className: "link", style: "font-size:12px", href }, [label])
           )
         ),
       ]),
@@ -677,7 +677,7 @@ function renderNativeEgoStudioPlayer(epTrack) {
           metaChips.map(([k, v]) =>
             el("div", { className: "meta-box" }, [
               el("span", { className: "mono", text: k }),
-              el("b", { className: "mono", style: "font-size:11.5px", text: String(v) }),
+              el("b", { className: "mono", style: "font-size:12px", text: String(v) }),
             ])
           )
         ),
@@ -808,7 +808,7 @@ function renderLineageSankeyCard(edges, rowMap, focusId = null) {
           lineStyle: { color: "source", curveness: 0.45, opacity: 0.34 },
           label: {
             color: ink || soft,
-            fontSize: 11,
+            fontSize: 12,
             formatter: (p) => nodeLabel(p.name),
           },
           labelLayout: { hideOverlap: true },
@@ -996,7 +996,7 @@ export function renderDataCatalogPage() {
                     el("td", {}, [
                       el("div", {
                         className: "mono",
-                        style: "font-size:11.5px;max-width:190px;overflow-wrap:anywhere",
+                        style: "font-size:12px;max-width:190px;overflow-wrap:anywhere",
                         text: r.format || r.data_type || t("state.na"),
                       }),
                       r.fps
@@ -2416,7 +2416,7 @@ export function renderEpisodeDetailPage(ctx) {
                   legend: {
                     type: "scroll", top: 0,
                     selected: Object.fromEntries(names.slice(0, 8).map((name, index) => [name, index === 0])),
-                    textStyle: { color: soft, fontSize: 10 },
+                    textStyle: { color: soft, fontSize: 12 },
                   },
                   xAxis: { type: "category", data: ts, axisLabel: { color: soft } },
                   yAxis: {
