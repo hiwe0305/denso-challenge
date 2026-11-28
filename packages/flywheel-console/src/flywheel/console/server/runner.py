@@ -1541,12 +1541,16 @@ def read_log(jid: str, offset: int) -> dict[str, Any]:
 
 # ------------------------------------------------------------------ artifacts for agent QA
 def _train_dirs() -> list[tuple[str, str]]:
-    """Return ``(task_id, train_dir)`` pairs from the task manifest, or tray fallback."""
+    """Return ``(task_id, train_dir)`` pairs from the task manifest, or tray fallback.
+
+    A round that names a train folder per run (``tray-jig-r1``) has no ``train_dir``; its jobs
+    are listed by the ``tray/jig-*`` glob of ``train_runs``, as before.
+    """
     try:
         from flywheel.console.index import tasks as task_idx
 
         m = task_idx.load(_p())
-        dirs = list(dict.fromkeys((r.task, r.train_dir) for r in m.rounds if r.train_dir))
+        dirs = list(dict.fromkeys((r.task, d) for r in m.rounds if (d := r.train_dir)))
     except Exception:
         dirs = []
     return dirs or [("tray", "tray/pair60k")]

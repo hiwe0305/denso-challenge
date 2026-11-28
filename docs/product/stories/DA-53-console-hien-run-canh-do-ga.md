@@ -140,7 +140,7 @@ Story này thay cách quét đó bằng vòng `tray-jig-r1` (quyết định 1) 
 
 - [x] 1.1 Viết story (file này)
 - [x] 1.2 Hiếu chốt bốn câu; ghi quyết định vào file này (mục "Quyết định của Hiếu")
-- [ ] 2.1 `index/tasks.py` và `seed/tasks.yaml`: vòng `tray-jig-r1`, đường dẫn theo run, ngưỡng và nguồn luật, có test (AC 1)
+- [x] 2.1 `index/tasks.py` và `seed/tasks.yaml`: vòng `tray-jig-r1`, đường dẫn theo run, ngưỡng và nguồn luật, có test (AC 1)
 - [ ] 2.2 `index/story.py`: đọc run train theo đường dẫn của từng run; sửa thời lượng pha VM, có test (AC 2, 5)
 - [ ] 2.3 Module mới trong `index/` đọc `results.json`, kiểm điều kiện trước khi đọc, ghi câu đọc theo luật, có test (AC 3, 4, 6)
 - [ ] 2.4 Giao diện: trang Train, Đánh giá, Vòng hiện vòng `tray-jig-r1`; câu so với DA-34 có điểm khác đi kèm (AC 2, 3, 4, 6, 7)
