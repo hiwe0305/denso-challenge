@@ -217,7 +217,7 @@ export function renderChatStudioPage() {
         "div",
         { className: "stack-sm", style: "margin-top:4px" },
         specSteps.map((st) =>
-          el("div", { className: "task-head", style: "font-size:11.5px" }, [
+          el("div", { className: "task-head", style: "font-size:12px" }, [
             el("span", {
               style: st.done ? "color:var(--green);font-weight:650" : "color:var(--soft)",
               text: `${st.done ? "✓" : "○"} ${st.label}`,
@@ -228,7 +228,7 @@ export function renderChatStudioPage() {
                   {
                     type: "button",
                     className: cls("turn-action-btn", "mono"),
-                    style: "padding:1px 6px;font-size:10px",
+                    style: "padding:1px 6px;font-size:12px",
                     onClick: () =>
                       runSharedTurn(st.slash, {
                         routeOverride: "#/home",
@@ -260,7 +260,7 @@ export function renderChatStudioPage() {
             "select",
             {
               className: cls("field", "mono"),
-              style: "width:100%;font-size:11px;margin-top:4px",
+              style: "width:100%;font-size:12px;margin-top:4px",
               onChange: (ev) => switchActiveApiModel(ev.target.value),
             },
             modelOptions.map((mId) =>
@@ -312,7 +312,7 @@ export function renderChatStudioPage() {
       "select",
       {
         className: "field",
-        style: "width:100%;font-size:11.5px;margin-top:6px",
+        style: "width:100%;font-size:12px;margin-top:6px",
         onChange: (ev) => {
           const val = ev.target.value;
           if (!val) return;
@@ -576,7 +576,7 @@ export function renderChatStudioPage() {
             const ovInput = el("input", {
               type: "text",
               className: "field",
-              style: "width:100%;font-size:11.5px",
+              style: "width:100%;font-size:12px",
               placeholder: t("studio.overridePlaceholder"),
             });
             setChildren(

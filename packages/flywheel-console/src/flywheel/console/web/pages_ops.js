@@ -1,5 +1,6 @@
 import {
   cleanInlineMarkdown,
+  cleanLogLines,
   cls,
   compactPath,
   el,
@@ -34,6 +35,7 @@ import {
   renderStatStrip,
   renderStateChip,
   scopeStoryForTask,
+  scrubPath,
   setChildren,
   setSelection,
   shortHashId,
@@ -685,7 +687,7 @@ export function renderHomePage() {
         : "";
       const withheldNote =
         withheldList.length > 0
-          ? t("ux.homeEvalWithheldNote", { run: withheldList.join(", ") })
+          ? t("ux.homeEvalWithheldNote")
           : "";
       const activeColabList =
         jigDoc && Array.isArray(jigDoc.active_sessions) ? jigDoc.active_sessions : [];
@@ -1306,7 +1308,7 @@ export function renderJobsPage(ctx) {
               );
               if (!lRes.ok || !lRes.data) return;
               if (lRes.data.text) {
-                logPre.textContent += lRes.data.text;
+                logPre.textContent += cleanLogLines(lRes.data.text).join("\n");
               }
               logOffset = lRes.data.offset || logOffset;
               setChildren(stateHolder, renderStateChip(lRes.data.state));
@@ -1357,11 +1359,11 @@ export function renderJobsPage(ctx) {
                       { className: "meta-strip" },
                       outEntries.map(([k, v]) => {
                         const fullStr = typeof v === "object" ? JSON.stringify(v) : String(v);
-                        return el("div", { className: "meta-box", title: fullStr }, [
+                        return el("div", { className: "meta-box", title: scrubPath(fullStr) }, [
                           el("span", { text: k }),
                           el("b", {
                             className: "mono",
-                            style: "font-size:11.5px;overflow-wrap:anywhere",
+                            style: "font-size:12px;overflow-wrap:anywhere",
                             text: fullStr.includes("/") ? compactPath(fullStr) : fullStr,
                           }),
                         ]);
@@ -1374,7 +1376,7 @@ export function renderJobsPage(ctx) {
                 el("pre", {
                   className: cls("log-box", "mono"),
                   style: "margin-top:6px",
-                  text: (job.argv || []).join(" "),
+                  text: scrubPath((job.argv || []).join(" ")),
                 }),
               ]),
               el("div", { className: "sect" }, [el("h3", { text: t("jobs.logTitle") })]),
@@ -1597,7 +1599,7 @@ export function renderJobsPage(ctx) {
             setChildren(
               fsBox,
               el("div", { className: "task-head" }, [
-                el("b", { className: "mono", text: data.path }),
+                el("b", { className: "mono", text: scrubPath(data.path) }),
                 el("div", { className: "actions" }, [
                   data.parent
                     ? el(
@@ -1901,7 +1903,7 @@ export function renderQaPage() {
         setChildren(
           agentResultContainer,
           el("section", { className: "card" }, [
-            el("h3", { className: "mono", text: `${jobId} · ${res.reports_path || outPath}` }),
+            el("h3", { className: "mono", text: `${jobId} · ${scrubPath(res.reports_path || outPath)}` }),
             el("pre", {
               className: cls("log-box", "mono"),
               text: JSON.stringify(res.reports || [], null, 2),
@@ -1911,6 +1913,10 @@ export function renderQaPage() {
       };
 
       const bench = story.demo && story.demo.qa_bench ? story.demo.qa_bench : null;
+      // Aborted train attempts (".attempt1" folders) are not QA artefacts worth showing.
+      const shownArtifacts = (Array.isArray(artifacts) ? artifacts : []).filter(
+        (a) => a && !/\.attempt\d*(?:\/|$)/.test(String(a.path || ""))
+      );
       const reasons = Array.isArray(story.reasons) ? [...story.reasons].sort((a, b) => b[1] - a[1]) : [];
 
       setChildren(
@@ -1927,7 +1933,6 @@ export function renderQaPage() {
           {
             label: t("ego.worksTitle"),
             value: formatNumber((works || []).length),
-            sub: "/api/works",
           },
           {
             label: t("qa.agentRunsTitle"),
@@ -1936,8 +1941,7 @@ export function renderQaPage() {
           },
           {
             label: t("qa.artifactsTitle"),
-            value: formatNumber((artifacts || []).length),
-            sub: "/api/artifacts",
+            value: formatNumber(shownArtifacts.length),
           },
         ]),
 
@@ -2171,17 +2175,17 @@ export function renderQaPage() {
         workEpsContainer,
         agentResultContainer,
 
-        Array.isArray(artifacts) && artifacts.length > 0
+        shownArtifacts.length > 0
           ? el("section", { className: "card" }, [
               el("h2", { text: t("qa.artifactsTitle") }),
               el(
                 "div",
                 { className: "row-list" },
-                artifacts.slice(0, 20).map((a) =>
+                shownArtifacts.slice(0, 20).map((a) =>
                   el("div", { className: "row" }, [
                     el("div", { className: "row-body" }, [
                       el("b", { text: a.label }),
-                      el("p", { className: cls("muted", "mono"), text: `${a.kind} · ${a.path}` }),
+                      el("p", { className: cls("muted", "mono"), text: scrubPath(a.path) }),
                     ]),
                   ])
                 )
