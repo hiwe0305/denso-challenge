@@ -877,7 +877,7 @@ export function jigReadingLines(ev) {
           : t("exp.scopePlace");
     const verdict =
       rd.verdict === "met"
-        ? t(rd.scope === "place" ? "exp.verdictPlaceMet" : "exp.verdictMet", { pct })
+        ? t("exp.verdictMet", { pct })
         : t("exp.verdictNotMet", { pct });
     out.push(`${scope}: ${verdict}`);
   }

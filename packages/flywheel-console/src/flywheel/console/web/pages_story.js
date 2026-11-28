@@ -831,9 +831,7 @@ export function renderEvalPage() {
         if (rd.verdict === "met") {
           return {
             chip: "",
-            text: t(rd.scope === "place" ? "exp.verdictPlaceMet" : "exp.verdictMet", {
-              pct: pct0(rd.threshold),
-            }),
+            text: t("exp.verdictMet", { pct: pct0(rd.threshold) }),
           };
         }
         if (rd.verdict === "not_met") {
