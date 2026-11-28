@@ -1,0 +1,30 @@
+[
+ {
+  "turn_id": "t-20261117-065039-81a8",
+  "conversation_id": "c-5381bb54",
+  "ts": "2026-11-17T06:50:39+07:00",
+  "question": "Nên làm gì tiếp theo?",
+  "tools": [
+   "round_report"
+  ],
+  "ms_total": 1464,
+  "tokens_in": 1016,
+  "tokens_out": 165,
+  "error": null,
+  "guard": null
+ },
+ {
+  "turn_id": "t-20261117-065032-ba68",
+  "conversation_id": "c-5381bb54",
+  "ts": "2026-11-17T06:50:32+07:00",
+  "question": "So sánh các bản model",
+  "tools": [
+   "round_report"
+  ],
+  "ms_total": 2790,
+  "tokens_in": 771,
+  "tokens_out": 130,
+  "error": null,
+  "guard": null
+ }
+]

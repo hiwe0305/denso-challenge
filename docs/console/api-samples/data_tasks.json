@@ -1,0 +1,602 @@
+{
+ "version": 1,
+ "source": "seed/tasks.yaml",
+ "tasks": [
+  {
+   "id": "tray",
+   "name": {
+    "vi": "Bê khay",
+    "en": "Carry the tray"
+   },
+   "word": {
+    "vi": "khay",
+    "en": "tray"
+   },
+   "description": {
+    "vi": "Robot Unitree G1 mang khay từ bàn A sang bàn B trong nhà máy ảo.",
+    "en": "A Unitree G1 robot carries a tray from table A to table B in a virtual factory."
+   },
+   "robot": "Unitree G1",
+   "model": "Ψ₀",
+   "simulator": "SIMPLE (MuJoCo physics, Isaac render)",
+   "catalog_task": "tray",
+   "inventory": "store",
+   "scorer_config": "configs/eval/scorer/tray.yaml",
+   "stages_source": "configs/eval/scorer/tray.yaml (header table), design 28/10/2026 §3.2",
+   "stages": [
+    {
+     "id": "approach_a",
+     "vi": "tới bàn A",
+     "en": "reach table A"
+    },
+    {
+     "id": "grasp",
+     "vi": "cầm khay",
+     "en": "grasp tray"
+    }
+   ],
+   "success": {
+    "vi": "khay trong ô đích trên bàn B, lệch tối đa target_pos_tol và target_yaw_tol_deg",
+    "en": "tray inside the target zone on table B, within target_pos_tol and target_yaw_tol_deg",
+    "source": "configs/eval/scorer/tray.yaml thresholds (giả định, chưa hiệu chỉnh)"
+   },
+   "rounds": [
+    "tray-r1"
+   ],
+   "index": [
+    "story.runs",
+    "story.train_log_tail"
+   ],
+   "evals": [],
+   "clusters": {},
+   "process": {
+    "1": {
+     "needs": [
+      "catalog"
+     ],
+     "how": [
+      {
+       "kind": "cmd",
+       "text": "fw egocentric ingest | deid | pose | annotate | qa | report"
+      },
+      {
+       "kind": "cmd",
+       "text": "fw data ingest | qa | release | report"
+      }
+     ],
+     "logs": [
+      {
+       "label": "egocentric work dirs",
+       "fw": "pipeline/src_*/qa/egocentric.jsonl"
+      }
+     ],
+     "results": [
+      {
+       "label": "catalog",
+       "index": "catalog.json"
+      },
+      {
+       "label": "sim library",
+       "index": "sim.json"
+      }
+     ]
+    },
+    "2": {
+     "needs": [
+      "story.h1m"
+     ],
+     "how": [
+      {
+       "kind": "cmd",
+       "text": "fw agentqa run --model nemotron --out D"
+      },
+      {
+       "kind": "cmd",
+       "text": "fw agentqa review --reports D/reports.jsonl"
+      }
+     ],
+     "logs": [
+      {
+       "label": "QA decisions",
+       "fw": "pipeline/src_*/qa/egocentric.jsonl"
+      }
+     ],
+     "results": [
+      {
+       "label": "human video summary",
+       "fw": "human1m/ego-h1m-*/summary.json"
+      }
+     ]
+    },
+    "3": {
+     "needs": [
+      "story.runs"
+     ],
+     "remote": "Colab A100",
+     "how": [
+      {
+       "kind": "module",
+       "path": "packages/flywheel-psi0/src/flywheel_psi0/tray/colab_train.py"
+      },
+      {
+       "kind": "module",
+       "path": "packages/flywheel-psi0/src/flywheel_psi0/tray/pair_cut.py",
+       "note": "cắt và đóng băng tập dạy"
+      }
+     ],
+     "logs": [
+      {
+       "label": "train log",
+       "fw": "tray/pair60k/<run>/<job>/vm-logs/train.log"
+      }
+     ],
+     "results": [
+      {
+       "label": "metrics",
+       "fw": "tray/pair60k/<run>/<job>/metrics.jsonl"
+      }
+     ]
+    },
+    "4": {
+     "needs": [
+      "story.pair"
+     ],
+     "remote": "Colab L4 (server) + rtx3060 (client)",
+     "how": [
+      {
+       "kind": "cmd",
+       "text": "python -m flywheel_psi0.tray.eval_batch --set S --conditions-sha256 H"
+      },
+      {
+       "kind": "cmd",
+       "text": "python -m flywheel_psi0.tray.eval_results --json"
+      }
+     ],
+     "logs": [
+      {
+       "label": "rollouts",
+       "fw": "tray/pair60k/stage1-60k/c70r1-rollouts.jsonl"
+      }
+     ],
+     "results": [
+      {
+       "label": "stage-1 reads",
+       "fw": "tray/pair60k/stage1-60k/stage1-*.json"
+      }
+     ]
+    },
+    "5": {
+     "needs": [
+      "story.round"
+     ],
+     "how": [
+      {
+       "kind": "cmd",
+       "text": "fw eval diag-system --episode E"
+      },
+      {
+       "kind": "config",
+       "path": "configs/eval/diagnosis/system.yaml"
+      }
+     ],
+     "logs": [],
+     "results": [
+      {
+       "label": "clusters",
+       "cited": "round.clusters.data"
+      }
+     ]
+    },
+    "6": {
+     "needs": [
+      "story.round"
+     ],
+     "how": [
+      {
+       "kind": "module",
+       "path": "packages/flywheel-psi0/src/flywheel_psi0/tray/round_select.py"
+      },
+      {
+       "kind": "module",
+       "path": "packages/flywheel-psi0/src/flywheel_psi0/tray/round_cut.py"
+      }
+     ],
+     "logs": [],
+     "results": [
+      {
+       "label": "round cut",
+       "fw": "tray/pair-cuts/C70_R1.tar"
+      }
+     ]
+    },
+    "0": {
+     "needs": [
+      "story.ledger"
+     ],
+     "how": [
+      {
+       "kind": "doc",
+       "path": "docs/g0/ledger",
+       "note": "một file CSV mỗi story"
+      }
+     ],
+     "logs": [],
+     "results": [
+      {
+       "label": "ledger",
+       "doc": "docs/g0/ledger/*.csv"
+      }
+     ]
+    }
+   },
+   "catalog_totals": {
+    "egocentric": {
+     "sets": 2,
+     "episodes": 161,
+     "hours": 0.124
+    },
+    "all": {
+     "sets": 7,
+     "episodes": 2161,
+     "hours": 15.441
+    },
+    "s1": {
+     "sets": 3,
+     "episodes": 1032,
+     "hours": 6.095
+    },
+    "s2": {
+     "sets": 2,
+     "episodes": 968,
+     "hours": 9.222
+    }
+   },
+   "catalog_rows": [
+    {
+     "id": "team-1109-480p30-old",
+     "title": "Tray đội 1109 · 480p30 (cũ)",
+     "group": "egocentric",
+     "kind": "raw source",
+     "episodes": 153,
+     "status": "superseded"
+    },
+    {
+     "id": "team-1109-480p",
+     "title": "Tray đội 1109 · 30fps 480p",
+     "group": "egocentric",
+     "kind": "raw source",
+     "episodes": 153,
+     "status": "current"
+    }
+   ]
+  },
+  {
+   "id": "two_table",
+   "name": {
+    "vi": "Gắp vật giữa hai bàn",
+    "en": "Pick between two tables"
+   },
+   "word": {
+    "vi": "hộp",
+    "en": "box"
+   },
+   "description": {
+    "vi": "Robot Unitree G1 gắp hộp ở bàn này, đi sang bàn kia và đặt vào giỏ (task của SIMPLE).",
+    "en": "A Unitree G1 robot picks a box on one table, walks to the other and puts it in a basket (a SIMPLE task)."
+   },
+   "robot": "Unitree G1",
+   "model": "Ψ₀ (checkpoint của tác giả)",
+   "simulator": "SIMPLE (MuJoCo physics, Isaac render)",
+   "catalog_task": "two_table",
+   "inventory": "task",
+   "scorer_config": "configs/eval/scorer/two-table.yaml",
+   "stages_source": "docs/spec-v10-failure-to-data.md §5.1; design 27/10/2026 §3",
+   "stages": [
+    {
+     "id": "approach",
+     "vi": "tiếp cận",
+     "en": "approach"
+    },
+    {
+     "id": "grasp",
+     "vi": "gắp",
+     "en": "grasp"
+    }
+   ],
+   "success": {
+    "vi": "cờ check_success của SIMPLE bật (ngưỡng từng bước trong scorer còn là giả định)",
+    "en": "SIMPLE's check_success flag is set (per-step scorer thresholds are still assumptions)",
+    "source": "configs/eval/scorer/two-table.yaml; docs/g0/psi0-eval.md §3.6"
+   },
+   "rounds": [],
+   "index": [],
+   "teleop_zip": "psi-data/simple/G1WholebodyLocomotionPickBetweenTablesTeleop-v0.zip",
+   "evals": [
+    {
+     "id": "s103-isaac-l0",
+     "label": {
+      "vi": "checkpoint của tác giả, Isaac, mức 0",
+      "en": "authors' checkpoint, Isaac, level 0"
+     },
+     "fw": "simple/s103/runs/simple-b75c678/eval-e78fb93/mujoco_isaac/level-0/pass-1/ep0-9/summary.json",
+     "doc": "docs/he/two-table-diagnosis.md §1; docs/g0/psi0-eval.md §3.6",
+     "n": 10,
+     "successes": 6,
+     "level": 0,
+     "sim_mode": "mujoco_isaac",
+     "origin": "file",
+     "source": "fwdata/simple/s103/runs/simple-b75c678/eval-e78fb93/mujoco_isaac/level-0/pass-1/ep0-9/summary.json"
+    }
+   ],
+   "clusters": {
+    "origin": "cited",
+    "items": [
+     {
+      "id": "A",
+      "checkpoint": "authors",
+      "level": 0,
+      "step": 5,
+      "stage": "place",
+      "members": 4,
+      "source": "docs/he/two-table-diagnosis.md §3",
+      "quote": "| A | Tác giả | 0 | 5 · đặt | S1-03 #4, #5, #6, #9 | 4 |"
+     },
+     {
+      "id": "B",
+      "checkpoint": "N20",
+      "level": 0,
+      "step": 2,
+      "stage": "grasp",
+      "members": 2,
+      "source": "docs/he/two-table-diagnosis.md §3",
+      "quote": "| B | N20 (V-EGO, V-NOEGO) | 0 | 2 · gắp | HE-1 #0, #1 (cùng seed 1000100) | 2 |"
+     }
+    ],
+    "diagnosis": "unknown",
+    "diagnosis_source": "docs/he/two-table-diagnosis.md §2.1",
+    "diagnosis_quote": "khi còn một mã hệ thống `not_judged`, chẩn đoán duy nhất hợp lệ là `unknown` (CHƯA RÕ)."
+   },
+   "process": {
+    "1": {
+     "needs": [
+      "catalog"
+     ],
+     "how": [
+      {
+       "kind": "cmd",
+       "text": "fw data ingest | qa | release | report"
+      },
+      {
+       "kind": "doc",
+       "path": "docs/he/two-table-diagnosis.md",
+       "section": "5.2 (ba loại dữ liệu)"
+      }
+     ],
+     "logs": [],
+     "results": [
+      {
+       "label": "catalog",
+       "index": "catalog.json"
+      }
+     ]
+    },
+    "2": {
+     "needs": [
+      "story.h1m"
+     ],
+     "how": [
+      {
+       "kind": "cmd",
+       "text": "fw data qa"
+      },
+      {
+       "kind": "cmd",
+       "text": "fw agentqa run --model nemotron --out D"
+      }
+     ],
+     "missing": {
+      "vi": "chưa có tập dữ liệu mới của đội cho task này",
+      "en": "no new team dataset for this task yet"
+     },
+     "logs": [],
+     "results": []
+    },
+    "3": {
+     "needs": [
+      "story.runs"
+     ],
+     "remote": "Colab",
+     "how": [
+      {
+       "kind": "doc",
+       "path": "docs/he/two-table-diagnosis.md",
+       "section": "5.2"
+      }
+     ],
+     "missing": {
+      "vi": "chưa có tập dữ liệu nhắm lỗi để dạy (không có đường thu teleop cho task này)",
+      "en": "no targeted data to train on (no teleop path for this task)"
+     },
+     "logs": [],
+     "results": []
+    },
+    "4": {
+     "needs": [
+      "story.pair"
+     ],
+     "remote": "Colab A100 (server) + rtx3060 (client Isaac)",
+     "how": [
+      {
+       "kind": "cmd",
+       "text": "bash scripts/g0/eval_psi0.sh run --level L --sim-mode mujoco_isaac"
+      },
+      {
+       "kind": "cmd",
+       "text": "fw eval score --trace T --task two-table"
+      }
+     ],
+     "missing": {
+      "vi": "chấm từng bước chưa chạy được: thiếu TaskDefinition hai bàn và trace",
+      "en": "per-step scoring cannot run yet: no two-table TaskDefinition and no trace"
+     },
+     "logs": [
+      {
+       "label": "client log",
+       "fw": "simple/s103/runs/simple-b75c678/eval-e78fb93/mujoco_isaac/level-0/pass-1/ep0-9/client.log"
+      }
+     ],
+     "results": [
+      {
+       "label": "summary",
+       "fw": "simple/s103/runs/simple-b75c678/eval-e78fb93/mujoco_isaac/level-0/pass-1/ep0-9/summary.json"
+      }
+     ]
+    },
+    "5": {
+     "needs": [
+      "story.round"
+     ],
+     "how": [
+      {
+       "kind": "cmd",
+       "text": "fw eval diag-system --episode E"
+      },
+      {
+       "kind": "config",
+       "path": "configs/eval/diagnosis/system.yaml"
+      }
+     ],
+     "missing": {
+      "vi": "lượt Isaac không ghi trace (steps.jsonl, rtc.jsonl): mọi kiểm hệ thống là not_judged",
+      "en": "the Isaac runs wrote no trace (steps.jsonl, rtc.jsonl): every system check is not_judged"
+     },
+     "logs": [],
+     "results": []
+    },
+    "6": {
+     "needs": [
+      "story.round"
+     ],
+     "how": [
+      {
+       "kind": "doc",
+       "path": "docs/he/two-table-diagnosis.md",
+       "section": "5.1 repair_ticket"
+      }
+     ],
+     "missing": {
+      "vi": "chưa có vòng; bước bắt buộc trước tiên là ghi lại trace rồi chẩn đoán lại",
+      "en": "no round yet; the required first step is to record a trace and diagnose again"
+     },
+     "logs": [],
+     "results": []
+    },
+    "0": {
+     "needs": [
+      "story.ledger"
+     ],
+     "how": [
+      {
+       "kind": "doc",
+       "path": "docs/g0/ledger"
+      }
+     ],
+     "missing": {
+      "vi": "sổ chi phí chưa tách theo task",
+      "en": "the ledger is not split by task yet"
+     },
+     "logs": [],
+     "results": []
+    }
+   },
+   "catalog_totals": {
+    "teleop": {
+     "sets": 1,
+     "episodes": 99,
+     "hours": 0.349
+    },
+    "all": {
+     "sets": 1,
+     "episodes": 99,
+     "hours": 0.349
+    }
+   },
+   "catalog_rows": [
+    {
+     "id": "psi-two-table",
+     "title": "psi-data · two_table (99)",
+     "group": "teleop",
+     "kind": "raw source",
+     "episodes": 99,
+     "status": "current"
+    },
+    {
+     "id": "psi-eval-e78fb93",
+     "title": "Eval cond · simple two_table e78fb93 (30)",
+     "group": "eval",
+     "kind": "eval conditions",
+     "episodes": 30,
+     "status": "archived"
+    }
+   ]
+  }
+ ],
+ "rounds": [
+  {
+   "id": "tray-r1",
+   "task": "tray",
+   "number": 1,
+   "title": {
+    "vi": "Vòng 1 Failure → Data trên bản 425 bài",
+    "en": "Failure → Data round 1 on the 425-demo model"
+   },
+   "doc": "docs/he/tray.md §19, §20",
+   "eval": {
+    "levels": [
+     1,
+     2
+    ],
+    "level_key": "levels 1-2"
+   },
+   "max_steps": 60000,
+   "train_dir": "tray/pair60k",
+   "eval_dir": "tray/pair60k/stage1-60k",
+   "cut": "tray/pair-cuts/C70_R1.tar",
+   "rollouts": "c70r1-rollouts.jsonl",
+   "log_run": "C_70",
+   "rule_tag": "r",
+   "runs": [
+    {
+     "id": "C_ALL",
+     "train_set": "ALL",
+     "session": "c-all",
+     "role": "control"
+    },
+    {
+     "id": "C_70",
+     "train_set": "S70",
+     "session": "c-70",
+     "role": "baseline"
+    }
+   ],
+   "baseline": "C_70",
+   "after_round": "C70_R1",
+   "withhold_eval": [
+    "C70_R1"
+   ],
+   "controls": [
+    "C_ALL",
+    "B_70"
+   ],
+   "follow": {
+    "level": 1,
+    "seed": 1000107
+   },
+   "deck_corrections": true,
+   "index": [
+    "story.pair",
+    "story.round"
+   ]
+  }
+ ]
+}

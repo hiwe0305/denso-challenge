@@ -1,0 +1,1226 @@
+{
+ "runs": [
+  {
+   "job": "da34-t6-ft-b-70-s0",
+   "branch": "B_70",
+   "release": "tray_s1_41899efb4b27+tray_s1_4a8f4a8c6a8d#S70:8ab4e33b657f",
+   "run_plan_id": "rp_e2fb9f62c223",
+   "step": 59999,
+   "max_steps": 60000,
+   "loss_last": 0.247,
+   "loss": [
+    [
+     0,
+     49.1478
+    ],
+    [
+     150,
+     17.7746
+    ]
+   ],
+   "val": [
+    [
+     0,
+     45.5779
+    ],
+    [
+     2000,
+     2.3176
+    ]
+   ],
+   "thr": [
+    [
+     0,
+     null
+    ],
+    [
+     150,
+     43.16940151527758
+    ]
+   ],
+   "vram": [
+    [
+     0,
+     16.116773888
+    ],
+    [
+     150,
+     16.117332992
+    ]
+   ],
+   "gn": [
+    [
+     0,
+     202.27835083007812
+    ],
+    [
+     150,
+     47.99340057373047
+    ]
+   ],
+   "groups_last": {
+    "hand": 0.0056,
+    "arm": 0.0102,
+    "torso_rpy": 0.0043,
+    "height": 0.0051,
+    "base_velocity": 0.0306,
+    "turn": 0.0198,
+    "target_yaw": 0.0156
+   },
+   "groups_first": {
+    "hand": 1.9055,
+    "arm": 1.7502,
+    "torso_rpy": 1.4874,
+    "height": 2.1142,
+    "base_velocity": 1.4791,
+    "turn": 1.9762,
+    "target_yaw": 2.1319
+   },
+   "argv": [
+    "finetune_simple_psi0_config",
+    "--exp=fw-da34-t6-ft-b-70-s0"
+   ]
+  },
+  {
+   "job": "da34-t6-ft-b-all-s0",
+   "branch": "B_ALL",
+   "release": "tray_s1_41899efb4b27+tray_s1_4a8f4a8c6a8d#ALL:113520c517a0",
+   "run_plan_id": "rp_e2fb9f62c223",
+   "step": 59999,
+   "max_steps": 60000,
+   "loss_last": 0.264,
+   "loss": [
+    [
+     0,
+     49.3841
+    ],
+    [
+     150,
+     17.9981
+    ]
+   ],
+   "val": [
+    [
+     0,
+     44.763
+    ],
+    [
+     2000,
+     2.3486
+    ]
+   ],
+   "thr": [
+    [
+     0,
+     null
+    ],
+    [
+     150,
+     38.38632617643473
+    ]
+   ],
+   "vram": [
+    [
+     0,
+     16.115053568
+    ],
+    [
+     150,
+     16.115772416
+    ]
+   ],
+   "gn": [
+    [
+     0,
+     214.4597625732422
+    ],
+    [
+     150,
+     47.35525131225586
+    ]
+   ],
+   "groups_last": {
+    "hand": 0.0069,
+    "arm": 0.0097,
+    "torso_rpy": 0.005,
+    "height": 0.0066,
+    "base_velocity": 0.035,
+    "turn": 0.0273,
+    "target_yaw": 0.024
+   },
+   "groups_first": {
+    "hand": 2.0828,
+    "arm": 1.7006,
+    "torso_rpy": 1.6144,
+    "height": 1.9042,
+    "base_velocity": 1.2298,
+    "turn": 2.1937,
+    "target_yaw": 1.4191
+   },
+   "argv": [
+    "finetune_simple_psi0_config",
+    "--exp=fw-da34-t6-ft-b-all-s0"
+   ]
+  }
+ ],
+ "train_log_tail": [
+  "wandb:      eval/unknown/err_l1_height 0",
+  "wandb:  eval/unknown/err_l1_target_yaw 0.06598"
+ ],
+ "vm_phases": {
+  "setup_tray_c_70": 119.3,
+  "train": 38049.2,
+  "persist": 38262.6
+ },
+ "sources": [
+  {
+   "id": "050b9bf5",
+   "name": "src_050b9bf56a4e843c",
+   "licence": "CC-BY-NC-ND-4.0",
+   "data_class": "public",
+   "episodes": 20,
+   "seconds": 138,
+   "pass": 8,
+   "flag": 11,
+   "reject": 1
+  },
+  {
+   "id": "158ec3c8",
+   "name": "src_158ec3c813ffe9a6",
+   "licence": "CC-BY-NC-ND-4.0",
+   "data_class": "public",
+   "episodes": 218,
+   "seconds": 3030,
+   "pass": 32,
+   "flag": 153,
+   "reject": 33
+  }
+ ],
+ "heat": [
+  [
+   "camera_jitter_deg_s",
+   "050b9bf5"
+  ],
+  [
+   "deid_gate",
+   "050b9bf5"
+  ]
+ ],
+ "reasons": [
+  [
+   "segment_ambiguous",
+   370
+  ],
+  [
+   "hand_pose_nan (D1)",
+   299
+  ]
+ ],
+ "qa_sample": "{\"report_id\": \"qa_99115c19694e4bd2\", \"episode_id\": \"ep_bd159d0c5259d7d5\", \"threshold_version\": \"ego-1@2b0b593722be\", \"decision\": \"pass\", \"reasons\": [], \"chec…",
+ "h1m": {
+  "clips": 379,
+  "hours": 0.9653796296296296,
+  "exported": 317,
+  "exported_hours": 0.8793796296296296,
+  "decisions": {
+   "exported": 317,
+   "rejected_qa": 54,
+   "excluded": 8
+  },
+  "qa": {
+   "flag": 283,
+   "reject": 54,
+   "pass": 42
+  },
+  "fps": [
+   30.0
+  ],
+  "resolutions": [
+   "1920x1080",
+   "640x480"
+  ],
+  "seconds_median": 3.8,
+  "hands_visible_median": 1.0,
+  "hands_visible_ge_95": 0.9656992084432717,
+  "exported_hands_visible_ge_95": 0.9747634069400631,
+  "bone_cv_median": 1.2807650468568565e-06,
+  "qa_reasons": {
+   "segment_ambiguous": 209,
+   "hand_pose_nan": 150,
+   "segment_count": 54,
+   "hand_out_of_frame": 30,
+   "segments": 21,
+   "pose_low_confidence": 11
+  }
+ },
+ "ledger": [
+  [
+   "DA-17",
+   0.0
+  ],
+  [
+   "DA-18",
+   0.0
+  ]
+ ],
+ "colab_balance": [
+  [
+   "2026-11-08T11:29:50+00:00",
+   38.42
+  ],
+  [
+   "2026-11-08T11:30:56+00:00",
+   38.42
+  ]
+ ],
+ "colab_sessions": [
+  {
+   "session": "da34-b-70",
+   "gpu": "A100",
+   "state": "stopped",
+   "cap": 82.0
+  },
+  {
+   "session": "da34-b-all",
+   "gpu": "A100",
+   "state": "running",
+   "cap": 82.0
+  }
+ ],
+ "ds": {
+  "generated": "2026-11-11",
+  "rows": [
+   {
+    "id": "egodex-test",
+    "name": "egodex-test (Apple EgoDex test.zip)",
+    "title": "Apple EgoDex test.zip (chỉ từ xa)",
+    "kind": "raw source",
+    "group": "egocentric",
+    "data_type": "egocentric",
+    "task": "other",
+    "episodes": null,
+    "frames": null,
+    "hours": null,
+    "fps": 30,
+    "format": "zip (mp4+hdf5)",
+    "licence": "CC-BY-NC-ND-4.0",
+    "data_class": "public",
+    "locations": [
+     {
+      "where": "remote",
+      "path": "https://ml-site.cdn-apple.com/datasets/egodex/test.zip",
+      "raw": "https://ml-site.cdn-apple.com/datasets/egodex/test.zip (remote only, 17.3 GB)",
+      "exists": false
+     }
+    ],
+    "size": "17.3 GB (remote)",
+    "status": "upstream",
+    "notes": "never downloaded whole; read by HTTP range",
+    "qa": "-",
+    "qa_counts": null,
+    "view": "remote",
+    "laptop_dir": null,
+    "parents": [],
+    "children": [
+     "egodex-da30",
+     "egodex-da30-probe"
+    ],
+    "thumbs": [],
+    "aliases": [],
+    "lerobot": null,
+    "ego_viewer": null,
+    "unique": false
+   },
+   {
+    "id": "egodex-da30",
+    "name": "egodex-test-first2 / egodex-test-da30-part1",
+    "title": "EgoDex · 218 clip (DA-30)",
+    "kind": "raw source",
+    "group": "egocentric",
+    "data_type": "egocentric",
+    "task": "other",
+    "episodes": 218,
+    "frames": 90906,
+    "hours": 0.842,
+    "fps": 30,
+    "format": "EgoDex raw (mp4+hdf5, part1, 111 tasks x2)",
+    "licence": "CC-BY-NC-ND-4.0",
+    "data_class": "public",
+    "locations": [
+     {
+      "where": "laptop",
+      "path": "fwdata/egodex-da30",
+      "raw": "laptop:fwdata/egodex-da30",
+      "exists": true
+     },
+     {
+      "where": "rtx3060",
+      "path": "~/denso-da30/data/egodex",
+      "raw": "rtx3060:~/denso-da30/data/egodex",
+      "exists": false
+     }
+    ],
+    "size": "2.1 GB",
+    "status": "current",
+    "notes": "frames from src_158e report; manifest pins D2 deid waiver",
+    "qa": "-",
+    "qa_counts": null,
+    "view": "meta",
+    "laptop_dir": "fwdata/egodex-da30",
+    "parents": [
+     "egodex-test"
+    ],
+    "children": [
+     "src_050b9bf56a4e843c",
+     "src_158ec3c813ffe9a6"
+    ],
+    "thumbs": [],
+    "aliases": [],
+    "lerobot": null,
+    "ego_viewer": null,
+    "unique": true
+   }
+  ],
+  "edges": [
+   [
+    "egodex-test",
+    "egodex-da30"
+   ],
+   [
+    "egodex-test",
+    "egodex-da30-probe"
+   ]
+  ],
+  "runs": [
+   {
+    "id": "run-da-30-da30-tray-ego-b-stage1-vlm",
+    "name": "RUN DA-30 da30-tray-ego-b (stage1 VLM)",
+    "title": "Run · DA-30 da30-tray-ego-b (stage1 VLM)",
+    "ext": false
+   },
+   {
+    "id": "run-da-34-b-all-b-70",
+    "name": "RUN DA-34 B_ALL / B_70",
+    "title": "Run · DA-34 B_ALL / B_70",
+    "ext": false
+   }
+  ],
+  "totals": {
+   "egocentric": {
+    "sets": 3,
+    "episodes": 379,
+    "hours": 0.966
+   },
+   "all": {
+    "sets": 10,
+    "episodes": 2572,
+    "hours": 16.869
+   },
+   "teleop": {
+    "sets": 2,
+    "episodes": 193,
+    "hours": 0.586
+   },
+   "s1": {
+    "sets": 3,
+    "episodes": 1032,
+    "hours": 6.095
+   },
+   "s2": {
+    "sets": 2,
+    "episodes": 968,
+    "hours": 9.222
+   }
+  }
+ },
+ "eval": {
+  "source": "docs/he/tray.md §16.6",
+  "policy": "C @40k, SimReady, dev, one train seed; rule 0: p_C < 10% at L1–2",
+  "levels": [
+   {
+    "level": "L0",
+    "n": 30,
+    "successes": 5,
+    "succ": "5/30",
+    "wilson": "7.3–33.6",
+    "steps_pct": [
+     93.3,
+     93.3
+    ]
+   },
+   {
+    "level": "L1",
+    "n": 120,
+    "successes": 9,
+    "succ": "9/120",
+    "wilson": "4.0–13.6",
+    "steps_pct": [
+     60.8,
+     60.8
+    ]
+   }
+  ],
+  "stages": [
+   "approach_a",
+   "grasp"
+  ],
+  "failure_labels": {
+   "L-PLACE-POSE": {
+    "L0": 16,
+    "L1": 68,
+    "L2": 63
+   },
+   "L-TIMEOUT": {
+    "L0": 1,
+    "L1": 24,
+    "L2": 18
+   },
+   "L-TRAY-TILT": {
+    "L0": 8,
+    "L1": 10,
+    "L2": 20
+   },
+   "L-PART-DROP": {
+    "L0": 0,
+    "L1": 6,
+    "L2": 5
+   },
+   "L-ONE-HAND": {
+    "L0": 0,
+    "L1": 3,
+    "L2": 3
+   }
+  },
+  "place_error_cm": {
+   "L0": {
+    "min": 0.9,
+    "p10": 2.5,
+    "p50": 9.5,
+    "p90": 17.6,
+    "max": 28.6
+   },
+   "L1": {
+    "min": 0.4,
+    "p10": 5.2,
+    "p50": 10.1,
+    "p90": 19.9,
+    "max": 36.1
+   },
+   "L2": {
+    "min": 2.7,
+    "p10": 6.1,
+    "p50": 11.2,
+    "p90": 32.0,
+    "max": 54.7
+   }
+  },
+  "clusters": [
+   {
+    "label": "L-PLACE-POSE",
+    "stage": "place",
+    "diagnosis": "data",
+    "intervention": "targeted gen",
+    "episodes": "262 → 229 → 177"
+   }
+  ]
+ },
+ "loop_chain": [
+  240,
+  131
+ ],
+ "loop_detail": {
+  "qa_pass": 226,
+  "in_cut": 160
+ },
+ "pair": {
+  "source": "fwdata/tray/pair60k/stage1-60k",
+  "steps": [
+   "approach_a",
+   "grasp"
+  ],
+  "runs": [
+   {
+    "run": "C_ALL",
+    "n": 60,
+    "successes": 5,
+    "p": 0.08333333333333333,
+    "wilson": [
+     0.03612045660173077,
+     0.1806894201833441
+    ],
+    "failures": {
+     "L-PLACE-POSE": 29,
+     "L-TRAY-TILT": 15,
+     "L-TIMEOUT": 7,
+     "L-ONE-HAND": 2,
+     "L-PART-DROP": 2
+    },
+    "step_pass": {
+     "approach_a": 0.7333333333333333,
+     "grasp": 0.7333333333333333,
+     "lift": 0.7333333333333333,
+     "carry": 0.6666666666666666,
+     "reach_b": 0.65,
+     "place": 0.1,
+     "release_stand": 0.06666666666666667
+    },
+    "levels": {
+     "1": {
+      "n": 30,
+      "successes": 3
+     },
+     "2": {
+      "n": 30,
+      "successes": 2
+     }
+    }
+   },
+   {
+    "run": "C_70",
+    "n": 60,
+    "successes": 10,
+    "p": 0.16666666666666666,
+    "wilson": [
+     0.0931317697919145,
+     0.2803161316361453
+    ],
+    "failures": {
+     "L-PLACE-POSE": 32,
+     "L-TRAY-TILT": 10,
+     "L-TIMEOUT": 7,
+     "L-PART-DROP": 1
+    },
+    "step_pass": {
+     "approach_a": 0.7833333333333333,
+     "grasp": 0.7833333333333333,
+     "lift": 0.7833333333333333,
+     "carry": 0.7666666666666667,
+     "reach_b": 0.7666666666666667,
+     "place": 0.25,
+     "release_stand": 0.15
+    },
+    "levels": {
+     "1": {
+      "n": 30,
+      "successes": 5
+     },
+     "2": {
+      "n": 30,
+      "successes": 5
+     }
+    }
+   }
+  ],
+  "best": "C_70",
+  "comparisons": [
+   {
+    "tag": "a",
+    "variant": "B_70",
+    "baseline": "C_70",
+    "n": 60,
+    "variant_succ": 7,
+    "baseline_succ": 10,
+    "diff": -0.05,
+    "ci": [
+     -0.1833,
+     0.0833
+    ],
+    "mcnemar_p": 0.6291,
+    "variant_only": 7,
+    "baseline_only": 10,
+    "outcome": "F"
+   },
+   {
+    "tag": "f",
+    "variant": "B_70",
+    "baseline": "C_ALL",
+    "n": 60,
+    "variant_succ": 7,
+    "baseline_succ": 5,
+    "diff": 0.0333,
+    "ci": [
+     -0.0833,
+     0.15
+    ],
+    "mcnemar_p": 0.7744,
+    "variant_only": 7,
+    "baseline_only": 5,
+    "outcome": "continue"
+   }
+  ]
+ },
+ "round": {
+  "source": "docs/he/tray.md §20.11–20.16",
+  "plan": "rp_aae292bc79da",
+  "chain": {
+   "targets": 23,
+   "generated": 290,
+   "recorded": 262,
+   "qa_pass": 261,
+   "quality": 204,
+   "selected": 181
+  },
+  "clusters": [
+   {
+    "id": "c1",
+    "stage": "place",
+    "n": 14,
+    "diagnosis": "KỸ NĂNG YẾU 5/5",
+    "intervention": "sinh quanh lỗi",
+    "failures": 10
+   },
+   {
+    "id": "c2",
+    "stage": "place",
+    "n": 12,
+    "diagnosis": "KỸ NĂNG YẾU 4/5",
+    "intervention": "sinh quanh lỗi",
+    "failures": 10
+   }
+  ],
+  "per_case": {
+   "approach_a": 30,
+   "place": 10
+  },
+  "planner_failures": {
+   "L-ONE-HAND": 8,
+   "L-PLACE-POSE": 3,
+   "L-TRAY-TILT": 4,
+   "L-TIMEOUT": 13
+  }
+ },
+ "follow": {
+  "source": "fwdata/tray/pair60k/stage1-60k",
+  "level": 1,
+  "seed": 1000107,
+  "tol": {
+   "distance_m": 0.05,
+   "yaw_error_deg": 10.0
+  },
+  "runs": {
+   "B_70": {
+    "success": false,
+    "failure": "L-TIMEOUT",
+    "reach_b": true,
+    "distance_m": 0.6068,
+    "yaw_error_deg": 0.93
+   },
+   "B_ALL": {
+    "success": true,
+    "failure": null,
+    "reach_b": false,
+    "distance_m": 0.0399,
+    "yaw_error_deg": 7.52
+   },
+   "C_70": {
+    "success": false,
+    "failure": "L-PLACE-POSE",
+    "reach_b": true,
+    "distance_m": 0.0704,
+    "yaw_error_deg": 16.32
+   },
+   "C_ALL": {
+    "success": false,
+    "failure": "L-PLACE-POSE",
+    "reach_b": true,
+    "distance_m": 0.1113,
+    "yaw_error_deg": 12.53
+   }
+  }
+ },
+ "demo": {
+  "source": "story.demo: fwdata files read at index time and seed/cited.yaml demo.*",
+  "ladder": {
+   "source": "fwdata/tray/pair60k/stage1-60k/place-error-<id>.json relaxed_curve['levels 1-2']; success = story.pair.runs[].successes",
+   "n": 60,
+   "yaw_tol_deg": 10.0,
+   "rows": [
+    "on_table_b",
+    "20"
+   ],
+   "relaxed_cm": [
+    "20",
+    "15"
+   ],
+   "standard_cm": "5",
+   "runs": {
+    "C_ALL": {
+     "on_table_b": 43,
+     "relaxed": {
+      "5": 5,
+      "7.5": 9,
+      "10": 12,
+      "15": 14,
+      "20": 17
+     },
+     "success": 5
+    },
+    "C_70": {
+     "on_table_b": 50,
+     "relaxed": {
+      "5": 10,
+      "7.5": 14,
+      "10": 19,
+      "15": 23,
+      "20": 23
+     },
+     "success": 10
+    },
+    "B_ALL": {
+     "on_table_b": 44,
+     "relaxed": {
+      "5": 6,
+      "7.5": 10,
+      "10": 15,
+      "15": 18,
+      "20": 18
+     },
+     "success": 6
+    },
+    "B_70": {
+     "on_table_b": 51,
+     "relaxed": {
+      "5": 7,
+      "7.5": 11,
+      "10": 15,
+      "15": 19,
+      "20": 20
+     },
+     "success": 7
+    }
+   },
+   "on_table_b": {
+    "value": {
+     "C_ALL": 43,
+     "C_70": 50,
+     "B_ALL": 44,
+     "B_70": 51
+    },
+    "source": "docs/he/tray.md §20.18 (c)",
+    "quote": null,
+    "secondary": true,
+    "check_from_rollouts": {}
+   },
+   "omitted": [
+    {
+     "row": "placed, released, tray still",
+     "reason": "no file or doc gives it for every model (the round's model included)"
+    }
+   ]
+  },
+  "qa_bench": {
+   "source": "docs/g0/defect-bench.md §6, docs/g0/agent-qa.md §3.2 and §3.7",
+   "code_layer": {
+    "caught": 30,
+    "planted": 30,
+    "kinds": 10,
+    "false_alarms": 0,
+    "clean_units": 40,
+    "false_alarm_is_upper_bound": true,
+    "date": "5/11/2026",
+    "cites": [
+     {
+      "value": "5/11/2026",
+      "source": "docs/g0/defect-bench.md §6",
+      "quote": "## 6. Lần chạy 5/11/2026 trên bộ log cấy"
+     },
+     {
+      "value": {
+       "planted": 30,
+       "kinds": 10,
+       "clean_units": 40
+      },
+      "source": "docs/g0/defect-bench.md §6",
+      "quote": "`bench-c6da75e9ff36` (30 lỗi: 10 loại × 3), `bench-cfcb0ba66776`; mỗi bản 40 job (30 train, 10 RTC)"
+     }
+    ]
+   },
+   "agent_layer_nemotron": {
+    "value": {
+     "caught": 30,
+     "planted": 30,
+     "false_alarms": 1,
+     "clean_units": 40,
+     "date": "12/11/2026"
+    },
+    "source": "docs/g0/agent-qa.md §đầu file, 3.2, 3.7",
+    "quote": "Trên bộ log cấy, lớp agent bắt 30/30 lỗi cấy, precision 3/3 ở 9 mã, T4 là 3/4, báo nhầm trên bản sạch 1/40 (cận trên)."
+   },
+   "psi_data_bench": {
+    "value": {
+     "planted": 33,
+     "kinds": 11,
+     "per_kind": 3,
+     "scored": false
+    },
+    "source": "docs/g0/defect-inject.md §Chạy trên psi-data thật",
+    "quote": "một bản có 33 lỗi, đủ 11 loại × 3",
+    "what": "dataset copies of the authors' psi-data (episodes), not the job-log bench",
+    "status": {
+     "value": "not scored yet",
+     "source": "docs/g0/defect-bench.md §8",
+     "quote": "| Chạy trên hai bản sao psi-data | Máy `rtx3060` |"
+    }
+   }
+  },
+  "fail_share": {
+   "source": "story.pair.runs[].failures (fwdata/tray/pair60k/stage1-60k)",
+   "labels": [
+    "L-PLACE-POSE",
+    "L-TRAY-TILT"
+   ],
+   "runs": {
+    "C_ALL": {
+     "place_pose": 29,
+     "tray_tilt": 15,
+     "failed": 55,
+     "n": 60,
+     "share": 0.8
+    },
+    "C_70": {
+     "place_pose": 32,
+     "tray_tilt": 10,
+     "failed": 50,
+     "n": 60,
+     "share": 0.84
+    },
+    "B_ALL": {
+     "place_pose": 25,
+     "tray_tilt": 17,
+     "failed": 54,
+     "n": 60,
+     "share": 0.7778
+    },
+    "B_70": {
+     "place_pose": 25,
+     "tray_tilt": 21,
+     "failed": 53,
+     "n": 60,
+     "share": 0.8679
+    }
+   },
+   "min": 0.7778,
+   "max": 0.8679
+  },
+  "diagnose": {
+   "source": "docs/he/tray.md §20.3, §20.9, §20.11; clusters from story.round.clusters",
+   "checks": [
+    {
+     "id": "H1",
+     "value": {
+      "clusters": [
+       "c6",
+       "c7"
+      ],
+      "result": "unclear (scorer threshold)",
+      "ticket": "DA-37"
+     },
+     "source": "docs/he/tray.md §20.11",
+     "quote": "**H1: chuỗi bước gãy ở `approach_a`.** CHƯA RÕ (ngưỡng bộ chấm), phiếu cho DA-37."
+    },
+    {
+     "id": "H2",
+     "value": {
+      "clusters": [
+       "c3",
+       "c8"
+      ],
+      "result": "policy failure",
+      "goes_to": "data"
+     },
+     "source": "docs/he/tray.md §20.9",
+     "quote": "- R8: c3, c8 đọc là lỗi của policy, đi bước 5–8 cùng c1, c2."
+    }
+   ],
+   "to_data": [
+    "c1",
+    "c2"
+   ],
+   "tickets": {
+    "DA-38": [
+     "c4",
+     "c5"
+    ],
+    "DA-37": [
+     "c6",
+     "c7"
+    ]
+   },
+   "cost_cu": {
+    "value": 0,
+    "source": "docs/he/tray.md §20.11",
+    "quote": "### 20.11 Kết quả bước 4: H1–H3 (12/11/2026, 0 CU)"
+   }
+  },
+  "design": {
+   "input": [
+    {
+     "id": "task",
+     "kind": "description",
+     "value": "seven steps, success when the tray is within 5 cm and 10 degrees of the target",
+     "source": "docs/superpowers/specs/2026-11-15-console-one-site-design.md §6",
+     "quote": "Bảy bước bằng lời thường: tới bàn A, cầm khay, nhấc lên, mang sang, tới bàn B, đặt xuống, buông tay và đứng. Lượt đạt khi khay nằm trong ô đích: lệch ≤ 5 cm …"
+    },
+    {
+     "id": "station",
+     "kind": "description",
+     "value": "two facing tables, robot starts near table A",
+     "source": "docs/superpowers/specs/2026-10-28-tray-transfer-he-design.md §3.1",
+     "quote": "Sàn phẳng, hai bàn đối diện, hành lang trống, robot đứng giữa gần bàn A"
+    }
+   ],
+   "output": [
+    {
+     "id": "trained_model",
+     "kind": "artifact",
+     "source": "story.pair.runs",
+     "value": {
+      "models": [
+       "C_ALL",
+       "C_70"
+      ]
+     }
+    },
+    {
+     "id": "step_scores",
+     "kind": "artifact",
+     "source": "story.pair.steps, story.pair.runs[].step_pass, .failures",
+     "value": {
+      "steps": 7
+     }
+    }
+   ],
+   "environment": [
+    {
+     "id": "sim_stack",
+     "kind": "description",
+     "value": {
+      "physics_and_generation": "SIMPLE on MuJoCo",
+      "rendering": "Isaac Sim"
+     },
+     "source": "CLAUDE.md §Dự án",
+     "quote": "Thu và sinh dữ liệu chạy MuJoCo thuần của SIMPLE, Isaac Sim chỉ render."
+    },
+    {
+     "id": "robot_model",
+     "kind": "description",
+     "value": {
+      "robot": "Unitree G1",
+      "model": "Ψ₀"
+     },
+     "source": "CLAUDE.md §Dự án",
+     "quote": "Model là Ψ₀ (dùng lại checkpoint của tác giả). Từ 27/10/2026 robot là Unitree G1 trong SIMPLE"
+    }
+   ],
+   "devices": [
+    {
+     "id": "laptop",
+     "kind": "description",
+     "value": "laptop runs the console",
+     "source": "docs/superpowers/specs/2026-11-15-console-one-site-design.md §1",
+     "quote": "\"tự mở, tự bấm\", trên laptop"
+    },
+    {
+     "id": "rtx3060",
+     "kind": "measured",
+     "value": {
+      "device": "rtx3060",
+      "role": "simulation test client",
+      "hours": 4.8,
+      "cu": 0
+     },
+     "source": "docs/he/tray.md §20.18",
+     "quote": "Eval client trên `rtx3060`: 4,80 giờ client, 0 CU."
+    }
+   ],
+   "resource": [
+    {
+     "id": "train_cu",
+     "per_model_cu": {
+      "B_70": 77.929,
+      "C_70": 73.979,
+      "C_ALL": 77.451,
+      "C70_R1": 77.27
+     },
+     "min_cu": 73.979,
+     "max_cu": 77.929,
+     "gpu": [
+      "A100"
+     ],
+     "kind": "measured",
+     "source": "fwdata/colab/batch-*/da34-*.jsonl, watcher 'exit' event wall_cu"
+    },
+    {
+     "id": "train_cu_estimate",
+     "kind": "estimated",
+     "value": {
+      "low": 74,
+      "high": 76,
+      "gpu": "A100",
+      "hours": 10.7
+     },
+     "source": "docs/he/tray.md §20.6",
+     "quote": "| Chi phí (ước lượng theo số đo bốn run) | Một A100, khoảng 10,7 giờ, 74–76 CU | Khoảng 25 CU |"
+    }
+   ],
+   "source": "seed/cited.yaml demo.design.*, fwdata/colab, story.h1m, story.pair",
+   "unsourced": [
+    "the deck's CU for one 60-run test: no ledger or doc line; use test_cu (measured)",
+    "human hours for generating the 181 episodes: no ledger or doc line"
+   ]
+  },
+  "round_cost": {
+   "source": "docs/he/tray.md §20.18 'Chi phí của 7.6–7.7' (measured, ledger DA-34)",
+   "kind": "measured",
+   "lines": [
+    {
+     "id": "train_1",
+     "value": 8.55,
+     "source": "docs/he/tray.md §20.18",
+     "quote": "| Train lần 1 (dừng sớm) | 8,55 |"
+    },
+    {
+     "id": "train_2",
+     "value": 77.27,
+     "source": "docs/he/tray.md §20.18",
+     "quote": "| Train lần 2 | 77,27 |"
+    }
+   ],
+   "total_cu": 109.22,
+   "total_note": "sum of the three lines; serve is 'about 23.4' in the doc",
+   "serve_waste": {
+    "value": 8,
+    "source": "docs/he/tray.md §20.18",
+    "quote": "Khoảng 8 CU serve là phí:"
+   },
+   "eval_client": {
+    "value": {
+     "hours": 4.8,
+     "cu": 0
+    },
+    "source": "docs/he/tray.md §20.18",
+    "quote": "Eval client trên `rtx3060`: 4,80 giờ client, 0 CU."
+   },
+   "usd_per_cu": 0.0999,
+   "usd_rate": {
+    "value": {
+     "cu": 100,
+     "usd": 9.99
+    },
+    "source": "docs/g0/ledger/S1-03.csv §job_s103_colab_cost",
+    "quote": "Colab Pro 100 CU = 9.99 USD"
+   },
+   "total_usd": 10.91
+  },
+  "success_clip": {
+   "model": "C_70",
+   "level": null,
+   "seed": null,
+   "success": true,
+   "provenance": "deck",
+   "deck_file": "DENSO-ilovephysicalintelligence-7.pptx",
+   "deck_member": "ppt/media/media2.mp4",
+   "deck_slide": 11,
+   "deck_caption": "Robot G1, model dạy bằng 425 bài mẫu (bản tốt nhất)",
+   "sha256": "e470196bcbfd804e73cd8b4152cc9b340a22f7fafb5a8e415621fd194e87618b",
+   "note": "No original rollout video of the pair60k eval exists under fwdata; level and seed of this clip are not recorded anywhere found",
+   "route": null,
+   "path": "console/media/demo/success-C_70.mp4",
+   "bytes": 7507527,
+   "source": "console/media/demo/success-C_70.json"
+  },
+  "models": {
+   "source": "docs/he/tray.md §19.1, §20.6, §20.16; round1 = variant of the 'r' comparisons",
+   "runs": {
+    "C_ALL": {
+     "data": "ALL",
+     "episodes": 606,
+     "base_episodes": null,
+     "targeted_episodes": null,
+     "human_video": false,
+     "human_clips": 0,
+     "round1": false
+    },
+    "C_70": {
+     "data": "S70",
+     "episodes": 425,
+     "base_episodes": null,
+     "targeted_episodes": null,
+     "human_video": false,
+     "human_clips": 0,
+     "round1": false
+    },
+    "B_ALL": {
+     "data": "ALL",
+     "episodes": 606,
+     "base_episodes": null,
+     "targeted_episodes": null,
+     "human_video": true,
+     "human_clips": 153,
+     "round1": false
+    },
+    "B_70": {
+     "data": "S70",
+     "episodes": 425,
+     "base_episodes": null,
+     "targeted_episodes": null,
+     "human_video": true,
+     "human_clips": 153,
+     "round1": false
+    },
+    "C70_R1": {
+     "data": "R181",
+     "episodes": 606,
+     "base_episodes": 425,
+     "targeted_episodes": 181,
+     "human_video": false,
+     "human_clips": 0,
+     "round1": true
+    }
+   },
+   "cites": {
+    "ALL": {
+     "value": {
+      "episodes": 606
+     },
+     "source": "docs/he/tray.md §19.1 (change log 11/11/2026)",
+     "quote": "606 episode, 861 624 frame"
+    },
+    "S70": {
+     "value": {
+      "episodes": 425
+     },
+     "source": "docs/he/tray.md §19.1",
+     "quote": "ceil(0,7 × 429) + ceil(0,7 × 177) = 301 + 124 = **425 episode**"
+    },
+    "R181": {
+     "value": {
+      "base": 425,
+      "targeted": 181
+     },
+     "source": "docs/he/tray.md §20.16",
+     "quote": "S70 (425 episode, từng byte như bản `C_70` đã train) rồi 181 episode nhắm lỗi từ index 425"
+    },
+    "human_video": {
+     "value": {
+      "clips": 153,
+      "used_by": [
+       "B_ALL",
+       "B_70"
+      ]
+     },
+     "source": "docs/he/tray.md §19.1",
+     "quote": "stage 1 của VLM C trên bản xuất `egx_7b43c30dc5d88cd7` (153 clip egocentric của đội"
+    },
+    "C70_R1_vlm": {
+     "value": {
+      "vlm": "C",
+      "human_video": false
+     },
+     "source": "docs/he/tray.md §20.6",
+     "quote": "VLM của C (cha `psi0-baseline-egodex-he`), dữ liệu S70 + tập nhắm lỗi, 60 000 bước"
+    }
+   }
+  }
+ }
+}

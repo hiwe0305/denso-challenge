@@ -1,0 +1,22 @@
+[
+ {
+  "name": "ego_summary",
+  "description": "The egocentric (human first-person video) pipeline in numbers: clips in, episodes exported, clips rejected by QA or left out, the QA reasons. Call this for a…",
+  "parameters": {
+   "type": "object",
+   "properties": {},
+   "required": []
+  },
+  "slash": "/ego"
+ },
+ {
+  "name": "round_report",
+  "description": "ALL facts of the selected task and its Failure -> Data round in one call, already written in the user's language: each model's test result, the best model, w…",
+  "parameters": {
+   "type": "object",
+   "properties": {},
+   "required": []
+  },
+  "slash": "/round"
+ }
+]

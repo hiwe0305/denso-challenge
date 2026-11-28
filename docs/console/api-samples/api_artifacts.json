@@ -1,0 +1,12 @@
+[
+ {
+  "label": "Báo cáo dữ liệu · src_050b9bf56a4e843c (egodex, 20 tập)",
+  "path": "fwdata/pipeline/src_050b9bf56a4e843c/report",
+  "kind": "dataset_report"
+ },
+ {
+  "label": "Báo cáo dữ liệu · src_158ec3c813ffe9a6 (egodex, 218 tập)",
+  "path": "fwdata/pipeline/src_158ec3c813ffe9a6/report",
+  "kind": "dataset_report"
+ }
+]

@@ -1,0 +1,106 @@
+[
+ {
+  "name": "src_8871de88a18bd8ab",
+  "path": "fwdata/pipeline/src_8871de88a18bd8ab",
+  "source_detail": "ego_video",
+  "root": "fwdata/egocentric-raw/console-test2",
+  "episodes": 2,
+  "tiers": [
+   {
+    "id": "ingest",
+    "label": "Ingest",
+    "state": "done",
+    "n": 2,
+    "total": 2,
+    "note": "2 tập, ego_video",
+    "result": "2 tập · 1.5 MB",
+    "took": 1
+   },
+   {
+    "id": "deid",
+    "label": "Che mặt",
+    "state": "done",
+    "n": 2,
+    "total": 2,
+    "note": "2/2 bản đã che",
+    "result": "2 bản .deid.mp4",
+    "took": 3
+   }
+  ],
+  "summary": {
+   "episodes": 2,
+   "frames": 167,
+   "seconds": 5.57,
+   "segments": 4,
+   "steps": {
+    "pick": 2,
+    "place": 2
+   },
+   "label_sources": {
+    "model": 4
+   },
+   "qa": {
+    "pass": 0,
+    "flag": 2,
+    "reject": 0
+   },
+   "source_id": "src_8871de88a18bd8ab",
+   "root": "fwdata/egocentric-raw/console-test2",
+   "data_class": "public",
+   "has_report": true
+  },
+  "mtime": "2026-11-11T13:25:03+07:00"
+ },
+ {
+  "name": "src_6d78861d658da83d",
+  "path": "fwdata/pipeline/src_6d78861d658da83d",
+  "source_detail": "ego_video",
+  "root": "fwdata/egocentric-raw/console-test",
+  "episodes": 2,
+  "tiers": [
+   {
+    "id": "ingest",
+    "label": "Ingest",
+    "state": "done",
+    "n": 2,
+    "total": 2,
+    "note": "2 tập, ego_video",
+    "result": "2 tập · 1.9 MB",
+    "took": 1
+   },
+   {
+    "id": "deid",
+    "label": "Che mặt",
+    "state": "done",
+    "n": 2,
+    "total": 2,
+    "note": "2/2 bản đã che",
+    "result": "2 bản .deid.mp4",
+    "took": 4
+   }
+  ],
+  "summary": {
+   "episodes": 2,
+   "frames": 207,
+   "seconds": 6.9,
+   "segments": 4,
+   "steps": {
+    "pick": 2,
+    "place": 2
+   },
+   "label_sources": {
+    "model": 4
+   },
+   "qa": {
+    "pass": 0,
+    "flag": 2,
+    "reject": 0
+   },
+   "source_id": "src_6d78861d658da83d",
+   "root": "fwdata/egocentric-raw/console-test",
+   "data_class": "public",
+   "has_report": true
+  },
+  "mtime": "2026-11-11T13:18:23+07:00"
+ }
+]

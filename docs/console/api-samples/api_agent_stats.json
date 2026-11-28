@@ -1,0 +1,25 @@
+{
+ "runs": [
+  {
+   "id": "j-20261111-131935-47e2",
+   "time": "2026-11-11T13:20:11+07:00",
+   "input": "da34-t6-ft-c-70-s0",
+   "findings": 3,
+   "model": "hf.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB:Q4_K_M",
+   "nemotron": true
+  },
+  {
+   "id": "j-20261111-131449-bcd0",
+   "time": "2026-11-11T13:15:23+07:00",
+   "input": "da34-t6-ft-c-70-s0",
+   "findings": 3,
+   "model": "hf.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB:Q4_K_M",
+   "nemotron": true
+  }
+ ],
+ "nemotron_runs": 3,
+ "findings": 6,
+ "last_time": "2026-11-11T13:20:11+07:00",
+ "last_job": "j-20261111-131935-47e2",
+ "last_with_findings": "j-20261111-131935-47e2"
+}
