@@ -334,18 +334,20 @@
  ],
  "colab_sessions": [
   {
-   "session": "da34-t5-ft-cplus-s0",
+   "session": "da48-m",
    "gpu": "L4",
    "state": "stopped",
-   "cap": 17.0,
-   "batch": "batch-20261109-012155"
+   "cap": 30.0,
+   "batch": "batch-20261126-003905",
+   "beat": "2026-11-26T04:21:35Z"
   },
   {
-   "session": "da34-b-70",
+   "session": "da34-b-all",
    "gpu": "A100",
-   "state": "stopped",
+   "state": "stale",
    "cap": 82.0,
-   "batch": "batch-20261111-103700"
+   "batch": "batch-20261111-103700",
+   "beat": "2026-11-12T02:00:20Z"
   }
  ],
  "ds": {

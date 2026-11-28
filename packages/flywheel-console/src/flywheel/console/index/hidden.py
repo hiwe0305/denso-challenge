@@ -23,9 +23,12 @@ import fnmatch
 import functools
 import json
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
+
+from flywheel.console.index import colab
 
 if TYPE_CHECKING:  # tasks imports this module
     from flywheel.console.index.tasks import Manifest, Round
@@ -43,6 +46,9 @@ class Hidden:
     # stories whose work is only the hidden runs' (``withhold_runs[].stories``): their catalog
     # rows are dropped and their ledger rows merge into one "other" row (``story.py``)
     stories: frozenset[str] = frozenset()
+    # serve and eval sessions of runs in ``withhold_eval`` (e.g. ``da34-serve-c70r1-1``): their
+    # result is held, so no presented session list names them; their training session stays
+    held_sessions: tuple[str, ...] = ()
 
     def __bool__(self) -> bool:
         return bool(self.ids)
@@ -56,11 +62,12 @@ class Hidden:
         return isinstance(name, str) and name in self.stories
 
     def session(self, name: Any) -> bool:
-        """``name`` (a Colab session, watcher folder or session name) matches a pattern."""
+        """``name`` (a Colab session, watcher folder or session name) matches a pattern of a
+        hidden run, or of the serve/eval sessions of a held run (``held_sessions``)."""
         return (
             isinstance(name, str)
             and bool(name)
-            and any(fnmatch.fnmatchcase(name, p) for p in self.sessions)
+            and any(fnmatch.fnmatchcase(name, p) for p in self.sessions + self.held_sessions)
         )
 
     def mentions(self, text: Any) -> bool:
@@ -91,11 +98,20 @@ def _mention_rx(h: Hidden) -> re.Pattern[str] | None:
 
 
 # ------------------------------------------------------------------ from the manifest
+def _held_sessions(rnd: Round) -> tuple[str, ...]:
+    """Serve and eval session patterns of the round's ``withhold_eval`` runs."""
+    out: list[str] = []
+    for run in rnd.runs:
+        if run.id in rnd.withhold_eval and run.session:
+            out += [f"*serve*{run.session}*", f"*eval*{run.session}*"]
+    return tuple(out)
+
+
 def of_round(rnd: Round) -> Hidden:
     """The hidden runs of one round."""
     ids = set(rnd.withhold_runs)
     if not ids:
-        return Hidden()
+        return Hidden(held_sessions=_held_sessions(rnd))
     sessions: list[str] = list(rnd.hidden_sessions)
     stories = frozenset(rnd.hidden_stories)
     names: list[str] = []
@@ -121,6 +137,7 @@ def of_round(rnd: Round) -> Hidden:
         tuple(dict.fromkeys(sessions)),
         tuple(dict.fromkeys(n for n in names if n)),
         stories,
+        _held_sessions(rnd),
     )
 
 
@@ -132,6 +149,7 @@ def from_manifest(m: Manifest) -> Hidden:
         tuple(dict.fromkeys(s for p in parts for s in p.sessions)),
         tuple(dict.fromkeys(n for p in parts for n in p.names)),
         frozenset().union(*(p.stories for p in parts)),
+        tuple(dict.fromkeys(s for p in parts for s in p.held_sessions)),
     )
 
 
@@ -272,10 +290,15 @@ def _rows(v: Any, h: Hidden, *keys: str) -> Any:
 
 
 def off_sessions(v: Any, h: Hidden, *keys: str) -> Any:
-    """Rows of ``v`` whose ``keys`` (session or folder names) match no hidden session pattern."""
+    """Rows of ``v`` whose ``keys`` (session or folder names) match no hidden or held session
+    pattern and name no hidden run (``mentions``: ``jig-n``, ``da50-*``...)."""
     if not isinstance(v, list):
         return v
-    return [x for x in v if not (isinstance(x, dict) and any(h.session(x.get(k)) for k in keys))]
+    return [
+        x for x in v
+        if not (isinstance(x, dict) and any(h.session(x.get(k)) or h.mentions(x.get(k))
+                                            for k in keys))
+    ]  # fmt: skip
 
 
 def _fallback(j: dict[str, Any], key: str) -> str | None:
@@ -338,10 +361,11 @@ def _jig(j: dict[str, Any], h: Hidden) -> dict[str, Any]:
             j["train_log_tail"], j["vm_phases"] = [], {}
             if "log_run" in j:
                 j["log_run"] = None
+    now = time.time()  # a session gone stale since the build leaves the live lists
     if "live_evals" in j:
-        j["live_evals"] = off_sessions(j["live_evals"], h, "folder", "session")
+        j["live_evals"] = colab.fresh(off_sessions(j["live_evals"], h, "folder", "session"), now)
     if "active_sessions" in j:
-        j["active_sessions"] = off_sessions(j["active_sessions"], h, "session")
+        j["active_sessions"] = colab.fresh(off_sessions(j["active_sessions"], h, "session"), now)
     if isinstance(j.get("agentqa"), list):
         j["agentqa"] = agentqa(j["agentqa"], h)
     c60 = j.get("compare60")
@@ -414,7 +438,8 @@ def story(doc: Any, h: Hidden) -> Any:
     if "runs" in out:
         out["runs"] = _rows(out["runs"], h, "branch", "run")
     if "colab_sessions" in out:
-        out["colab_sessions"] = off_sessions(out["colab_sessions"], h, "session")
+        out["colab_sessions"] = colab.aged(off_sessions(out["colab_sessions"], h, "session"),
+                                           time.time())  # fmt: skip
     if "ledger" in out:
         out["ledger"] = ledger(out["ledger"], h)
     pair = out.get("pair")
