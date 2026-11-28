@@ -325,6 +325,100 @@ def failure_table(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     return out
 
 
+# ------------------------------------------------------------------ compare_runs_60
+LADDER_RULE_VI = "thành công, hoặc Đặt lệch với khoảng cách ≤ ngưỡng và góc lệch ≤ 10° (không cần tới bàn B)"
+LADDER_RULE_EN = "a success, or Misplaced with distance ≤ the threshold and yaw ≤ 10° (reaching table B not required)"
+
+
+def _share(say: Say, k: Any, n: Any) -> str | None:
+    """``47/60 (78,3 %)``: the count and its share of ``n`` with one decimal; None without both."""
+    if isinstance(k, bool) or not isinstance(k, int) or not isinstance(n, int) or n <= 0:
+        return None
+    return f"{k}/{n} ({say.num(100 * k / n, 1)}{say(' %', '%')})"
+
+
+def _cm(say: Say, t: Any) -> str:
+    """A threshold in cm as the reader writes it: "7,5" in Vietnamese."""
+    try:
+        v = float(t)
+    except (TypeError, ValueError):
+        return str(t)
+    return str(int(v)) if v.is_integer() else say.num(v, 1)
+
+
+def compare_runs_60(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
+    """Run M (repeat 0, 60 rollouts) beside the earlier round's runs on the same 60-rollout
+    ladder (story.jig.compare60.ladder, Hiếu 28/11/2026): success, the relaxed thresholds,
+    reaching table B and the placement spread, each as a count and its share. Side by side only;
+    never a held or hidden run."""
+    say = Say(ctx.get("lang"))
+    holds = _Holds()
+    jig = story().get("jig") or {}
+    c60 = jig.get("compare60") or {}
+    lad = c60.get("ladder") if isinstance(c60, dict) else None
+    if not isinstance(lad, dict) or not isinstance(lad.get("runs"), list):
+        return result({"type": "text", "text": ""}, row("COMPARE60", [("missing", "story.jig.compare60.ladder")]))
+    runs = [r for r in lad["runs"] if isinstance(r, dict) and holds.shown(r.get("run"))]
+    if not runs:
+        return result({"type": "text", "text": ""}, row("COMPARE60", [("missing", "runs")]))
+    n = lad.get("n") if isinstance(lad.get("n"), int) else 60
+    ids = [str(r["run"]) for r in runs]
+    new = str(c60.get("run") or "")
+    rr = lad.get("repeats_range") or []
+    lo, hi = (rr + [None, None])[:2]
+    outcome = next((o for o in jig.get("outcomes") or [] if isinstance(o, dict) and o.get("run") == new), {})
+    reps = len(outcome.get("repeats") or []) or None
+    ths = [str(t) for t in lad.get("thresholds_cm") or []]
+    lines = [
+        row("COMPARE60", [("n", n), ("runs", ",".join(ids)), ("thresholds_cm", ",".join(_cm(say, t) for t in ths)),
+                          ("repeat_of", f"{new} {c60.get('repeat', 0)}" if new else None),
+                          ("repeats_of", new or None), ("repeats_count", reps), ("repeats_min", lo), ("repeats_max", hi),
+                          ("comparable", "no"), ("reading", say("chỉ đặt cạnh nhau", "side by side only"))]),
+        row("RULE", [("relaxed", say(LADDER_RULE_VI, LADDER_RULE_EN)), ("index_rule", lad.get("rule"))]),
+    ]  # fmt: skip
+    def scene(r: dict[str, Any]) -> Any:
+        v = r.get("scene")
+        return v if say.vi or v != "không đồ gá" else "no jig"
+
+    def scorer(r: dict[str, Any]) -> Any:
+        v = r.get("scorer")
+        return v if say.vi or not isinstance(v, str) else v.replace("bản ", "v")
+
+    for r in runs:
+        lines.append(row("RUN", [("run", r.get("run")), ("round", r.get("round")), ("scene", scene(r)),
+                                 ("scorer", scorer(r))]))  # fmt: skip
+    measures: list[tuple[str, dict[str, Any]]] = [
+        (say("Thành công (chuẩn 5 cm)", "Success (5 cm standard)"), {i: _share(say, r.get("success"), n) for i, r in zip(ids, runs)}),
+    ]
+    for t in ths:
+        measures.append((say(f"Nới ≤ {_cm(say, t)} cm", f"Relaxed ≤ {_cm(say, t)} cm"),
+                         {i: _share(say, (r.get("relaxed") or {}).get(t), n) for i, r in zip(ids, runs)}))  # fmt: skip
+    measures.append((say("Tới bàn B", "Reached table B"), {i: _share(say, r.get("reach_b"), n) for i, r in zip(ids, runs)}))
+    ui_rows: list[dict[str, Any]] = []
+    for name, cells in measures:
+        lines.append(row("MEASURE", [("measure", name), *cells.items()]))
+        ui_rows.append({"measure": name, **cells})
+    for i, r in zip(ids, runs):
+        dev = r.get("dev") or {}
+        dn = dev.get("n")
+        d, y = dev.get("dist_cm") or {}, dev.get("yaw_deg") or {}
+        lines.append(row("DEVIATION", [("run", i), ("rollouts_on_table_b", dn), ("dist_p50_cm", _num(say, d.get("p50"))),
+                                       ("dist_p90_cm", _num(say, d.get("p90"))), ("yaw_p50_deg", _num(say, y.get("p50"))),
+                                       ("yaw_p90_deg", _num(say, y.get("p90"))),
+                                       ("yaw_le_10_deg", _share(say, dev.get("yaw_le_10"), dn))]))  # fmt: skip
+    nr = next((r for r in runs if str(r.get("run")) == new), None)
+    if nr is not None and lo is not None and hi is not None:
+        times = say.count(reps) + " lượt lặp" if reps else "các lượt lặp"
+        note = say(f"{new} khác cảnh ({scene(nr)}) và bộ chấm ({scorer(nr)}), chỉ đặt cạnh nhau; {times} của {new}: {lo}–{hi}/{n}.",
+                   f"{new} differs in scene ({scene(nr)}) and scorer ({scorer(nr)}), side by side only; "
+                   f"{reps or 'all'} repeats of {new}: {lo}–{hi}/{n}.")  # fmt: skip
+        lines.append(row("NOTE", [("text", note)]))
+    title = say(f"So sánh {n} lượt", f"{n} rollouts compared")
+    out = result(table(title, cols("measure", *ids), ui_rows, link="#/eval"), "\n".join(lines))
+    out["sources"] = _sources(c60.get("doc"), "docs/he/tray-jig.md §2")
+    return out
+
+
 # ------------------------------------------------------------------ train_progress
 def _points(v: Any) -> list[tuple[float, float]]:
     out: list[tuple[float, float]] = []

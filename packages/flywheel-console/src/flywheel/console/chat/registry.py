@@ -18,7 +18,7 @@ from .tools_data import (
     qa_summary,
 )
 from .tools_ops import KINDS, findings, job_get, job_list, open_page, propose_job
-from .tools_project import failure_table, project_status, train_progress
+from .tools_project import compare_runs_60, failure_table, project_status, train_progress
 from .tools_round import (
     RANK_RX,
     asks_held,
@@ -60,6 +60,7 @@ TOOL_LABELS: dict[str, tuple[str, str]] = {
     "failure_table": ("Bảng lỗi", "Failure table"),
     "train_progress": ("Tiến độ train", "Training progress"),
     "project_status": ("Diễn tiến dự án", "Project status"),
+    "compare_runs_60": ("So sánh 60 lượt", "60 rollouts compared"),
     "ego_summary": ("Video egocentric", "Egocentric video"),
     "catalog_search": ("Tìm bộ dữ liệu", "Dataset search"),
     "dataset_stats": ("Thống kê bộ dữ liệu", "Dataset statistics"),
@@ -124,6 +125,8 @@ TOOLS: dict[str, tuple[ToolFn, str, str, dict[str, Any]]] = {
                          P()),
     "failure_table": (failure_table, "/failures", "Failure labels by run for every round of the task (or the round the question names): one row per failure label with the count of each run, then failed and n per run, the scorer version of each round and whether two rounds can be compared. Never a run whose result is not presented. Call this for every failure type, failure statistics, a table of failures (thống kê lỗi, toàn bộ loại lỗi, bảng lỗi, nhãn lỗi, lỗi theo run).",
                       P(round=("string", "round id, e.g. tray-r1 or tray-jig-r1; omit for every round"))),
+    "compare_runs_60": (compare_runs_60, "/compare60", "Run M (repeat 0, 60 rollouts) set beside the runs of round 1 (C_ALL, C_70, B_ALL, B_70) on one 60-rollout ladder: success, success when the placing threshold is relaxed to 5, 7.5, 10, 15 and 20 cm, rollouts that reached table B, and the placement spread (distance and yaw p50/p90, yaw within 10 degrees), each as count/60 (percent); the scene and scorer of each run, the repeats range of M and the counting rule. Side by side only. Call this to compare M with C_70 or the other runs, for thresholds (≤ 5 / 7,5 / 10 cm, nới ngưỡng), reaching table B (tới bàn B) or placement deviation (độ lệch).",
+                        P()),
     "train_progress": (train_progress, "/train", "Training progress of each run of the round(s): steps done of max, state, steps per second, VM hours by phase (setup, train, persist) and whether they cover the whole run, measured training CU, and the loss as a trend only (first value, end mean, late trend) with the note that training loss is not a measure of the result. Call this for training progress, phases, training logs, loss of a run (tiến độ train, các phase, log training, loss, train mất bao lâu).",
                        P(round=("string", "round id; omit for every round"))),
     "project_status": (project_status, "/status", "Where the project stands: the latest presented result with its numbers, the dated timeline of work since 18/11 with results, the next steps written in the docs, and how the rounds of the task link (default round, previous and next round). Says which parts the index does not have yet. Call this for project status, progress so far, what has been done, what is the latest result, what comes next (tình hình dự án, diễn tiến, đã làm gì, kết quả mới nhất, bước tiếp theo).",
@@ -330,6 +333,11 @@ FAILURE_TABLE_RX = re.compile(r"thống kê.{0,40}lỗi|loại lỗi|nhãn lỗi
                               r"failure (table|labels?|types?|breakdown|counts?|statistics)|(types?|kinds?) of failures?|all (the )?failures|failures? (by|per) (run|type|label)|error types|(chart|plot).{0,30}failures?", re.I)  # fmt: skip
 TRAIN_PROGRESS_RX = re.compile(r"tiến độ.{0,30}(train|huấn luyện)|(train|training|huấn luyện).{0,40}(tiến độ|phase|log)|\bphases?\b|\blogs? (train|training)|"
                                r"training (log|progress|phases?)|đánh giá.{0,30}\blogs?\b|train (đến đâu|tới đâu|bao nhiêu bước)", re.I)  # fmt: skip
+# M beside round 1 on the 60-rollout ladder (Hiếu, 28/11/2026): M with the other runs, a placing
+# threshold, relaxing it, reaching table B, the placement deviation
+COMPARE60_RX = re.compile(r"so sánh (run )?(?-i:M)\b|(?-i:\bM\b)\s*(với|so với|và|vs\.?|versus|against|with)\s*(C_|B_|các run|những run|bốn run|4 run|the (other )?runs)|"
+                          r"(≤|<=|=<|dưới|trong vòng|trong|within|under)\s*(5|7[,.]5|10|15|20)\s*cm|nới (ngưỡng|dung sai)|"
+                          r"(tới|đến|lên) bàn B|độ lệch|compare (run )?(?-i:M)\b|relax\w* (the )?(threshold|tolerance)|reach\w* table B|placement deviation", re.I)  # fmt: skip
 PROJECT_STATUS_RX = re.compile(r"tiến độ (của )?dự án|dự án.{0,30}(đến đâu|tới đâu|thế nào|ra sao|tiến độ|diễn tiến)|diễn tiến|timeline|dòng thời gian|"
                                r"(đã|vừa) làm (được )?(những )?gì|gần đây (đã|có) gì|project (status|progress|timeline)|where (is the project|are we)|what has been done|what('s| is) new", re.I)  # fmt: skip
 # "what should we do / how to improve": the weak points of the latest presented result and the
@@ -389,6 +397,8 @@ def forced_tools(question: Any) -> list[str]:
     q = str(question or "")
     if asks_held(q) and not _LOOKUP_RX.search(q):
         return ["round_report"]
+    if COMPARE60_RX.search(q) and not _dataset_in(strip_round_refs(q)) and not asks_hidden(q):
+        return ["compare_runs_60"]  # M beside round 1 on the 60-rollout ladder
     if RANK_RX.search(q) and not _dataset_in(strip_round_refs(q)):
         # "which run is best / better", a ranking: the test results of the round, never the loss
         return ["round_report"]

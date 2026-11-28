@@ -81,7 +81,7 @@ DYNAMIC: dict[str, list[str]] = {
         "train_progress project_status ego_summary catalog_search dataset_stats "
         "episode_list episode_get qa_summary run_list run_metrics run_compare log_tail "
         "eval_summary eval_failures loop_proposals ledger_query job_list job_get findings "
-        "lineage open_page propose_job"
+        "lineage open_page propose_job compare_runs_60"
     ).split(),
     "runs.metric.": ["loss", "val", "thr", "vram", "gn"],
     "runs.phase.": ["setup", "train"],
