@@ -19,7 +19,9 @@ A round may list ``withhold_runs`` (Hiếu, 28/11/2026, story DA-53): runs it do
 all, each with optional ``sessions`` (fnmatch patterns of its Colab session and eval watcher
 names). Unlike ``withhold_eval`` (only the retest result is held), nothing of such a run reaches a
 page: ``tasks.json`` drops it from the round's ``runs``, writes ``after_round: null`` when it is
-the after-round run and carries no ``withhold_runs`` key (``hidden.py`` holds the filters).
+the after-round run and carries no ``withhold_runs`` key (``hidden.py`` holds the filters). An entry
+may also name ``stories`` whose work is only that run's (e.g. DA-50): their catalog rows are
+dropped and their ledger rows merge into one "other" row (decision Q1, 28/11/2026).
 """
 
 from __future__ import annotations
@@ -39,6 +41,9 @@ PROCESS_STAGES = ("1", "2", "3", "4", "5", "6", "0")
 HOW_KINDS = ("cmd", "config", "module", "doc")
 ROLES = ("baseline", "after_round", "control")
 RULE_KEYS = ("whole_task", "per_level", "place")
+# index keys several rounds may list: their index file holds one block per round (``sim.json``
+# keeps the first such round at the top level and every round under ``rounds``)
+MULTI_ROUND_KEYS = ("sim",)
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -93,6 +98,8 @@ class Round:
     # runs not presented at all (``withhold_runs``) and their session/watcher name patterns
     withhold_runs: tuple[str, ...] = ()
     hidden_sessions: tuple[str, ...] = ()
+    # stories whose work is only the hidden runs' (``withhold_runs[].stories``)
+    hidden_stories: tuple[str, ...] = ()
     # a ``story.jig`` round: scene, eval set, rollouts and scorer the results must match, rules
     scene: str | None = None
     eval_set: str | None = None
@@ -159,8 +166,13 @@ class Manifest:
         return next((r for r in self.rounds if "story.pair" in r.index), None)
 
     def sim_round(self) -> Round | None:
-        """The round whose training cut ``sim.json`` describes (the one listing ``sim``)."""
+        """The round whose training cut the top level of ``sim.json`` describes (the first one
+        listing ``sim``)."""
         return next((r for r in self.rounds if "sim" in r.index), None)
+
+    def sim_rounds(self) -> tuple[Round, ...]:
+        """Every round listing ``sim`` (``sim.json · rounds``), in manifest order."""
+        return tuple(r for r in self.rounds if "sim" in r.index)
 
     def jig_round(self) -> Round | None:
         """The round whose runs ``story.json · jig`` holds (the one listing ``story.jig``)."""
@@ -208,15 +220,16 @@ def _text(d: Any, key: str, where: str) -> dict[str, str]:
 
 def _withhold_runs(
     v: Any, where: str, ids: list[str], kept: dict[str, str]
-) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """Ids and session patterns of ``withhold_runs``; ``kept`` maps the roles a hidden run may
-    not hold (baseline, controls, log_run) to their run id."""
+) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+    """Ids, session patterns and story ids of ``withhold_runs``; ``kept`` maps the roles a
+    hidden run may not hold (baseline, controls, log_run) to their run id."""
     if v is None:
-        return (), ()
+        return (), (), ()
     if not isinstance(v, list):
         raise ManifestError(f"{where}: expected a list of {{id, sessions}}")
     out: list[str] = []
     patterns: list[str] = []
+    stories: list[str] = []
     for j, x in enumerate(v):
         w = f"{where}[{j}]"
         rid = _need(x, "id", w)
@@ -234,9 +247,15 @@ def _withhold_runs(
             not isinstance(ss, list) or not all(isinstance(p, str) and p.strip() for p in ss)
         ):
             raise ManifestError(f"{w}.sessions: expected a list of non-empty strings")
+        st = x.get("stories")
+        if st is not None and (
+            not isinstance(st, list) or not all(isinstance(p, str) and p.strip() for p in st)
+        ):
+            raise ManifestError(f"{w}.stories: expected a list of non-empty story ids")
         out.append(rid)
         patterns += list(ss or [])
-    return tuple(out), tuple(dict.fromkeys(patterns))
+        stories += list(st or [])
+    return tuple(out), tuple(dict.fromkeys(patterns)), tuple(dict.fromkeys(stories))
 
 
 def _stage(s: Any, where: str) -> Stage:
@@ -358,7 +377,7 @@ def _round(r: Any, i: int) -> Round:
     if r.get("log_run") is not None:
         kept["log_run"] = r["log_run"]
     w_hide = f"{where}.withhold_runs"
-    hide, hide_sessions = _withhold_runs(r.get("withhold_runs"), w_hide, ids, kept)
+    hide, hide_sessions, hide_stories = _withhold_runs(r.get("withhold_runs"), w_hide, ids, kept)
     pair = "story.pair" in index  # the stage-1 reads need one train folder and one eval folder
     sha = _opt(r, "conditions_sha256", where, jig)
     if sha is not None and not _SHA256.match(sha):
@@ -388,6 +407,7 @@ def _round(r: Any, i: int) -> Round:
         withhold_eval=withhold,
         withhold_runs=hide,
         hidden_sessions=hide_sessions,
+        hidden_stories=hide_stories,
         scene=_opt(r, "scene", where, False),
         eval_set=_opt(r, "eval_set", where, jig),
         conditions_sha256=sha,
@@ -419,8 +439,10 @@ def parse(data: Any) -> Manifest:
             if next(r for r in rounds if r.id == rid).task != t.id:
                 raise ManifestError(f"task '{t.id}'.rounds: round '{rid}' belongs to another task")
     seen: dict[str, str] = {}
-    for r in rounds:  # one round per index key until the index holds several rounds (phase 2)
+    for r in rounds:  # one round per index key, except keys whose file holds one block per round
         for k in r.index:
+            if k in MULTI_ROUND_KEYS:
+                continue
             if k in seen:
                 raise ManifestError(f"round '{r.id}'.index: '{k}' already belongs to '{seen[k]}'")
             seen[k] = r.id

@@ -556,3 +556,78 @@ cited:
   doc: docs/he/two-table-diagnosis.md
   section: '2.1'
   quote: 'khi còn một mã hệ thống `not_judged`, chẩn đoán duy nhất hợp lệ là `unknown` (CHƯA RÕ).'
+# Round tray-r1 diagnosis for the chat ("vì sao"; audit 04 B4, decision F3 of 28/11/2026):
+# story.json · diag (cited.diag_block). One entry per cluster of tray.md 20.2 (key = first failed
+# step, label, level), one per step-4 check H1-H3, and the host of the targeted generation.
+- key: diag.cluster.c1
+  value: {id: c1, step: place, label: L-PLACE-POSE, level: 1, n_fail: 14}
+  doc: docs/he/tray.md
+  section: '20.2'
+  quote: '| c1 | `place` | `L-PLACE-POSE` | 1 | 14 | Bước 5–8 |'
+- key: diag.cluster.c2
+  value: {id: c2, step: place, label: L-PLACE-POSE, level: 2, n_fail: 12}
+  doc: docs/he/tray.md
+  section: '20.2'
+  quote: '| c2 | `place` | `L-PLACE-POSE` | 2 | 12 | Bước 5–8 |'
+- key: diag.cluster.c3
+  value: {id: c3, step: approach_a, label: L-TIMEOUT, level: 1, n_fail: 4}
+  doc: docs/he/tray.md
+  section: '20.2'
+  quote: '| c3 | `approach_a` | `L-TIMEOUT` | 1 | 4 | Kiểm H2 |'
+- key: diag.cluster.c4
+  value: {id: c4, step: release_stand, label: L-TRAY-TILT, level: 2, n_fail: 4}
+  doc: docs/he/tray.md
+  section: '20.2'
+  quote: '| c4 | `release_stand` | `L-TRAY-TILT` | 2 | 4 | Kiểm H3 |'
+- key: diag.cluster.c5
+  value: {id: c5, step: place, label: L-TRAY-TILT, level: 2, n_fail: 3}
+  doc: docs/he/tray.md
+  section: '20.2'
+  quote: '| c5 | `place` | `L-TRAY-TILT` | 2 | 3 | Kiểm H3 |'
+- key: diag.cluster.c6
+  value: {id: c6, step: approach_a, label: L-PLACE-POSE, level: 2, n_fail: 3}
+  doc: docs/he/tray.md
+  section: '20.2'
+  quote: '| c6 | `approach_a` | `L-PLACE-POSE` | 2 | 3 | Kiểm H1 |'
+- key: diag.cluster.c7
+  value: {id: c7, step: approach_a, label: L-PLACE-POSE, level: 1, n_fail: 2}
+  doc: docs/he/tray.md
+  section: '20.2'
+  quote: '| c7 | `approach_a` | `L-PLACE-POSE` | 1 | 2 | Kiểm H1 |'
+- key: diag.cluster.c8
+  value: {id: c8, step: approach_a, label: L-TIMEOUT, level: 2, n_fail: 2}
+  doc: docs/he/tray.md
+  section: '20.2'
+  quote: '| c8 | `approach_a` | `L-TIMEOUT` | 2 | 2 | Kiểm H2 |'
+- key: diag.step4.H1
+  value: {id: H1, claim: chuỗi bước gãy ở approach_a, clusters: [c6, c7], verdict: CHƯA RÕ (ngưỡng bộ chấm), ticket: DA-37}
+  doc: docs/he/tray.md
+  section: '20.11'
+  quote: '**H1: chuỗi bước gãy ở `approach_a`.** CHƯA RÕ (ngưỡng bộ chấm), phiếu cho DA-37.'
+- key: diag.step4.H2
+  value: {id: H2, claim: hết giờ ở approach_a, clusters: [c3, c8], verdict: lỗi của policy (quyết định R8), ticket: null}
+  doc: docs/he/tray.md
+  section: '20.9'
+  quote: '- R8: c3, c8 đọc là lỗi của policy, đi bước 5–8 cùng c1, c2.'
+- key: diag.step4.H3
+  value: {id: H3, claim: nghiêng lúc hạ và buông, clusters: [c4, c5], verdict: CHƯA RÕ (thiếu tín hiệu), ticket: DA-38}
+  doc: docs/he/tray.md
+  section: '20.11'
+  quote: '**H3: nghiêng lúc hạ và buông.** CHƯA RÕ (thiếu tín hiệu, spec 6.4 mục 1), phiếu cho DA-38.'
+- key: diag.gen_host
+  value: rtx3060
+  doc: docs/he/tray.md
+  section: '20.16'
+  quote: '**Sinh** (lô `round-c70-tgt-1112`, `rtx3060`, 6 worker)'
+# Cost of round tray-jig-r1 (run M), measured: story.json · jig.cost cross-checks the ledger
+# (DA-48, DA-47) against these (audit 02 B14).
+- key: jig.cost.train
+  value: 56.15
+  doc: docs/he/tray-jig.md
+  section: '4'
+  quote: '| Tổng | 56,15 CU (số dư 214,88 xuống 158,73), khoảng 21 giờ train.'
+- key: jig.cost.eval
+  value: 6.8
+  doc: docs/he/tray-jig.md
+  section: '5'
+  quote: 'Chi phí eval, thực đo: một phiên L4 chạy ba server Ψ₀, 2 giờ 24 phút, 6,8 CU'

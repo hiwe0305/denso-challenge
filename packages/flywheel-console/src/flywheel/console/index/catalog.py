@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from flywheel.console.index import cards
+from flywheel.console.index import cards, hidden
 from flywheel.console.paths import ConsolePaths, PathDenied, guard
 
 _GROUPS = {
@@ -179,10 +179,13 @@ def _dir_size(d: Path) -> str:
 def build(paths: ConsolePaths, out: Path) -> dict[str, int]:
     """Write ``out/catalog.json`` and return the counts of rows, edges, runs and cards.
 
-    Rows are the seed rows overlaid with the dataset cards (a bad card raises ``CardError``).
+    Rows are the seed rows overlaid with the dataset cards (a bad card raises ``CardError``),
+    without the rows ``hidden.catalog_rows`` drops (a hidden run's story, e.g. DA-50).
     Only ``out`` is written; nothing under ``fw_root`` changes."""
     seed = _load_seed(paths)
     merged, edges = cards.merged(paths, strict=True)
+    # rows of a hidden run's story or naming a hidden run never reach a page (decision Q1)
+    merged, edges = hidden.catalog_rows(merged, edges, hidden.load(paths))
     rows: list[dict[str, Any]] = []
     for r in merged:
         locs = [_parse_loc(x) for x in r["locations"]]

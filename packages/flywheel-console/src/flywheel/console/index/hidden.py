@@ -11,13 +11,17 @@ index cannot switch the hiding off. ``load`` reads the seed again when its mtime
 
 Unlike ``withhold_eval`` (``server/withhold.py``: only the retest result is held; training, data
 cut and cost stay), nothing of a hidden run is kept, except the ledger: its rows are money already
-spent (story DA-53, decision 28/11/2026 point 2) and ``story.ledger`` is never filtered.
+spent (story DA-53, decision 28/11/2026 point 2). Decision Q1 of 28/11/2026 (audit 00 · Tổng
+hợp): the ledger rows of a hidden story (``withhold_runs[].stories``, e.g. DA-50) are summed into
+one row ``story: "other"`` with the same numbers (``story._ledger``), and the catalog rows of that
+story, or naming a hidden run, are dropped (``catalog_rows``).
 """
 
 from __future__ import annotations
 
 import fnmatch
 import functools
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -36,6 +40,9 @@ class Hidden:
     sessions: tuple[str, ...] = ()
     # job folder, train parent folder, outcome folder, cut and stats file names of hidden runs
     names: tuple[str, ...] = ()
+    # stories whose work is only the hidden runs' (``withhold_runs[].stories``): their catalog
+    # rows are dropped and their ledger rows merge into one "other" row (``story.py``)
+    stories: frozenset[str] = frozenset()
 
     def __bool__(self) -> bool:
         return bool(self.ids)
@@ -43,6 +50,10 @@ class Hidden:
     def run(self, name: Any) -> bool:
         """``name`` is a hidden run id (exact)."""
         return isinstance(name, str) and name in self.ids
+
+    def story(self, name: Any) -> bool:
+        """``name`` is a hidden story id (exact, e.g. ``DA-50``)."""
+        return isinstance(name, str) and name in self.stories
 
     def session(self, name: Any) -> bool:
         """``name`` (a Colab session, watcher folder or session name) matches a pattern."""
@@ -86,6 +97,7 @@ def of_round(rnd: Round) -> Hidden:
     if not ids:
         return Hidden()
     sessions: list[str] = list(rnd.hidden_sessions)
+    stories = frozenset(rnd.hidden_stories)
     names: list[str] = []
     shown_parents = {PurePosixPath(r.train).parent.name for r in rnd.shown_runs if r.train}
     for run in rnd.runs:
@@ -108,6 +120,7 @@ def of_round(rnd: Round) -> Hidden:
         frozenset(ids),
         tuple(dict.fromkeys(sessions)),
         tuple(dict.fromkeys(n for n in names if n)),
+        stories,
     )
 
 
@@ -118,6 +131,7 @@ def from_manifest(m: Manifest) -> Hidden:
         frozenset().union(*(p.ids for p in parts)),
         tuple(dict.fromkeys(s for p in parts for s in p.sessions)),
         tuple(dict.fromkeys(n for p in parts for n in p.names)),
+        frozenset().union(*(p.stories for p in parts)),
     )
 
 
@@ -146,6 +160,45 @@ def load(paths: ConsolePaths) -> Hidden:
         h = Hidden()
     _CACHE[f] = (mtime, h)
     return h
+
+
+# ------------------------------------------------------------------ catalog rows
+def catalog_row(row: Any, h: Hidden) -> bool:
+    """True when a catalog row (seed row or card) belongs to a hidden run: its ``story`` is a
+    hidden story, or any of its text (notes, locations, ids) names a hidden run or session
+    (``mentions``; e.g. ``analysis/da50-clean`` in the notes of the run-N data sets)."""
+    if not h or not isinstance(row, dict):
+        return False
+    if h.story(row.get("story")):
+        return True
+    return h.mentions(json.dumps(row, ensure_ascii=False, default=str))
+
+
+def catalog_rows(
+    rows: list[dict[str, Any]], edges: list[Any], h: Hidden
+) -> tuple[list[dict[str, Any]], list[Any]]:
+    """Catalog rows and edges without the rows of hidden runs (``catalog_row``); the other rows'
+    ``parents``, ``children`` and ``superseded_by`` lose the dropped ids, and an edge with a
+    dropped end is dropped. Unchanged when no run is hidden."""
+    if not h:
+        return rows, edges
+    gone = {str(r.get("id")) for r in rows if catalog_row(r, h)}
+    if not gone:
+        return rows, edges
+    kept: list[dict[str, Any]] = []
+    for r in rows:
+        if str(r.get("id")) in gone:
+            continue
+        r = dict(r)
+        for key in ("parents", "children", "superseded_by"):
+            if isinstance(r.get(key), list):
+                r[key] = [x for x in r[key] if str(x) not in gone]
+        kept.append(r)
+    edges = [
+        e for e in edges
+        if not (isinstance(e, (list, tuple)) and any(str(x) in gone for x in e[:2]))
+    ]  # fmt: skip
+    return kept, edges
 
 
 # ------------------------------------------------------------------ tasks.json
@@ -282,11 +335,44 @@ def agentqa(assemblies: list[Any], h: Hidden) -> list[Any]:
     return out
 
 
+OTHER_STORY = "other"
+OTHER_LABEL = "Thí nghiệm khác (không trình bày)"
+_LEDGER_KEYS = ("est_cu", "mea_cu", "est_usd", "mea_usd")
+
+
+def ledger(rows: Any, h: Hidden) -> Any:
+    """``story.ledger`` with the rows of hidden stories summed into one last row ``story:
+    "other"`` (decision Q1, 28/11/2026), for both shapes: ``{story, label, est_cu, mea_cu,
+    est_usd, mea_usd}`` and the older ``[story, est_usd, mea_usd]``. Numbers are kept."""
+    if not h.stories or not isinstance(rows, list):
+        return rows
+    kept: list[Any] = []
+    obj: dict[str, Any] | None = None
+    old: list[Any] | None = None
+    for r in rows:
+        if isinstance(r, dict) and h.story(r.get("story")):
+            obj = obj or {"story": OTHER_STORY, "label": OTHER_LABEL} | dict.fromkeys(_LEDGER_KEYS)
+            for k in _LEDGER_KEYS:
+                v = r.get(k)
+                if isinstance(v, (int, float)) and not isinstance(v, bool):
+                    obj[k] = round((obj[k] or 0.0) + v, 2)
+        elif isinstance(r, list) and r and h.story(r[0]):
+            old = old or [OTHER_STORY, 0.0, 0.0]
+            for i in (1, 2):
+                v = r[i] if len(r) > i else None
+                if isinstance(v, (int, float)) and not isinstance(v, bool):
+                    old[i] = round(old[i] + v, 2)
+        else:
+            kept.append(r)
+    return kept + [x for x in (obj, old) if x is not None]
+
+
 def story(doc: Any, h: Hidden) -> Any:
     """``story.json`` without the hidden runs, for both shapes of its ``jig`` block (the one of
     ``jig.py``, and the older one whose ``jig.runs`` are eval rows keyed ``run`` while the
-    top-level ``runs`` hold the jig train entries). The ledger is kept. Unchanged when no run is
-    hidden."""
+    top-level ``runs`` hold the jig train entries). The ledger is passed through: an index built
+    since 28/11/2026 already merges hidden stories into one "other" row (``story._ledger``), and
+    ``ledger`` does the same for an older document. Unchanged when no run is hidden."""
     if not h or not isinstance(doc, dict):
         return doc
     out = dict(doc)
