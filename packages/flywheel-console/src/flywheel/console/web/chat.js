@@ -5,6 +5,7 @@ import {
   ensureModels,
   formatNumber,
   getJSON,
+  hasI18nKey,
   postJSON,
   setChatOpen,
   setChildren,
@@ -292,12 +293,21 @@ export async function fetchApiConfig(force = false) {
     if (res.data.ready && (chatStore.remoteModels.length === 0 || force)) {
       const rm = await tryGetJSON("/api/chat/remote_models");
       if (rm.ok && rm.data && Array.isArray(rm.data.models)) {
-        chatStore.remoteModels = rm.data.models;
+        chatStore.remoteModels = rm.data.models.filter(isChatModel);
         emitChatStore("api-config");
       }
     }
   }
   return chatStore.apiConfig;
+}
+
+// A gateway lists every model it sells; the picker shows the ones that can hold a chat.
+const NON_CHAT_MODEL =
+  /(embed|image|imagen|banana|tts|whisper|dall-?e|moderation|rerank|flux|audio|speech|transcri|veo|sora|midjourney|stable-diffusion|seedream|seedance|kling|suno|ocr)/i;
+
+export function isChatModel(m) {
+  const id = typeof m === "string" ? m : (m && (m.id || m.name)) || "";
+  return Boolean(id) && !NON_CHAT_MODEL.test(id);
 }
 
 export async function switchActiveApiModel(newModelId) {
@@ -330,7 +340,7 @@ function suggestionsForPage(pageKey) {
   }
   if (pageKey === "runs") return [t("chat.sug.runs1"), t("chat.sug.default1")];
   if (pageKey === "eval" || pageKey === "loop" || pageKey === "diagnose") {
-    return [t("chat.sug.eval1"), t("chat.sug.default2")];
+    return [t("chat.sug.evalBest"), t("chat.sug.default2")];
   }
   if (pageKey === "jobs" || pageKey === "qa") return [t("chat.sug.jobs1"), t("chat.sug.default1")];
   return [t("chat.sug.default1"), t("chat.sug.default2")];
@@ -1060,6 +1070,15 @@ export async function runSharedTurn(rawQuestion, opts = {}) {
       return;
     }
 
+    if (evName === "retract") {
+      // the server took back text that read like a plan, not an answer (A9)
+      turnObj.rawStream = "";
+      turnObj.answer = "";
+      emitChatStore("stream");
+      renderSidePanelTurns();
+      return;
+    }
+
     if (evName === "token") {
       turnObj.phase = "synth";
       if (dataObj.text) {
@@ -1086,6 +1105,9 @@ export async function runSharedTurn(rawQuestion, opts = {}) {
         ? dataObj.numbers.filter((n) => n && n.grounded)
         : [];
       turnObj.groundedCount = grounded.length;
+      turnObj.round = dataObj.round || null;
+      turnObj.roundMismatch = Array.isArray(dataObj.round_mismatch) ? dataObj.round_mismatch : [];
+      if (!turnObj.answer && dataObj.no_narration) turnObj.error = t("chat.err.empty");
       turnObj.phase = "done";
       if (turnObj.answer) {
         sess.messages.push({ role: "assistant", content: turnObj.answer });
@@ -1096,7 +1118,13 @@ export async function runSharedTurn(rawQuestion, opts = {}) {
     }
 
     if (evName === "error") {
-      turnObj.error = dataObj.message || t("error.network");
+      const code = dataObj.code;
+      turnObj.error = code && hasI18nKey(`chat.err.${code}`) ? t(`chat.err.${code}`) : dataObj.message || t("error.network");
+      if (dataObj.partial) {
+        // keep what was written before the cap, marked as cut short (A6)
+        turnObj.answer = dataObj.partial;
+        turnObj.error = `${turnObj.error} ${t("chat.err.partial")}`;
+      }
       turnObj.fallback = dataObj.fallback || null;
       turnObj.phase = "done";
       emitChatStore("error");
@@ -1325,6 +1353,11 @@ export async function openApiConfigModal() {
                 await ensureModels(true);
                 emitChatStore("api-config");
                 syncChatMeta();
+                if (saved && saved.needs_key) {
+                  // a new host needs its own key: keep the dialog open (S-P0-3)
+                  statusNote.textContent = t("chat.keyNeeded");
+                  return;
+                }
                 statusNote.textContent = t("studio.savedOk");
                 window.setTimeout(() => backdrop.remove(), 350);
               },
@@ -1516,7 +1549,7 @@ function renderSideTurnNode(tr) {
     el("div", { className: "turn-header" }, [
       el("span", {
         className: "turn-header-brand",
-        text: tr.kind === "slash" ? `⚡ ${tr.question.split(/\s+/)[0]}` : `✦ ${t("chat.title")}`,
+        text: tr.kind === "slash" ? `⚡ ${tr.question.split(/\s+/)[0]}` : `✦ ${t("chat.titleAnalysis")}`,
       }),
       isRunning
         ? el("span", { className: "turn-badge-live" }, [
@@ -1590,9 +1623,17 @@ function renderSideTurnNode(tr) {
           tr.groundedCount > 0
             ? el("span", {
                 className: "grounded-pill",
-                text: t("chat.groundedOk", { count: formatNumber(tr.groundedCount) }),
+                text: tr.round
+                  ? t("chat.roundChecked", { count: formatNumber(tr.groundedCount), round: tr.round })
+                  : t("chat.groundedOk", { count: formatNumber(tr.groundedCount) }),
               })
             : el("span", {}),
+          (tr.roundMismatch || []).length > 0
+            ? el("span", {
+                className: "missing-item",
+                text: t("chat.roundMismatch", { nums: tr.roundMismatch.join(", "), round: tr.round || "" }),
+              })
+            : null,
           el("div", { className: "turn-actions" }, [
             tr.artifactId || (tr.steps || []).some((s) => s.artifactId)
               ? el("a", { className: "turn-action-btn", href: "#/chat" }, [
@@ -1632,16 +1673,13 @@ function syncChatMeta() {
     (m && m.chat && m.chat.kind && m.chat.kind !== "ollama");
 
   if (isApiActive) {
-    const provName = (cfg && cfg.provider) || (m && m.chat && m.chat.provider) || "API";
-    const modName = (cfg && cfg.active_model) || (m && m.chat && m.chat.model) || "";
+    // the model and gateway names belong to the config page only (audit Q3, P0-8)
     const ready = cfg ? Boolean(cfg.ready) : Boolean(m && m.chat && m.chat.ready);
-    els.subEl.textContent = `${shortModelLabel(modName)} · ${provName}`;
+    els.subEl.textContent = t("chat.subAnalysis");
     els.statusDot.className = cls("status-dot", ready ? "warm" : "cold");
-    els.modelStatusLabel.textContent = ready
-      ? `${provName} · ${shortModelLabel(modName)}`
-      : `${provName} · ${t("studio.apiNeedsKey")}`;
+    els.modelStatusLabel.textContent = ready ? t("chat.statusReady") : t("chat.keyNeeded");
   } else {
-    els.subEl.textContent = t("chat.sub");
+    els.subEl.textContent = t("chat.subAnalysis");
     els.statusDot.className = cls("status-dot", "cold");
     els.modelStatusLabel.textContent = t("studio.apiNeedsKey");
   }
@@ -2003,7 +2041,7 @@ export function syncChatShell() {
     panel.setAttribute("aria-label", t("chat.ariaLabel"));
   }
   if (titleEl) {
-    titleEl.textContent = t("chat.title");
+    titleEl.textContent = t("chat.titleAnalysis");
   }
   if (closeBtn) {
     closeBtn.setAttribute("aria-label", t("chat.close"));

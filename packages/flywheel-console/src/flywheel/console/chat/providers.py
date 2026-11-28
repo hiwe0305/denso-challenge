@@ -159,7 +159,8 @@ def reset_runtime_config() -> None:
 
 def _current_base() -> str:
     """The base URL ``active()`` uses now (runtime setting, else environment, else saved file)."""
-    return str(_RUNTIME_CFG.get("base_url") or startup_url() or _load_persisted_cfg().get("base_url") or "")
+    base = _RUNTIME_CFG.get("base_url") or startup_url() or _load_persisted_cfg().get("base_url")
+    return str(base or "")
 
 
 def set_runtime_config(body: dict[str, Any], persist: bool = True) -> dict[str, Any]:
@@ -233,7 +234,8 @@ def _resolve_api_key(preset: str = "", base_url: str = "") -> tuple[str, str]:
     env_main = os.environ.get("FW_CHAT_API_KEY", "").strip()
     if env_main and host == _host(startup_url()):
         return env_main, "FW_CHAT_API_KEY"
-    if preset in PROVIDER_PRESETS and preset != "custom" and _host(PROVIDER_PRESETS[preset]["base_url"]) == host:
+    preset_host = _host(PROVIDER_PRESETS[preset]["base_url"]) if preset in PROVIDER_PRESETS else ""
+    if preset != "custom" and preset_host and preset_host == host:
         ek = PROVIDER_PRESETS[preset]["env_key"]
         val = os.environ.get(ek, "").strip()
         if val:
@@ -317,7 +319,10 @@ def active(default_url: str, default_model: str) -> Provider:
     ``FW_CHAT_BASE_URL``, then the saved ``chat_provider.json``, else Nemotron over the tunnel."""
     tunnel = urllib.parse.urlparse(default_url)
     env_base = startup_url()
-    cfg = dict(_RUNTIME_CFG) if _RUNTIME_CFG.get("base_url") else ({} if env_base else _load_persisted_cfg())
+    if _RUNTIME_CFG.get("base_url"):
+        cfg = dict(_RUNTIME_CFG)
+    else:
+        cfg = {} if env_base else _load_persisted_cfg()
     if cfg.get("base_url"):
         base = str(cfg["base_url"]).strip().rstrip("/")
         u = urllib.parse.urlparse(base)
@@ -375,7 +380,11 @@ def problem(p: Provider) -> str | None:
             " (set FW_CHAT_SELF_HOSTED=1 if the server runs on a machine of the team)."
         )
     if remote and not p.key:
-        return f"No API key for {_host(p.base_url) or 'this server'}: enter the key for this host (FW_CHAT_API_KEY is not set for it)."
+        where = _host(p.base_url) or "this server"
+        return (
+            f"No API key for {where}: enter the key for this host "
+            "(FW_CHAT_API_KEY is not set for it)."
+        )
     return None
 
 
