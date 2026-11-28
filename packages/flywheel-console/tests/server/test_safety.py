@@ -186,14 +186,23 @@ HIDDEN_DIRS = [
     "colab/da50-eval-n-20261128-033608",
     "analysis/da50-clean",
 ]
+# folders a later job of the same run would write: not in the manifest, found by their prefix
+LATER_HIDDEN_DIRS = [
+    "tray/jig-n-60000-r3",
+    "tray/eval/jig-n-60000-r3",
+    "tray/outcomes/jig-n_old",
+    "colab/jig-n.bak",
+    "tray/da50-ft-n-s0-retry",
+]
 
 
 def test_fs_and_dir_check_skip_hidden_runs(
     open_srv: Srv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     home = tmp_path / "home"
-    shown = ["tray/jig-m", "tray/outcomes/jig-m-100000-r3", "tray/eval", ".ssh/keys"]
-    for rel in HIDDEN_DIRS + shown:
+    shown = ["tray/jig-m", "tray/jig-new", "tray/outcomes/jig-m-100000-r3", "tray/eval"]
+    shown += [".ssh/keys"]
+    for rel in HIDDEN_DIRS + LATER_HIDDEN_DIRS + shown:
         (home / rel).mkdir(parents=True, exist_ok=True)
     (home / "tray" / "da50-demo.mp4").write_bytes(b"x")
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
@@ -205,10 +214,11 @@ def test_fs_and_dir_check_skip_hidden_runs(
     for rel in ("", "tray", "tray/outcomes", "tray/eval", "colab", "analysis"):
         st, text = listing(rel)
         assert st == 200, rel
-        for needle in ("jig-n", "da50", ".ssh"):
+        for needle in ('jig-n"', "jig-n-", "jig-n_", "jig-n.", "da50", ".ssh"):
             assert needle not in text, (rel, needle)
-    assert "jig-m" in listing("tray")[1]
-    for rel in [*HIDDEN_DIRS, "tray/jig-n", "tray/eval/jig-n-100000-r3", ".ssh"]:
+    assert "jig-m" in listing("tray")[1] and "jig-new" in listing("tray")[1]  # not a prefix
+    later = [*HIDDEN_DIRS, *LATER_HIDDEN_DIRS]
+    for rel in [*later, "tray/jig-n", "tray/eval/jig-n-100000-r3", ".ssh"]:
         for api in ("fs", "dir_check"):
             st, body = open_srv.get(f"/api/{api}?path={home / rel}")
             assert st == 400 and b"l1-000" not in body, (api, rel)
