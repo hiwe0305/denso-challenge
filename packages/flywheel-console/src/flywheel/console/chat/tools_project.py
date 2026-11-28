@@ -377,7 +377,7 @@ def compare_runs_60(args: dict[str, Any], ctx: dict[str, Any]) -> Result:
     reps = len(outcome.get("repeats") or []) or None
     # the relaxed thresholds above the 5 cm standard: "≤ 5 cm" relaxed is the success row again
     std = 5.0
-    ths = [str(t) for t in lad.get("thresholds_cm") or [] if _float(t) is not None and _float(t) > std]
+    ths = [str(t) for t in lad.get("thresholds_cm") or [] if (_float(t) or 0.0) > std]
     lines = [
         row("COMPARE60", [("n", n), ("runs", ",".join(ids)), ("standard_cm", _cm(say, std)),
                           ("relaxed_cm", ",".join(_cm(say, t) for t in ths)),
