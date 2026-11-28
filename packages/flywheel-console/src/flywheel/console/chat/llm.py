@@ -73,7 +73,11 @@ SYSTEM = (
     '{"type": "bar" or "line", "title": "...", "unit": "...", "x": ["label", ...], "series": [{"name": "...", "data": [number, ...]}]}. '
     "At most 12 x labels, 6 series and 2 charts per answer; one number per x label in each series; numbers only from the rows, written with a dot as the decimal mark (75.6, not 75,6); "
     "no other keys, no code, no HTML. A chart never replaces the numbers: always keep the table, or a line with the key numbers, next to it. "
-    "One chart holds the runs of one round only: runs of rounds with a different scene, eval set or scorer never share a chart, since bars side by side read as a ranking. "
+    "One chart holds the runs of one round only: runs of rounds with a different scene, eval set or scorer never share a chart, since bars side by side read as a ranking; the one exception is the COMPARE60 chart below. "
+    "COMPARE60 rows (run M beside the runs of round 1 on 60 rollouts): answer with a table that has the runs as columns and one row per MEASURE "
+    "(add the DEVIATION rows when the question asks about deviation, độ lệch), each cell written exactly as the row gives it, e.g. '47/60 (78,3 %)'. "
+    "In deep analysis only, add one bar chart: x = the success and relaxed measures, one series per run, data = their percents. "
+    "Then the NOTE text as one line starting 'Lưu ý:' / 'Note:'. Never write 'tốt hơn', 'better', 'tăng X điểm' or 'up by'. "
     "Answer only the newest question: earlier questions of the conversation are already answered, so never answer or repeat them. "
     "A follow-up such as 'chi tiết hơn', 'thành bảng', 'vì sao', 'more detail', 'as a table' or 'why' applies to the topic of the previous question; for 'thành bảng' / 'as a table' give the same facts as a table. "
     "GLOSSARY. The task carries a tray from table A to table B: write 'bàn A' / 'bàn B' (table A / table B), never 'bảng A' / 'bảng B'. "

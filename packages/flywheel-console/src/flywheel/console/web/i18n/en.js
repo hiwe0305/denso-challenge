@@ -1167,6 +1167,7 @@ export default {
   "chat.tool.lineage": "Data lineage",
   "chat.tool.open_page": "Open page",
   "chat.tool.propose_job": "Job proposal",
+  "chat.tool.compare_runs_60": "60 rollouts compared",
   "chat.trace.round": "Round: {round}",
   "chat.trace.rows": "{n} rows",
   "chat.trace.steps": "{n} steps",

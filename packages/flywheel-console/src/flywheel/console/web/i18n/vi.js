@@ -1167,6 +1167,7 @@ export default {
   "chat.tool.lineage": "Nguồn gốc dữ liệu",
   "chat.tool.open_page": "Mở trang",
   "chat.tool.propose_job": "Đề xuất job",
+  "chat.tool.compare_runs_60": "So sánh 60 lượt",
   "chat.trace.round": "Vòng: {round}",
   "chat.trace.rows": "{n} dòng",
   "chat.trace.steps": "{n} bước",
